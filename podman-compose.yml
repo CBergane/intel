@@ -19,23 +19,12 @@ services:
       - .env
     environment:
       DB_HOST: db
-      DB_PORT: ${DB_PORT:-5432}
+      DB_PORT: ${DB_PORT}
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+    ports:
+      - "8000:8000"
     depends_on:
       - db
-    restart: unless-stopped
-    # Rekommenderat när du kör via Cloudflare Tunnel:
-    # - exponera inte 8000 publikt
-    # Om du vill testa lokalt på hosten: behåll 127.0.0.1-bindningen nedan.
-    ports:
-      - "127.0.0.1:8000:8000"
-
-  tunnel:
-    image: docker.io/cloudflare/cloudflared:latest
-    env_file:
-      - .env
-    command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
-    depends_on:
-      - web
     restart: unless-stopped
 
 volumes:
