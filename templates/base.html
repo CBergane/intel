@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" class="h-full bg-slate-950">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}BorealSec Intel{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        night: "#070a11",
+                        panel: "#0f172a",
+                        line: "#1e293b",
+                        accent: "#38bdf8",
+                        accent2: "#22d3ee"
+                    },
+                    boxShadow: {
+                        glow: "0 0 0 1px rgba(34,211,238,0.18), 0 10px 30px rgba(2,8,23,0.8)"
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="min-h-full bg-gradient-to-b from-night via-slate-950 to-slate-900 text-slate-100">
+    <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <header class="mb-8 rounded-2xl border border-line bg-panel/80 p-5 shadow-glow backdrop-blur">
+            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <a href="/" class="text-2xl font-semibold tracking-tight text-white">BorealSec Intel</a>
+                    <p class="mt-1 text-sm text-slate-400">Public cybersecurity intelligence dashboard</p>
+                </div>
+                <nav class="flex flex-wrap gap-2 text-sm">
+                    <a href="/" class="rounded-lg px-3 py-2 {% if current_page == 'now' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Now</a>
+                    <a href="/active" class="rounded-lg px-3 py-2 {% if current_page == 'active' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Active</a>
+                    <a href="/advisories" class="rounded-lg px-3 py-2 {% if current_page == 'advisories' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Advisories</a>
+                    <a href="/research" class="rounded-lg px-3 py-2 {% if current_page == 'research' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Research</a>
+                    <a href="/sweden" class="rounded-lg px-3 py-2 {% if current_page == 'sweden' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Sweden</a>
+                    <a href="/feed-health" class="rounded-lg px-3 py-2 {% if current_page == 'feed-health' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Feed Health</a>
+                    <a href="/sources" class="rounded-lg px-3 py-2 {% if current_page == 'sources' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Sources</a>
+                    <a href="/about" class="rounded-lg px-3 py-2 {% if current_page == 'about' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">About</a>
+                </nav>
+            </div>
+        </header>
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

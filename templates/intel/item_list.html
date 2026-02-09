@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="space-y-5">
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+        <h1 class="text-xl font-semibold text-white">{{ page_title }}</h1>
+        <p class="mt-1 text-sm text-slate-400">Fresh items from trusted feeds with safe text-only summaries.</p>
+    </div>
+
+    <form method="get" class="grid gap-3 rounded-2xl border border-line bg-panel/80 p-4 md:grid-cols-4">
+        <div class="md:col-span-2">
+            <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_q">Search</label>
+            <input id="id_q" name="q" value="{{ query }}" placeholder="CVE, vendor, keyword" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none">
+        </div>
+        <div>
+            <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_source">Source</label>
+            <select id="id_source" name="source" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none">
+                <option value="">All sources</option>
+                {% for source in sources %}
+                    <option value="{{ source.slug }}" {% if selected_source == source.slug %}selected{% endif %}>{{ source.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_time">Time</label>
+            <select id="id_time" name="time" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none">
+                {% for value, label in time_options %}
+                    <option value="{{ value }}" {% if selected_time == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="md:col-span-4 flex flex-wrap gap-2">
+            <button type="submit" class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400">Apply filters</button>
+            <a href="{{ request.path }}" class="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800">Reset</a>
+        </div>
+    </form>
+
+    <div class="space-y-4">
+        {% for item in page_obj.object_list %}
+            <article class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <div class="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                    <span class="rounded bg-slate-800 px-2 py-1 text-slate-300">{{ item.source.name }}</span>
+                    <span class="rounded bg-slate-800 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
+                    <time datetime="{{ item.published_at|date:'c' }}">{{ item.published_at|date:"Y-m-d H:i" }} UTC</time>
+                </div>
+                <h2 class="text-lg font-medium text-white">
+                    {% if item.url %}
+                        <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="hover:text-accent">{{ item.title }}</a>
+                    {% else %}
+                        {{ item.title }}
+                    {% endif %}
+                </h2>
+                {% if item.summary %}
+                    <p class="mt-2 text-sm leading-6 text-slate-300">{{ item.summary }}</p>
+                {% endif %}
+            </article>
+        {% empty %}
+            <div class="rounded-2xl border border-line bg-panel/80 p-8 text-center text-slate-400">
+                No items matched the current filters.
+            </div>
+        {% endfor %}
+    </div>
+
+    {% if page_obj.paginator.count > 0 %}
+        <div class="flex items-center justify-between rounded-2xl border border-line bg-panel/80 p-4 text-sm text-slate-300">
+            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} items)</span>
+            <div class="flex gap-2">
+                {% if page_obj.has_previous %}
+                    <a class="rounded border border-slate-600 px-3 py-1 hover:bg-slate-800" href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.previous_page_number }}">Newer</a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                    <a class="rounded border border-slate-600 px-3 py-1 hover:bg-slate-800" href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.next_page_number }}">Older</a>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

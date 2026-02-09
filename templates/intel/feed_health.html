@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load intel_extras %}
+
+{% block title %}Feed Health | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="space-y-5">
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+        <h1 class="text-xl font-semibold text-white">Feed Health</h1>
+        <p class="mt-1 text-sm text-slate-400">Monitor freshness and ingestion errors per feed.</p>
+    </div>
+
+    <div class="overflow-x-auto rounded-2xl border border-line bg-panel/80 shadow-glow">
+        <table class="min-w-full text-sm">
+            <thead class="bg-slate-900 text-slate-300">
+                <tr>
+                    <th class="px-3 py-2 text-left">Source</th>
+                    <th class="px-3 py-2 text-left">Feed</th>
+                    <th class="px-3 py-2 text-left">Type</th>
+                    <th class="px-3 py-2 text-left">Last Success</th>
+                    <th class="px-3 py-2 text-left">Last Run</th>
+                    <th class="px-3 py-2 text-left">Status</th>
+                    <th class="px-3 py-2 text-left">Error</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for feed in feeds %}
+                    <tr class="border-t border-line text-slate-200">
+                        <td class="px-3 py-2">{{ feed.source.name }}</td>
+                        <td class="px-3 py-2">{{ feed.name }}</td>
+                        <td class="px-3 py-2">{{ feed.feed_type|upper }}</td>
+                        <td class="px-3 py-2">
+                            {% if feed.last_success_at %}
+                                {{ feed.last_success_at|date:"Y-m-d H:i" }} UTC
+                            {% else %}
+                                never
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-2">
+                            {% with latest=latest_by_feed|get_item:feed.id %}
+                                {% if latest %}
+                                    {{ latest.started_at|date:"Y-m-d H:i" }} UTC
+                                {% else %}
+                                    -
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="px-3 py-2">
+                            {% with latest=latest_by_feed|get_item:feed.id %}
+                                {% if latest and latest.ok %}
+                                    <span class="rounded bg-emerald-500/20 px-2 py-1 text-emerald-300">ok</span>
+                                {% elif latest %}
+                                    <span class="rounded bg-rose-500/20 px-2 py-1 text-rose-300">error</span>
+                                {% else %}
+                                    <span class="rounded bg-slate-700 px-2 py-1 text-slate-300">unknown</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="px-3 py-2 text-xs text-slate-400">{{ feed.last_error|truncatechars:90|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-3 py-6 text-center text-slate-400">No feeds configured yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

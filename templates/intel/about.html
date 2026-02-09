@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}About | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="space-y-5">
+    <div class="rounded-2xl border border-line bg-panel/80 p-6 shadow-glow">
+        <h1 class="text-xl font-semibold text-white">About</h1>
+        <p class="mt-3 text-sm leading-6 text-slate-300">BorealSec Intel is a read-only dashboard for public cybersecurity intelligence. It ingests allowlisted RSS/Atom feeds, normalizes and deduplicates entries, and displays sanitized summaries with transparent feed freshness.</p>
+        <ul class="mt-4 space-y-2 text-sm text-slate-300">
+            <li>Safe-by-default rendering: fetched HTML is sanitized into text before display.</li>
+            <li>Deterministic ingestion: each entry gets a stable id and duplicate checks.</li>
+            <li>Operational visibility: feed-health captures success/error and recency.</li>
+        </ul>
+    </div>
+</section>
+{% endblock %}

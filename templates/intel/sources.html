@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Sources | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="space-y-5">
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+        <h1 class="text-xl font-semibold text-white">Sources</h1>
+        <p class="mt-1 text-sm text-slate-400">Allowlisted publishers and their feed coverage.</p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {% for source in sources %}
+            <article class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <h2 class="text-lg font-medium text-white">{{ source.name }}</h2>
+                <p class="mt-1 text-xs text-slate-400">slug: {{ source.slug }}</p>
+                {% if source.homepage %}
+                    <p class="mt-2 text-sm"><a class="text-accent hover:text-accent2" href="{{ source.homepage }}" target="_blank" rel="noopener noreferrer">{{ source.homepage }}</a></p>
+                {% endif %}
+                <div class="mt-3 flex items-center gap-3 text-sm text-slate-300">
+                    <span>{{ source.feed_count }} feeds</span>
+                    <span>{{ source.item_count }} items</span>
+                </div>
+                {% if source.tags %}
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        {% for tag in source.tags %}
+                            <span class="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </article>
+        {% empty %}
+            <div class="rounded-2xl border border-line bg-panel/80 p-8 text-center text-slate-400 md:col-span-2 xl:col-span-3">
+                No sources configured yet.
+            </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
