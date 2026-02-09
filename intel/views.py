@@ -1,8 +1,16 @@
+import re
+from collections import Counter
 from datetime import timedelta
+from io import StringIO
 
+from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
+from django.core.management import call_command
 from django.db.models import Count, Q
-from django.shortcuts import render
+from django.db.models.functions import Coalesce
+from django.shortcuts import redirect, render
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
 from .models import Feed, FetchRun, Item, Source
@@ -20,6 +28,84 @@ TIME_OPTIONS = [
     ("90d", "Last 90 days"),
 ]
 NOW_MAX_PER_SOURCE = 10
+CVE_RE = re.compile(r"\bCVE-\d{4}-\d+\b", re.IGNORECASE)
+HIGH_SIGNAL_KEYWORDS = (
+    "actively exploited",
+    "zero-day",
+    "0day",
+    "kev",
+    "rce",
+    "critical",
+    "remote code",
+    "authentication bypass",
+)
+
+
+def extract_cve_ids(text: str) -> list[str]:
+    seen = set()
+    cves = []
+    for match in CVE_RE.findall(text or ""):
+        cve = match.upper()
+        if cve in seen:
+            continue
+        seen.add(cve)
+        cves.append(cve)
+    return cves
+
+
+def _item_text(item) -> str:
+    return f"{item.title or ''}\n{item.summary or ''}"
+
+
+def _item_cves(item) -> list[str]:
+    return extract_cve_ids(_item_text(item))
+
+
+def score_dashboard_item(item, *, cves=None) -> int:
+    if cves is None:
+        cves = _item_cves(item)
+
+    score = 0
+    if cves:
+        score += 20
+
+    lowered_text = _item_text(item).lower()
+    if any(keyword in lowered_text for keyword in HIGH_SIGNAL_KEYWORDS):
+        score += 10
+
+    if item.feed.section in {Feed.Section.ADVISORIES, Feed.Section.SWEDEN}:
+        score += 5
+
+    return score
+
+
+def _attach_item_meta(items):
+    for item in items:
+        item.cves = _item_cves(item)
+        item.activity_at = getattr(item, "activity_at", None) or item.published_at or item.created_at
+    return items
+
+
+def _balanced_items(queryset, *, limit: int, per_source_max: int):
+    source_counts = {}
+    balanced = []
+    for item in queryset:
+        count = source_counts.get(item.source_id, 0)
+        if count >= per_source_max:
+            continue
+        balanced.append(item)
+        source_counts[item.source_id] = count + 1
+        if len(balanced) >= limit:
+            break
+    return _attach_item_meta(balanced)
+
+
+def build_trending_cves(items, *, limit: int = 10):
+    counts = Counter()
+    for item in items:
+        for cve in _item_cves(item):
+            counts[cve] += 1
+    return counts.most_common(limit)
 
 
 def _filtered_items(request, section=None, *, balance_per_source=False):
@@ -56,6 +142,7 @@ def _filtered_items(request, section=None, *, balance_per_source=False):
     else:
         paginator = Paginator(ordered, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
+    page_obj.object_list = _attach_item_meta(list(page_obj.object_list))
 
     return {
         "page_obj": page_obj,
@@ -79,9 +166,101 @@ def _render_items_page(request, *, title, nav_key, section=None):
 
 
 def now_view(request):
-    context = _filtered_items(request, section=None, balance_per_source=True)
-    context.update({"page_title": "Now", "current_page": "now"})
-    return render(request, "intel/item_list.html", context)
+    now = timezone.now()
+    # Item.created_at is our ingestion-time fallback when feeds lack publish timestamps.
+    item_base = Item.objects.select_related("source", "feed").annotate(
+        activity_at=Coalesce("published_at", "created_at")
+    )
+    ordered_by_activity = item_base.order_by("-activity_at", "-id")
+
+    high_candidates = list(
+        ordered_by_activity.filter(activity_at__gte=now - timedelta(days=7))[:400]
+    )
+    for item in high_candidates:
+        item.cves = _item_cves(item)
+        item.activity_at = item.activity_at or item.published_at or item.created_at
+        item.dashboard_score = score_dashboard_item(item, cves=item.cves)
+    high_candidates.sort(
+        key=lambda item: (item.dashboard_score, item.activity_at, item.id),
+        reverse=True,
+    )
+    high_signal_items = high_candidates[:15]
+
+    advisories_items = _balanced_items(
+        ordered_by_activity.filter(feed__section=Feed.Section.ADVISORIES),
+        limit=20,
+        per_source_max=8,
+    )
+    research_items = _balanced_items(
+        ordered_by_activity.filter(
+            feed__section=Feed.Section.RESEARCH,
+            activity_at__gte=now - timedelta(days=30),
+        ),
+        limit=15,
+        per_source_max=6,
+    )
+
+    sweden_source_ids = []
+    for source in Source.objects.only("id", "tags"):
+        tags = {str(tag).strip().lower() for tag in (source.tags or [])}
+        if "sweden" in tags:
+            sweden_source_ids.append(source.id)
+    sweden_items = _attach_item_meta(
+        list(
+            item_base.filter(
+                Q(feed__section=Feed.Section.SWEDEN) | Q(source_id__in=sweden_source_ids)
+            ).order_by("-activity_at", "-id")[:10]
+        )
+    )
+
+    trending_sources = list(
+        Item.objects.annotate(activity_at=Coalesce("published_at", "created_at"))
+        .filter(activity_at__gte=now - timedelta(hours=48))
+        .values("source__name", "source__slug")
+        .annotate(item_count=Count("id"))
+        .order_by("-item_count", "source__name")[:8]
+    )
+    trending_cves = build_trending_cves(
+        list(ordered_by_activity.filter(activity_at__gte=now - timedelta(days=7))[:400]),
+        limit=10,
+    )
+
+    enabled_feeds = list(Feed.objects.filter(enabled=True).only("id"))
+    latest_by_feed = {}
+    for run in FetchRun.objects.filter(feed__enabled=True).order_by("-started_at"):
+        if run.feed_id not in latest_by_feed:
+            latest_by_feed[run.feed_id] = run
+    feed_status_counts = {"ok": 0, "error": 0, "never": 0}
+    for feed in enabled_feeds:
+        latest = latest_by_feed.get(feed.id)
+        if latest is None:
+            feed_status_counts["never"] += 1
+        elif latest.ok:
+            feed_status_counts["ok"] += 1
+        else:
+            feed_status_counts["error"] += 1
+
+    last_ingest_finished_at = (
+        FetchRun.objects.filter(finished_at__isnull=False)
+        .order_by("-finished_at")
+        .values_list("finished_at", flat=True)
+        .first()
+    )
+
+    context = {
+        "page_title": "Now",
+        "current_page": "now",
+        "high_signal_items": high_signal_items,
+        "advisories_items": advisories_items,
+        "research_items": research_items,
+        "sweden_items": sweden_items,
+        "trending_sources": trending_sources,
+        "trending_cves": trending_cves,
+        "feed_status_counts": feed_status_counts,
+        "enabled_feed_count": len(enabled_feeds),
+        "last_ingest_finished_at": last_ingest_finished_at,
+    }
+    return render(request, "intel/dashboard.html", context)
 
 
 def active_view(request):
@@ -168,5 +347,125 @@ def about_view(request):
         {
             "current_page": "about",
             "page_title": "About",
+        },
+    )
+
+
+def _run_ops_command(request, *, command_name: str, args: list[str], label: str):
+    output = StringIO()
+    try:
+        call_command(command_name, *args, stdout=output, stderr=output)
+        text = output.getvalue().strip() or f"{label} completed."
+        messages.success(request, f"{label} completed.\n{text[:8000]}")
+    except Exception as exc:
+        base = output.getvalue().strip()
+        detail = f"{base}\n{exc}" if base else str(exc)
+        messages.error(request, f"{label} failed.\n{detail[:8000]}")
+
+
+@staff_member_required
+def ops_dashboard(request):
+    actions = {
+        "ingest": ("ingest_sources", [], "Ingest run"),
+        "prune": ("prune_items", [], "Prune run"),
+        "prune_dry_run": ("prune_items", ["--dry-run"], "Prune dry-run"),
+        "seed": ("seed_sources", [], "Seed run"),
+    }
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action in actions:
+            command_name, args, label = actions[action]
+            _run_ops_command(
+                request,
+                command_name=command_name,
+                args=args,
+                label=label,
+            )
+        else:
+            messages.error(request, "Unknown action.")
+        return redirect("ops-dashboard")
+
+    enabled_feeds_qs = Feed.objects.filter(enabled=True).select_related("source")
+    enabled_feeds = list(enabled_feeds_qs.order_by("source__name", "name"))
+
+    enabled_feeds_count = len(enabled_feeds)
+    ok_count = enabled_feeds_qs.filter(last_success_at__isnull=False, last_error="").count()
+    error_count = enabled_feeds_qs.exclude(last_error="").count()
+    never_run_count = enabled_feeds_qs.filter(last_success_at__isnull=True).count()
+
+    latest_finished = (
+        FetchRun.objects.filter(finished_at__isnull=False)
+        .order_by("-finished_at")
+        .values_list("finished_at", flat=True)
+        .first()
+    )
+    if latest_finished is None:
+        latest_finished = (
+            FetchRun.objects.order_by("-started_at")
+            .values_list("started_at", flat=True)
+            .first()
+        )
+
+    latest_run_by_feed = {}
+    feed_ids = [feed.id for feed in enabled_feeds]
+    if feed_ids:
+        for run in FetchRun.objects.filter(feed_id__in=feed_ids).order_by("feed_id", "-started_at"):
+            if run.feed_id not in latest_run_by_feed:
+                latest_run_by_feed[run.feed_id] = run
+
+    feed_rows = []
+    for feed in enabled_feeds:
+        latest_run = latest_run_by_feed.get(feed.id)
+        if latest_run is not None:
+            if latest_run.ok:
+                status = "ok"
+            elif latest_run.error or feed.last_error:
+                status = "error"
+            else:
+                status = "error"
+            last_run_at = latest_run.finished_at or latest_run.started_at
+        else:
+            if feed.last_success_at is None:
+                status = "never"
+            elif feed.last_error:
+                status = "error"
+            else:
+                status = "ok"
+            last_run_at = None
+
+        feed_rows.append(
+            {
+                "feed": feed,
+                "latest_run": latest_run,
+                "status": status,
+                "last_run_at": last_run_at,
+            }
+        )
+
+    recent_runs = list(
+        FetchRun.objects.select_related("feed", "feed__source").order_by("-started_at")[:50]
+    )
+
+    feed_list_url = None
+    try:
+        feed_list_url = reverse("admin:intel_feed_changelist")
+    except NoReverseMatch:
+        feed_list_url = None
+
+    return render(
+        request,
+        "intel/ops_dashboard.html",
+        {
+            "page_title": "Ops",
+            "current_page": "ops",
+            "enabled_feeds_count": enabled_feeds_count,
+            "ok_count": ok_count,
+            "error_count": error_count,
+            "never_run_count": never_run_count,
+            "last_ingest_at": latest_finished,
+            "feed_rows": feed_rows,
+            "recent_runs": recent_runs,
+            "feed_list_url": feed_list_url,
         },
     )

@@ -1,0 +1,31 @@
+{% load humanize %}
+<article class="min-w-0 overflow-hidden rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+    <div class="mb-2 flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
+        <span class="max-w-[14rem] truncate rounded bg-slate-800 px-2 py-1 text-slate-300">
+            {{ item.source.name }}
+        </span>
+        <span class="rounded bg-slate-800 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
+        <time datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
+            {{ item.activity_at|naturaltime }}
+        </time>
+    </div>
+    <h2 class="{% if compact %}text-base{% else %}text-lg{% endif %} min-w-0 break-words font-medium text-white">
+        {% if item.url %}
+            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block overflow-hidden break-words hover:text-accent">{{ item.title|truncatechars:170 }}</a>
+        {% else %}
+            {{ item.title|truncatechars:170 }}
+        {% endif %}
+    </h2>
+    {% if item.cves %}
+        <div class="mt-2 flex flex-wrap gap-2">
+            {% for cve in item.cves|slice:":3" %}
+                <a href="/advisories?q={{ cve|urlencode }}" class="rounded bg-sky-500/15 px-2 py-1 text-xs font-medium text-sky-200 hover:bg-sky-500/25">{{ cve }}</a>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% if item.summary %}
+  <p class="mt-2 max-h-28 overflow-hidden break-words text-sm leading-6 text-slate-300">
+    {{ item.summary|striptags|truncatechars:380 }}
+  </p>
+{% endif %}
+</article>

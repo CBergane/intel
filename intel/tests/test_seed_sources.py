@@ -4,7 +4,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from intel.models import Feed, Source
-from intel.tier1_sources import TIER1_SOURCES
+from intel.tier1_sources import DISABLED_FEED_URLS, TIER1_SOURCES
 
 
 def _find_feed_config(source_slug: str):
@@ -76,3 +76,20 @@ class SeedSourcesCommandTests(TestCase):
         self.assertEqual(cert.slug, "cert-se")
         self.assertEqual(Source.objects.filter(name="CERT-SE").count(), 1)
         self.assertFalse(Source.objects.filter(slug="cert").exists())
+
+    def test_seed_sources_disables_known_broken_feed_urls(self):
+        source = Source.objects.create(name="Legacy Source", slug="legacy-source")
+        broken_url = next(iter(DISABLED_FEED_URLS))
+        feed = Feed.objects.create(
+            source=source,
+            name="Legacy Broken Feed",
+            url=broken_url,
+            feed_type=Feed.FeedType.RSS,
+            section=Feed.Section.ADVISORIES,
+            enabled=True,
+        )
+
+        call_command("seed_sources")
+        feed.refresh_from_db()
+
+        self.assertFalse(feed.enabled)

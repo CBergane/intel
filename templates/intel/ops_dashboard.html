@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Ops | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="space-y-5">
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+        <h1 class="text-xl font-semibold text-white">Ops Dashboard</h1>
+        <p class="mt-1 text-sm text-slate-400">Internal feed health and operational controls.</p>
+    </div>
+
+    {% if messages %}
+        <div class="space-y-3">
+            {% for message in messages %}
+                <div class="rounded-xl border {% if message.tags == 'error' %}border-rose-500/40 bg-rose-900/30 text-rose-100{% else %}border-emerald-500/40 bg-emerald-900/30 text-emerald-100{% endif %} p-3 text-sm">
+                    <pre class="whitespace-pre-wrap break-words">{{ message }}</pre>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div class="rounded-xl border border-line bg-panel/80 p-4 shadow-glow">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Enabled Feeds</p>
+            <p class="mt-2 text-2xl font-semibold text-white">{{ enabled_feeds_count }}</p>
+        </div>
+        <div class="rounded-xl border border-line bg-panel/80 p-4 shadow-glow">
+            <p class="text-xs uppercase tracking-wide text-slate-400">OK</p>
+            <p class="mt-2 text-2xl font-semibold text-emerald-300">{{ ok_count }}</p>
+        </div>
+        <div class="rounded-xl border border-line bg-panel/80 p-4 shadow-glow">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Error</p>
+            <p class="mt-2 text-2xl font-semibold text-rose-300">{{ error_count }}</p>
+        </div>
+        <div class="rounded-xl border border-line bg-panel/80 p-4 shadow-glow">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Never Run</p>
+            <p class="mt-2 text-2xl font-semibold text-amber-300">{{ never_run_count }}</p>
+        </div>
+        <div class="rounded-xl border border-line bg-panel/80 p-4 shadow-glow">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Last Ingest</p>
+            <p class="mt-2 text-sm font-medium text-white">
+                {% if last_ingest_at %}
+                    <span title="{{ last_ingest_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_at|naturaltime }}</span>
+                {% else %}
+                    never
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-12">
+        <div class="space-y-4 lg:col-span-8">
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <h2 class="mb-3 text-base font-semibold text-white">Feed Health (Enabled)</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
+                            <tr>
+                                <th class="px-2 py-2">Source</th>
+                                <th class="px-2 py-2">Feed</th>
+                                <th class="px-2 py-2">Type</th>
+                                <th class="px-2 py-2">Section</th>
+                                <th class="px-2 py-2">Last Success</th>
+                                <th class="px-2 py-2">Last Run</th>
+                                <th class="px-2 py-2">Status</th>
+                                <th class="px-2 py-2">HTTP</th>
+                                <th class="px-2 py-2">New</th>
+                                <th class="px-2 py-2">Updated</th>
+                                <th class="px-2 py-2">Duration</th>
+                                <th class="px-2 py-2">Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in feed_rows %}
+                                <tr class="border-b border-line/60 align-top text-slate-200">
+                                    <td class="px-2 py-2">{{ row.feed.source.name|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ row.feed.name }}</td>
+                                    <td class="px-2 py-2">{{ row.feed.feed_type|upper }}</td>
+                                    <td class="px-2 py-2">{{ row.feed.get_section_display }}</td>
+                                    <td class="px-2 py-2">
+                                        {% if row.feed.last_success_at %}
+                                            <span title="{{ row.feed.last_success_at|date:'Y-m-d H:i' }} UTC">{{ row.feed.last_success_at|naturaltime }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-2 py-2">
+                                        {% if row.last_run_at %}
+                                            <span title="{{ row.last_run_at|date:'Y-m-d H:i' }} UTC">{{ row.last_run_at|naturaltime }}</span>
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-2 py-2">
+                                        {% if row.status == "ok" %}
+                                            <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
+                                        {% elif row.status == "error" %}
+                                            <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
+                                        {% else %}
+                                            <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">never</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-2 py-2">{{ row.latest_run.http_status|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ row.latest_run.items_new|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ row.latest_run.items_updated|default:"-" }}</td>
+                                    <td class="px-2 py-2">
+                                        {% if row.latest_run and row.latest_run.duration_ms %}
+                                            {{ row.latest_run.duration_ms }}ms
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="max-w-xs px-2 py-2 text-xs text-slate-400 break-words">
+                                        {{ row.latest_run.error|default:row.feed.last_error|truncatechars:200|default:"-" }}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="12" class="px-2 py-6 text-center text-slate-400">No enabled feeds.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <h2 class="mb-3 text-base font-semibold text-white">Recent Runs</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
+                            <tr>
+                                <th class="px-2 py-2">When</th>
+                                <th class="px-2 py-2">Feed</th>
+                                <th class="px-2 py-2">OK</th>
+                                <th class="px-2 py-2">HTTP</th>
+                                <th class="px-2 py-2">New</th>
+                                <th class="px-2 py-2">Updated</th>
+                                <th class="px-2 py-2">Duration</th>
+                                <th class="px-2 py-2">Error</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for run in recent_runs %}
+                                <tr class="border-b border-line/60 align-top text-slate-200">
+                                    <td class="px-2 py-2">
+                                        {% with when=run.finished_at|default:run.started_at %}
+                                            <span title="{{ when|date:'Y-m-d H:i' }} UTC">{{ when|naturaltime }}</span>
+                                        {% endwith %}
+                                    </td>
+                                    <td class="px-2 py-2">
+                                        {% if feed_list_url %}
+                                            <a href="{{ feed_list_url }}" class="text-sky-300 hover:text-sky-200">{{ run.feed.name }}</a>
+                                        {% else %}
+                                            {{ run.feed.name }}
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-2 py-2">
+                                        {% if run.ok %}
+                                            <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
+                                        {% else %}
+                                            <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="px-2 py-2">{{ run.http_status|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ run.items_new }}</td>
+                                    <td class="px-2 py-2">{{ run.items_updated }}</td>
+                                    <td class="px-2 py-2">
+                                        {% if run.duration_ms %}
+                                            {{ run.duration_ms }}ms
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                    <td class="max-w-xs px-2 py-2 text-xs text-slate-400 break-words">{{ run.error|truncatechars:200|default:"-" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="8" class="px-2 py-6 text-center text-slate-400">No runs yet.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <aside class="space-y-4 lg:col-span-4">
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <h2 class="mb-3 text-base font-semibold text-white">Actions</h2>
+                <div class="space-y-3">
+                    <form method="post" action="/ops/">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="ingest">
+                        <button class="w-full rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400" type="submit">Run ingest now</button>
+                    </form>
+                    <form method="post" action="/ops/">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="prune">
+                        <button class="w-full rounded-lg bg-amber-400 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-300" type="submit">Run prune now</button>
+                    </form>
+                    <form method="post" action="/ops/">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="prune_dry_run">
+                        <button class="w-full rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800" type="submit">Dry-run prune</button>
+                    </form>
+                    <form method="post" action="/ops/">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="seed">
+                        <button class="w-full rounded-lg border border-sky-500/50 px-4 py-2 text-sm text-sky-200 hover:bg-sky-500/15" type="submit">Run seed now</button>
+                    </form>
+                </div>
+            </div>
+        </aside>
+    </div>
+</section>
+{% endblock %}

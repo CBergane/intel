@@ -1,3 +1,9 @@
+DISABLED_FEED_URLS = {
+    "https://www.debian.org/security/dsa.en.rdf",
+    "https://access.redhat.com/security/data/metrics/recently-published-cve.rss",
+    "https://security.access.redhat.com/data/metrics/recently-published-cve.rss",
+}
+
 TIER1_SOURCES = [
     {
         "name": "CERT-SE",
@@ -87,8 +93,8 @@ TIER1_SOURCES = [
         "enabled": True,
         "feeds": [
             {
-                "name": "Red Hat CVE Feed",
-                "url": "https://access.redhat.com/security/data/metrics/recently-published-cve.rss",
+                "name": "Red Hat RHSA Feed",
+                "url": "https://access.redhat.com/security/data/metrics/recently-released-rhsa.rss",
                 "feed_type": "rss",
                 "section": "advisories",
                 "enabled": True,
@@ -107,8 +113,8 @@ TIER1_SOURCES = [
         "enabled": True,
         "feeds": [
             {
-                "name": "Debian Security Advisories",
-                "url": "https://www.debian.org/security/dsa.en.rdf",
+                "name": "Debian DSA Feed",
+                "url": "https://www.debian.org/security/dsa.rdf",
                 "feed_type": "rss",
                 "section": "advisories",
                 "enabled": True,

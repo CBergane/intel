@@ -15,8 +15,18 @@
                 <h2 class="text-lg font-medium text-white">{{ source.name }}</h2>
                 <p class="mt-1 text-xs text-slate-400">slug: {{ source.slug }}</p>
                 {% if source.homepage %}
-                    <p class="mt-2 text-sm"><a class="text-accent hover:text-accent2" href="{{ source.homepage }}" target="_blank" rel="noopener noreferrer">{{ source.homepage }}</a></p>
-                {% endif %}
+                    <p class="mt-2 min-w-0 text-sm">
+                        <a
+                        class="block max-w-full truncate text-accent hover:text-accent2"
+                        href="{{ source.homepage }}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="{{ source.homepage }}"
+                        >
+                        {{ source.homepage }}
+                        </a>
+                    </p>
+                    {% endif %}
                 <div class="mt-3 flex items-center gap-3 text-sm text-slate-300">
                     <span>{{ source.feed_count }} feeds</span>
                     <span>{{ source.item_count }} items</span>

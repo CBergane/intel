@@ -39,23 +39,7 @@
 
     <div class="space-y-4">
         {% for item in page_obj.object_list %}
-            <article class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-                <div class="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                    <span class="rounded bg-slate-800 px-2 py-1 text-slate-300">{{ item.source.name }}</span>
-                    <span class="rounded bg-slate-800 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
-                    <time datetime="{{ item.published_at|date:'c' }}">{{ item.published_at|date:"Y-m-d H:i" }} UTC</time>
-                </div>
-                <h2 class="text-lg font-medium text-white">
-                    {% if item.url %}
-                        <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="hover:text-accent">{{ item.title }}</a>
-                    {% else %}
-                        {{ item.title }}
-                    {% endif %}
-                </h2>
-                {% if item.summary %}
-                    <p class="mt-2 text-sm leading-6 text-slate-300">{{ item.summary }}</p>
-                {% endif %}
-            </article>
+            {% include "intel/_item_card.html" with compact=False %}
         {% empty %}
             <div class="rounded-2xl border border-line bg-panel/80 p-8 text-center text-slate-400">
                 No items matched the current filters.

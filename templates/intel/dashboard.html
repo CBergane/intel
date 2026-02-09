@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Now | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="space-y-5">
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+        <h1 class="text-xl font-semibold text-white">Now</h1>
+        <p class="mt-1 text-sm text-slate-400">High-signal cybersecurity intelligence overview across advisories, research, and Sweden-focused sources.</p>
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-12">
+        <div class="space-y-4 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow lg:col-span-8">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-lg font-semibold text-white">High Signal (Last 7 days)</h2>
+                <a href="/active" class="text-sm text-sky-300 hover:text-sky-200">View active page</a>
+            </div>
+            <div class="space-y-3">
+                {% for item in high_signal_items %}
+                    {% include "intel/_item_card.html" with compact=False %}
+                {% empty %}
+                    <p class="text-sm text-slate-400">No high-signal items yet.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <aside class="space-y-4 lg:col-span-4">
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h2 class="text-base font-semibold text-white">Feed Health</h2>
+                    <a href="/feed-health" class="text-sm text-sky-300 hover:text-sky-200">Open panel</a>
+                </div>
+                <div class="space-y-2 text-sm text-slate-300">
+                    <p>Enabled feeds: <span class="font-medium text-white">{{ enabled_feed_count }}</span></p>
+                    <p>OK: <span class="font-medium text-emerald-300">{{ feed_status_counts.ok }}</span></p>
+                    <p>Error: <span class="font-medium text-rose-300">{{ feed_status_counts.error }}</span></p>
+                    <p>Never run: <span class="font-medium text-amber-300">{{ feed_status_counts.never }}</span></p>
+                    <p>
+                        Last ingest:
+                        {% if last_ingest_finished_at %}
+                            <span class="font-medium text-white" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
+                        {% else %}
+                            <span class="font-medium text-slate-400">never</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <h2 class="mb-3 text-base font-semibold text-white">Trending Sources (48h)</h2>
+                <ul class="space-y-2 text-sm text-slate-300">
+                    {% for row in trending_sources %}
+                        <li class="flex items-center justify-between gap-3">
+                            <a href="/advisories?source={{ row.source__slug|urlencode }}" class="hover:text-sky-300">{{ row.source__name }}</a>
+                            <span class="rounded bg-slate-800 px-2 py-1 text-xs">{{ row.item_count }}</span>
+                        </li>
+                    {% empty %}
+                        <li class="text-slate-400">No recent source activity.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <h2 class="mb-3 text-base font-semibold text-white">Trending CVEs (7d)</h2>
+                <div class="flex flex-wrap gap-2">
+                    {% for cve, count in trending_cves %}
+                        <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded bg-sky-500/15 px-2 py-1 text-xs font-medium text-sky-200 hover:bg-sky-500/25">
+                            <span>{{ cve }}</span>
+                            <span class="text-sky-100/80">({{ count }})</span>
+                        </a>
+                    {% empty %}
+                        <span class="text-sm text-slate-400">No CVE activity in the last 7 days.</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-3">
+        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-base font-semibold text-white">Advisories</h2>
+                <a href="/advisories" class="text-sm text-sky-300 hover:text-sky-200">All advisories</a>
+            </div>
+            {% for item in advisories_items %}
+                {% include "intel/_item_card.html" with compact=True %}
+            {% empty %}
+                <p class="text-sm text-slate-400">No advisories found.</p>
+            {% endfor %}
+        </div>
+
+        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-base font-semibold text-white">Research</h2>
+                <a href="/research" class="text-sm text-sky-300 hover:text-sky-200">All research</a>
+            </div>
+            {% for item in research_items %}
+                {% include "intel/_item_card.html" with compact=True %}
+            {% empty %}
+                <p class="text-sm text-slate-400">No research items found.</p>
+            {% endfor %}
+        </div>
+
+        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-base font-semibold text-white">Sweden</h2>
+                <a href="/sweden" class="text-sm text-sky-300 hover:text-sky-200">All Sweden items</a>
+            </div>
+            {% for item in sweden_items %}
+                {% include "intel/_item_card.html" with compact=True %}
+            {% empty %}
+                <p class="text-sm text-slate-400">No Sweden-related items found.</p>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

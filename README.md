@@ -40,6 +40,12 @@ Dashboard pages:
 - `/sources`
 - `/about`
 
+Home dashboard (`/`) includes:
+- High Signal (scored by CVE/keyword/section over last 7 days)
+- Advisories, Research, Sweden blocks with per-source balancing
+- Trending Sources (48h) and Trending CVEs (7d)
+- Feed health mini-panel (ok/error/never + last ingest time)
+
 ## Tailwind
 Templates are already Tailwind-compatible via CDN in `templates/base.html`.
 
@@ -121,6 +127,22 @@ python manage.py prune_items --dry-run
    sudo systemctl daemon-reload
    sudo systemctl enable --now borealsec-intel.service
    ```
+
+## Pre-launch checklist
+- Sync and curate feeds:
+  ```bash
+  python manage.py seed_sources
+  ```
+  This disables known broken feeds such as deprecated Debian/Red Hat URLs if they still exist in DB.
+- Set a strong `SECRET_KEY` in environment for `DJANGO_ENV=prod` (required at startup).
+- Run Django deployment checks:
+  ```bash
+  python manage.py check --deploy
+  ```
+- Run dependency audit:
+  ```bash
+  python -m pip_audit
+  ```
 
 ## Optional scheduling notes
 - Cron approach:

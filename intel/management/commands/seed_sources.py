@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from intel.models import Feed, Source
-from intel.tier1_sources import TIER1_SOURCES
+from intel.tier1_sources import DISABLED_FEED_URLS, TIER1_SOURCES
 
 
 class Command(BaseCommand):
@@ -14,6 +14,7 @@ class Command(BaseCommand):
         feed_updated = 0
         source_errors = 0
         feed_errors = 0
+        disabled_broken_feeds = self._disable_broken_feeds()
 
         for source_data in TIER1_SOURCES:
             try:
@@ -54,8 +55,14 @@ class Command(BaseCommand):
                 f"feeds_created={feed_created}, "
                 f"feeds_updated={feed_updated}, "
                 f"source_errors={source_errors}, "
-                f"feed_errors={feed_errors}"
+                f"feed_errors={feed_errors}, "
+                f"disabled_broken_feeds={disabled_broken_feeds}"
             )
+        )
+
+    def _disable_broken_feeds(self):
+        return Feed.objects.filter(url__in=DISABLED_FEED_URLS, enabled=True).update(
+            enabled=False
         )
 
     def _upsert_source(self, source_data):
