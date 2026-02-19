@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.core.management import call_command
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.db.models.functions import Coalesce
 from django.shortcuts import redirect, render
 from django.urls import NoReverseMatch, reverse
@@ -324,16 +324,107 @@ def feed_health_view(request):
 
 
 def sources_view(request):
-    sources = (
-        Source.objects.annotate(feed_count=Count("feeds"), item_count=Count("items"))
-        .order_by("name")
-        .all()
+    now = timezone.now()
+    since_24h = now - timedelta(hours=24)
+    since_7d = now - timedelta(days=7)
+
+    sources = list(Source.objects.order_by("name"))
+
+    item_stats_by_source = {}
+    for row in (
+        Item.objects.annotate(activity_at=Coalesce("published_at", "created_at"))
+        .values("source_id")
+        .annotate(
+            item_count=Count("id"),
+            new_24h=Count("id", filter=Q(activity_at__gte=since_24h)),
+            new_7d=Count("id", filter=Q(activity_at__gte=since_7d)),
+            last_item_at=Max("activity_at"),
+        )
+    ):
+        item_stats_by_source[row["source_id"]] = row
+
+    enabled_feeds = list(
+        Feed.objects.filter(enabled=True)
+        .select_related("source")
+        .only("id", "source_id", "last_error")
     )
+    latest_run_by_feed = {}
+    enabled_feed_ids = [feed.id for feed in enabled_feeds]
+    if enabled_feed_ids:
+        for run in (
+            FetchRun.objects.filter(feed_id__in=enabled_feed_ids)
+            .only("feed_id", "ok", "error", "started_at")
+            .order_by("feed_id", "-started_at")
+        ):
+            if run.feed_id not in latest_run_by_feed:
+                latest_run_by_feed[run.feed_id] = run
+
+    feed_health_by_source = {}
+    for feed in enabled_feeds:
+        source_health = feed_health_by_source.setdefault(
+            feed.source_id,
+            {"feeds_total": 0, "feeds_ok": 0, "feeds_error": 0, "feeds_never": 0},
+        )
+        source_health["feeds_total"] += 1
+
+        latest_run = latest_run_by_feed.get(feed.id)
+        if latest_run is None:
+            source_health["feeds_never"] += 1
+        elif latest_run.ok:
+            source_health["feeds_ok"] += 1
+        elif (latest_run.error or "").strip() or (feed.last_error or "").strip():
+            source_health["feeds_error"] += 1
+        else:
+            source_health["feeds_error"] += 1
+
+    source_cards = []
+    for source in sources:
+        item_stats = item_stats_by_source.get(
+            source.id,
+            {"item_count": 0, "new_24h": 0, "new_7d": 0, "last_item_at": None},
+        )
+        feed_health = feed_health_by_source.get(
+            source.id,
+            {"feeds_total": 0, "feeds_ok": 0, "feeds_error": 0, "feeds_never": 0},
+        )
+
+        feeds_total = feed_health["feeds_total"]
+        feeds_error = feed_health["feeds_error"]
+        feeds_never = feed_health["feeds_never"]
+        total_items = item_stats["item_count"]
+
+        if feeds_total == 0 or (feeds_never == feeds_total and total_items == 0):
+            source_status = "Never"
+        elif feeds_error == 0 and feeds_total > 0:
+            source_status = "OK"
+        elif 0 < feeds_error < feeds_total:
+            source_status = "Degraded"
+        elif feeds_error == feeds_total and feeds_total > 0:
+            source_status = "Down"
+        else:
+            source_status = "Degraded"
+
+        source_cards.append(
+            {
+                "source": source,
+                "status": source_status,
+                "new_24h": item_stats["new_24h"],
+                "new_7d": item_stats["new_7d"],
+                "item_count": item_stats["item_count"],
+                "last_item_at": item_stats["last_item_at"],
+                "feeds_total": feed_health["feeds_total"],
+                "feeds_ok": feed_health["feeds_ok"],
+                "feeds_error": feed_health["feeds_error"],
+                "feeds_never": feed_health["feeds_never"],
+                "open_url": f"{reverse('advisories')}?source={source.slug}",
+            }
+        )
+
     return render(
         request,
         "intel/sources.html",
         {
-            "sources": sources,
+            "source_cards": source_cards,
             "current_page": "sources",
             "page_title": "Sources",
         },
