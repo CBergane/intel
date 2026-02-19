@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Login | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="mx-auto max-w-md space-y-5">
+    <div class="rounded-2xl border border-line bg-panel/80 p-5 shadow-glow">
+        <h1 class="text-xl font-semibold text-white">Admin Login</h1>
+        <p class="mt-1 text-sm text-slate-400">Superuser access only.</p>
+    </div>
+
+    {% if messages %}
+        <div class="space-y-3">
+            {% for message in messages %}
+                <div class="rounded-xl border border-rose-500/40 bg-rose-900/30 p-3 text-sm text-rose-100">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'intel_admin:login' %}" class="rounded-2xl border border-line bg-panel/80 p-5 shadow-glow">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next_url }}">
+        <div class="space-y-4">
+            <div>
+                <label for="id_username" class="mb-1 block text-xs uppercase tracking-wide text-slate-400">Username</label>
+                <input id="id_username" name="username" type="text" value="{{ form.username.value|default:'' }}" autocomplete="username" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none">
+            </div>
+            <div>
+                <label for="id_password" class="mb-1 block text-xs uppercase tracking-wide text-slate-400">Password</label>
+                <input id="id_password" name="password" type="password" autocomplete="current-password" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none">
+            </div>
+            <button type="submit" class="w-full rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400">Sign in</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

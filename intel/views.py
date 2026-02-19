@@ -4,15 +4,20 @@ from datetime import timedelta
 from io import StringIO
 
 from django.contrib import messages
-from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import user_passes_test
+from django.contrib.auth.forms import AuthenticationForm
 from django.core.paginator import Paginator
 from django.core.management import call_command
 from django.db.models import Count, Max, Q
 from django.db.models.functions import Coalesce
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
+from .forms import FeedCreateForm, FeedEditForm
 from .models import Feed, FetchRun, Item, Source
 
 TIME_RANGES = {
@@ -39,6 +44,28 @@ HIGH_SIGNAL_KEYWORDS = (
     "remote code",
     "authentication bypass",
 )
+
+
+def _is_superuser(user):
+    return user.is_active and user.is_superuser
+
+
+def superuser_required(view_func):
+    return user_passes_test(_is_superuser, login_url="intel_admin:login")(view_func)
+
+
+def _validated_next_url(request) -> str:
+    raw = (request.POST.get("next") or request.GET.get("next") or "").strip()
+    default_target = reverse("intel_admin:ops")
+    if not raw:
+        return default_target
+    if url_has_allowed_host_and_scheme(
+        raw,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ) and raw.startswith("/"):
+        return raw
+    return default_target
 
 
 def extract_cve_ids(text: str) -> list[str]:
@@ -442,6 +469,34 @@ def about_view(request):
     )
 
 
+def admin_login_view(request):
+    if request.user.is_authenticated and request.user.is_superuser:
+        return redirect("intel_admin:ops")
+
+    next_url = _validated_next_url(request)
+    form = AuthenticationForm(request=request, data=request.POST or None)
+
+    if request.method == "POST":
+        if form.is_valid():
+            user = form.get_user()
+            if user is not None and user.is_superuser:
+                login(request, user)
+                return redirect(next_url)
+        messages.error(request, "Invalid credentials.")
+
+    return render(
+        request,
+        "intel/admin_panel/login.html",
+        {"form": form, "next_url": next_url, "current_page": "admin-login"},
+    )
+
+
+@require_POST
+def admin_logout_view(request):
+    logout(request)
+    return redirect("intel_admin:login")
+
+
 def _run_ops_command(request, *, command_name: str, args: list[str], label: str):
     output = StringIO()
     try:
@@ -454,59 +509,16 @@ def _run_ops_command(request, *, command_name: str, args: list[str], label: str)
         messages.error(request, f"{label} failed.\n{detail[:8000]}")
 
 
-@staff_member_required
-def ops_dashboard(request):
-    actions = {
-        "ingest": ("ingest_sources", [], "Ingest run"),
-        "prune": ("prune_items", [], "Prune run"),
-        "prune_dry_run": ("prune_items", ["--dry-run"], "Prune dry-run"),
-        "seed": ("seed_sources", [], "Seed run"),
-    }
-
-    if request.method == "POST":
-        action = (request.POST.get("action") or "").strip()
-        if action in actions:
-            command_name, args, label = actions[action]
-            _run_ops_command(
-                request,
-                command_name=command_name,
-                args=args,
-                label=label,
-            )
-        else:
-            messages.error(request, "Unknown action.")
-        return redirect("ops-dashboard")
-
-    enabled_feeds_qs = Feed.objects.filter(enabled=True).select_related("source")
-    enabled_feeds = list(enabled_feeds_qs.order_by("source__name", "name"))
-
-    enabled_feeds_count = len(enabled_feeds)
-    ok_count = enabled_feeds_qs.filter(last_success_at__isnull=False, last_error="").count()
-    error_count = enabled_feeds_qs.exclude(last_error="").count()
-    never_run_count = enabled_feeds_qs.filter(last_success_at__isnull=True).count()
-
-    latest_finished = (
-        FetchRun.objects.filter(finished_at__isnull=False)
-        .order_by("-finished_at")
-        .values_list("finished_at", flat=True)
-        .first()
-    )
-    if latest_finished is None:
-        latest_finished = (
-            FetchRun.objects.order_by("-started_at")
-            .values_list("started_at", flat=True)
-            .first()
-        )
-
+def _build_feed_rows(feeds):
     latest_run_by_feed = {}
-    feed_ids = [feed.id for feed in enabled_feeds]
+    feed_ids = [feed.id for feed in feeds]
     if feed_ids:
         for run in FetchRun.objects.filter(feed_id__in=feed_ids).order_by("feed_id", "-started_at"):
             if run.feed_id not in latest_run_by_feed:
                 latest_run_by_feed[run.feed_id] = run
 
     feed_rows = []
-    for feed in enabled_feeds:
+    for feed in feeds:
         latest_run = latest_run_by_feed.get(feed.id)
         if latest_run is not None:
             if latest_run.ok:
@@ -533,6 +545,54 @@ def ops_dashboard(request):
                 "last_run_at": last_run_at,
             }
         )
+    return feed_rows
+
+
+@superuser_required
+def ops_dashboard(request):
+    actions = {
+        "ingest": ("ingest_sources", [], "Ingest run"),
+        "prune": ("prune_items", [], "Prune run"),
+        "prune_dry_run": ("prune_items", ["--dry-run"], "Prune dry-run"),
+        "seed": ("seed_sources", [], "Seed run"),
+    }
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action in actions:
+            command_name, args, label = actions[action]
+            _run_ops_command(
+                request,
+                command_name=command_name,
+                args=args,
+                label=label,
+            )
+        else:
+            messages.error(request, "Unknown action.")
+        return redirect("intel_admin:ops")
+
+    enabled_feeds_qs = Feed.objects.filter(enabled=True).select_related("source")
+    enabled_feeds = list(enabled_feeds_qs.order_by("source__name", "name"))
+
+    enabled_feeds_count = len(enabled_feeds)
+    ok_count = enabled_feeds_qs.filter(last_success_at__isnull=False, last_error="").count()
+    error_count = enabled_feeds_qs.exclude(last_error="").count()
+    never_run_count = enabled_feeds_qs.filter(last_success_at__isnull=True).count()
+
+    latest_finished = (
+        FetchRun.objects.filter(finished_at__isnull=False)
+        .order_by("-finished_at")
+        .values_list("finished_at", flat=True)
+        .first()
+    )
+    if latest_finished is None:
+        latest_finished = (
+            FetchRun.objects.order_by("-started_at")
+            .values_list("started_at", flat=True)
+            .first()
+        )
+
+    feed_rows = _build_feed_rows(enabled_feeds)
 
     recent_runs = list(
         FetchRun.objects.select_related("feed", "feed__source").order_by("-started_at")[:50]
@@ -558,5 +618,76 @@ def ops_dashboard(request):
             "feed_rows": feed_rows,
             "recent_runs": recent_runs,
             "feed_list_url": feed_list_url,
+            "admin_panel_url": reverse("intel_admin:panel"),
         },
     )
+
+
+@superuser_required
+def admin_panel_view(request):
+    feeds = list(Feed.objects.select_related("source").order_by("source__name", "name"))
+    feed_rows = _build_feed_rows(feeds)
+    return render(
+        request,
+        "intel/admin_panel/feed_list.html",
+        {
+            "page_title": "Admin Panel",
+            "current_page": "admin",
+            "feed_rows": feed_rows,
+        },
+    )
+
+
+@superuser_required
+def admin_panel_feed_create(request):
+    form = FeedCreateForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        feed = form.save()
+        messages.success(request, f"Feed '{feed.name}' created.")
+        return redirect("intel_admin:panel")
+    return render(
+        request,
+        "intel/admin_panel/feed_form.html",
+        {
+            "page_title": "Create Feed",
+            "current_page": "admin",
+            "form": form,
+            "mode": "create",
+            "cancel_url": reverse("intel_admin:panel"),
+        },
+    )
+
+
+@superuser_required
+def admin_panel_feed_edit(request, feed_id: int):
+    feed = get_object_or_404(Feed.objects.select_related("source"), id=feed_id)
+    form = FeedEditForm(request.POST or None, instance=feed)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"Feed '{feed.name}' updated.")
+        return redirect("intel_admin:panel")
+    return render(
+        request,
+        "intel/admin_panel/feed_form.html",
+        {
+            "page_title": "Edit Feed",
+            "current_page": "admin",
+            "form": form,
+            "mode": "edit",
+            "feed": feed,
+            "cancel_url": reverse("intel_admin:panel"),
+        },
+    )
+
+
+@superuser_required
+@require_POST
+def admin_panel_feed_disable(request, feed_id: int):
+    feed = get_object_or_404(Feed, id=feed_id)
+    if feed.enabled:
+        feed.enabled = False
+        feed.save(update_fields=["enabled", "updated_at"])
+        messages.success(request, f"Feed '{feed.name}' disabled.")
+    else:
+        messages.info(request, f"Feed '{feed.name}' is already disabled.")
+    return redirect("intel_admin:panel")

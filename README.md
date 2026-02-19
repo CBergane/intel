@@ -39,6 +39,8 @@ Dashboard pages:
 - `/feed-health`
 - `/sources`
 - `/about`
+- `/ops/` (superuser only)
+- `/admin-panel/` (superuser only)
 
 Home dashboard (`/`) includes:
 - High Signal (scored by CVE/keyword/section over last 7 days)
@@ -87,6 +89,11 @@ Per-feed guardrails:
 - `Feed.max_age_days` (default `180`) skips entries older than this window.
 - Entries without a published timestamp use fetch time as fallback for age checks.
 - MSRC feeds default to `max_age_days=90` via migration.
+- Global response-size cap is controlled by env `FEED_MAX_BYTES` (default `1500000`).
+
+Admin auth routes:
+- Login: `/admin-login/`
+- Logout (POST only): `/logout/`
 
 Prune stale items (keeps `FetchRun` history):
 ```bash

@@ -11,31 +11,35 @@ from intel.models import Feed, FetchRun, Source
 class OpsDashboardTests(TestCase):
     def setUp(self):
         user_model = get_user_model()
-        self.staff_user = user_model.objects.create_user(
-            username="opsstaff",
+        self.superuser = user_model.objects.create_superuser(
+            username="opsadmin",
+            password="test-pass-123",
+        )
+        self.non_superuser = user_model.objects.create_user(
+            username="viewer",
             password="test-pass-123",
             is_staff=True,
         )
-        self.non_staff_user = user_model.objects.create_user(
-            username="viewer",
-            password="test-pass-123",
-            is_staff=False,
-        )
-        self.url = reverse("ops-dashboard")
+        self.url = reverse("intel_admin:ops")
 
-    def test_non_staff_cannot_access_ops_dashboard(self):
-        self.client.force_login(self.non_staff_user)
+    def test_non_authenticated_user_redirected_to_login(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("intel_admin:login"), response.url)
+
+    def test_non_superuser_cannot_access_ops_dashboard(self):
+        self.client.force_login(self.non_superuser)
         response = self.client.get(self.url)
         self.assertIn(response.status_code, (302, 403))
 
-    def test_staff_can_access_ops_dashboard(self):
-        self.client.force_login(self.staff_user)
+    def test_superuser_can_access_ops_dashboard(self):
+        self.client.force_login(self.superuser)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ops Dashboard")
 
     def test_actions_require_post_and_csrf(self):
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.superuser)
 
         with patch("intel.views.call_command") as mocked_call:
             response = self.client.get(f"{self.url}?action=seed")
@@ -47,7 +51,7 @@ class OpsDashboardTests(TestCase):
             mocked_call.assert_called_once()
 
         csrf_client = Client(enforce_csrf_checks=True)
-        csrf_client.force_login(self.staff_user)
+        csrf_client.force_login(self.superuser)
         forbidden = csrf_client.post(self.url, {"action": "seed"}, follow=True)
         self.assertEqual(forbidden.status_code, 403)
 
@@ -116,7 +120,7 @@ class OpsDashboardTests(TestCase):
             items_updated=0,
         )
 
-        self.client.force_login(self.staff_user)
+        self.client.force_login(self.superuser)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["enabled_feeds_count"], 3)

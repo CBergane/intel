@@ -116,5 +116,11 @@ INTEL_USER_AGENT = os.getenv(
     "INTEL_USER_AGENT", "borealsec-intel-bot/0.1 (+https://borealsec.io)"
 )
 INTEL_FETCH_TIMEOUT = int(os.getenv("INTEL_FETCH_TIMEOUT", "10"))
-INTEL_FETCH_MAX_BYTES = int(os.getenv("INTEL_FETCH_MAX_BYTES", "1500000"))
+FEED_MAX_BYTES = int(
+    os.getenv(
+        "FEED_MAX_BYTES",
+        os.getenv("FEED_MAX_BYTES_DEFAULT", os.getenv("INTEL_FETCH_MAX_BYTES", "1500000")),
+    )
+)
+INTEL_FETCH_MAX_BYTES = FEED_MAX_BYTES
 INTEL_FETCH_RETRIES = int(os.getenv("INTEL_FETCH_RETRIES", "3"))

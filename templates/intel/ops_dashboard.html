@@ -6,8 +6,13 @@
 {% block content %}
 <section class="space-y-5">
     <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-        <h1 class="text-xl font-semibold text-white">Ops Dashboard</h1>
-        <p class="mt-1 text-sm text-slate-400">Internal feed health and operational controls.</p>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h1 class="text-xl font-semibold text-white">Ops Dashboard</h1>
+                <p class="mt-1 text-sm text-slate-400">Internal feed health and operational controls.</p>
+            </div>
+            <a href="{{ admin_panel_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Open Admin Panel</a>
+        </div>
     </div>
 
     {% if messages %}
@@ -190,22 +195,22 @@
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <h2 class="mb-3 text-base font-semibold text-white">Actions</h2>
                 <div class="space-y-3">
-                    <form method="post" action="/ops/">
+                    <form method="post" action="{% url 'intel_admin:ops' %}">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="ingest">
                         <button class="w-full rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400" type="submit">Run ingest now</button>
                     </form>
-                    <form method="post" action="/ops/">
+                    <form method="post" action="{% url 'intel_admin:ops' %}">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="prune">
                         <button class="w-full rounded-lg bg-amber-400 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-300" type="submit">Run prune now</button>
                     </form>
-                    <form method="post" action="/ops/">
+                    <form method="post" action="{% url 'intel_admin:ops' %}">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="prune_dry_run">
                         <button class="w-full rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800" type="submit">Dry-run prune</button>
                     </form>
-                    <form method="post" action="/ops/">
+                    <form method="post" action="{% url 'intel_admin:ops' %}">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="seed">
                         <button class="w-full rounded-lg border border-sky-500/50 px-4 py-2 text-sm text-sky-200 hover:bg-sky-500/15" type="submit">Run seed now</button>

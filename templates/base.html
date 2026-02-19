@@ -41,6 +41,13 @@
                     <a href="/feed-health" class="rounded-lg px-3 py-2 {% if current_page == 'feed-health' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Feed Health</a>
                     <a href="/sources" class="rounded-lg px-3 py-2 {% if current_page == 'sources' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Sources</a>
                     <a href="/about" class="rounded-lg px-3 py-2 {% if current_page == 'about' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">About</a>
+                    {% if request.user.is_superuser %}
+                        <a href="{% url 'intel_admin:panel' %}" class="rounded-lg px-3 py-2 {% if current_page == 'admin' or current_page == 'ops' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Admin</a>
+                        <form method="post" action="{% url 'intel_admin:logout' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="rounded-lg px-3 py-2 text-slate-300 hover:bg-slate-800">Logout</button>
+                        </form>
+                    {% endif %}
                 </nav>
             </div>
         </header>

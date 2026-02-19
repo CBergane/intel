@@ -4,9 +4,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
+from intel.management.commands.ingest_sources import Command
 from intel.models import Feed, Item, Source
 
 
@@ -88,6 +89,33 @@ class IngestionGuardrailTests(TestCase):
             list(Item.objects.order_by("id").values_list("url", flat=True)),
             ["https://example.com/item-0", "https://example.com/item-1"],
         )
+
+    @override_settings(FEED_MAX_BYTES=2_000_000)
+    def test_fetch_once_respects_feed_max_bytes_setting(self):
+        self.feed.max_bytes = 2_000_000
+        self.feed.save(update_fields=["max_bytes", "updated_at"])
+
+        chunk = b"a" * 800_000
+
+        class DummyResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size=8192):
+                del chunk_size
+                yield chunk
+                yield chunk
+
+        with patch(
+            "intel.management.commands.ingest_sources.requests.get",
+            return_value=DummyResponse(),
+        ):
+            payload, status = Command()._fetch_once(self.feed)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(len(payload), 1_600_000)
 
 
 class PruneItemsCommandTests(TestCase):

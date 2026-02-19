@@ -142,7 +142,7 @@ class Command(BaseCommand):
 
     def _fetch_once(self, feed):
         timeout = max(1, min(feed.timeout_seconds, settings.INTEL_FETCH_TIMEOUT))
-        max_bytes = max(1, min(feed.max_bytes, settings.INTEL_FETCH_MAX_BYTES))
+        max_bytes = max(1, min(feed.max_bytes, settings.FEED_MAX_BYTES))
 
         response = requests.get(
             feed.url,
