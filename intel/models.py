@@ -62,8 +62,8 @@ class Feed(models.Model):
 class Item(models.Model):
     source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name="items")
     feed = models.ForeignKey(Feed, on_delete=models.CASCADE, related_name="items")
-    title = models.CharField(max_length=500)
-    normalized_title = models.CharField(max_length=500, blank=True)
+    title = models.CharField(max_length=1500)
+    normalized_title = models.CharField(max_length=1500, blank=True)
     title_hash = models.CharField(max_length=64, db_index=True)
     url = models.URLField(max_length=1500, blank=True)
     canonical_url = models.URLField(max_length=1500, blank=True, db_index=True)
