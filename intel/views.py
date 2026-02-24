@@ -56,15 +56,18 @@ def superuser_required(view_func):
 
 def _validated_next_url(request) -> str:
     raw = (request.POST.get("next") or request.GET.get("next") or "").strip()
-    default_target = reverse("intel_admin:ops")
+    default_target = reverse("intel_admin:panel") 
+
     if not raw:
         return default_target
-    if url_has_allowed_host_and_scheme(
+
+    if raw.startswith("/") and url_has_allowed_host_and_scheme(
         raw,
         allowed_hosts={request.get_host()},
-        require_https=request.is_secure(),
-    ) and raw.startswith("/"):
+        require_https=False,
+    ):
         return raw
+
     return default_target
 
 
@@ -471,7 +474,7 @@ def about_view(request):
 
 def admin_login_view(request):
     if request.user.is_authenticated and request.user.is_superuser:
-        return redirect("intel_admin:ops")
+        return redirect("intel_admin:panel")
 
     next_url = _validated_next_url(request)
     form = AuthenticationForm(request=request, data=request.POST or None)
