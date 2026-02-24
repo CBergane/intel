@@ -14,4 +14,3 @@ urlpatterns = [
     path("admin-panel/feeds/<int:feed_id>/edit/", views.admin_panel_feed_edit, name="feed-edit"),
     path("admin-panel/feeds/<int:feed_id>/disable/", views.admin_panel_feed_disable, name="feed-disable"),
 ]
-]
