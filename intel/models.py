@@ -116,3 +116,6 @@ class FetchRun(models.Model):
 
     def __str__(self) -> str:
         return f"{self.feed.name} @ {self.started_at.isoformat()}"
+
+
+from .dark_models import DarkFetchRun, DarkHit, DarkSource  # noqa: E402,F401

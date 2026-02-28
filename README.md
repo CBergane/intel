@@ -38,6 +38,7 @@ Dashboard pages:
 - `/sweden`
 - `/feed-health`
 - `/sources`
+- `/dark`
 - `/about`
 - `/ops/` (superuser only)
 - `/admin-panel/` (superuser only)
@@ -90,6 +91,29 @@ Per-feed guardrails:
 - Entries without a published timestamp use fetch time as fallback for age checks.
 - MSRC feeds default to `max_age_days=90` via migration.
 - Global response-size cap is controlled by env `FEED_MAX_BYTES` (default `1500000`).
+
+## Dark intel
+Dark intel is isolated from the RSS/Atom pipeline and uses separate models plus a separate ingestion command.
+
+Environment variables:
+- `DARK_TOR_SOCKS_URL` default `socks5h://127.0.0.1:9050`
+- `DARK_FETCH_TIMEOUT` default `20`
+- `DARK_MAX_BYTES` default `750000`
+- `DARK_FETCH_RETRIES` default `3`
+
+Run passive dark source collection:
+```bash
+python manage.py ingest_dark
+```
+
+Pages:
+- `/dark` public read-only hit dashboard
+- `/admin-panel/dark/` superuser-only allowlist management
+
+Notes:
+- Dark sources are allowlist-only and created by a superuser in the custom admin panel.
+- Collection is passive HTTP GET only over Tor SOCKS (`socks5h`).
+- `DARK_MAX_BYTES` is separate from `FEED_MAX_BYTES`.
 
 Admin auth routes:
 - Login: `/admin-login/`

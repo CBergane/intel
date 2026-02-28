@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
-from .models import Feed, Source
+from .models import DarkSource, Feed, Source
 
 
 _INPUT_CLASS = (
@@ -90,3 +90,61 @@ class SourceEditForm(_BaseSourceForm):
     class Meta:
         model = Source
         fields = ["name", "slug", "homepage", "tags", "enabled"]
+
+
+class _BaseDarkSourceForm(forms.ModelForm):
+    tags = forms.CharField(required=False, help_text="Comma-separated tags.")
+    watch_keywords = forms.CharField(
+        required=False, help_text="Comma-separated keywords for passive matching."
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["tags"].initial = ", ".join(self.instance.tags or [])
+            self.fields["watch_keywords"].initial = self.instance.watch_keywords
+        for field in self.fields.values():
+            widget = field.widget
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs["class"] = _CHECKBOX_CLASS
+            else:
+                widget.attrs["class"] = _INPUT_CLASS
+
+    def clean_name(self):
+        name = self.cleaned_data["name"].strip()
+        queryset = DarkSource.objects.filter(name=name)
+        if self.instance.pk:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise ValidationError("A dark source with this name already exists.")
+        return name
+
+    def clean_slug(self):
+        slug = self.cleaned_data["slug"]
+        queryset = DarkSource.objects.filter(slug=slug)
+        if self.instance.pk:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise ValidationError("A dark source with this slug already exists.")
+        return slug
+
+    def clean_tags(self):
+        raw = self.cleaned_data.get("tags", "")
+        return [tag.strip() for tag in raw.split(",") if tag.strip()]
+
+    def clean_watch_keywords(self):
+        raw = self.cleaned_data.get("watch_keywords", "")
+        normalized = [part.strip().lower() for part in raw.split(",") if part.strip()]
+        return ", ".join(normalized)
+
+
+class DarkSourceCreateForm(_BaseDarkSourceForm):
+    class Meta:
+        model = DarkSource
+        fields = ["name", "slug", "homepage", "url", "tags", "watch_keywords"]
+
+
+class DarkSourceEditForm(_BaseDarkSourceForm):
+    class Meta:
+        model = DarkSource
+        fields = ["name", "slug", "homepage", "url", "tags", "watch_keywords", "enabled"]

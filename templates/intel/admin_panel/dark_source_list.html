@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Dark Admin | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="space-y-5">
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h1 class="text-xl font-semibold text-white">Dark Admin</h1>
+                <p class="mt-1 text-sm text-slate-400">Superuser allowlist for passive dark intel collection.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'intel_admin:panel' %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Feeds</a>
+                <a href="{% url 'intel_admin:sources' %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Sources</a>
+                <a href="{% url 'intel_admin:dark_source_create' %}" class="rounded-lg bg-sky-500 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-sky-400">New Dark Source</a>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="space-y-3">
+            {% for message in messages %}
+                <div class="rounded-xl border {% if message.tags == 'error' %}border-rose-500/40 bg-rose-900/30 text-rose-100{% else %}border-emerald-500/40 bg-emerald-900/30 text-emerald-100{% endif %} p-3 text-sm">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
+                    <tr>
+                        <th class="px-2 py-2">Name</th>
+                        <th class="px-2 py-2">URL</th>
+                        <th class="px-2 py-2">Enabled</th>
+                        <th class="px-2 py-2">Keywords</th>
+                        <th class="px-2 py-2">Hits</th>
+                        <th class="px-2 py-2">Last Hit</th>
+                        <th class="px-2 py-2">Last Run</th>
+                        <th class="px-2 py-2">Status</th>
+                        <th class="px-2 py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in source_rows %}
+                        <tr class="border-b border-line/60 align-top text-slate-200">
+                            <td class="px-2 py-2">
+                                <div class="font-medium text-white">{{ row.source.name }}</div>
+                                <div class="text-xs text-slate-400">{{ row.source.slug }}</div>
+                            </td>
+                            <td class="max-w-xs min-w-0 px-2 py-2">
+                                <a href="{{ row.source.url }}" target="_blank" rel="noopener noreferrer" class="block max-w-full truncate overflow-hidden text-sky-300 hover:text-sky-200" title="{{ row.source.url }}">{{ row.source.url }}</a>
+                            </td>
+                            <td class="px-2 py-2">
+                                {% if row.source.enabled %}
+                                    <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">enabled</span>
+                                {% else %}
+                                    <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">disabled</span>
+                                {% endif %}
+                            </td>
+                            <td class="max-w-xs px-2 py-2 text-xs text-slate-300 break-words">{{ row.source.watch_keywords|default:"-"|truncatechars:120 }}</td>
+                            <td class="px-2 py-2">{{ row.source.hit_count }}</td>
+                            <td class="px-2 py-2">
+                                {% if row.source.last_hit_at %}
+                                    <span title="{{ row.source.last_hit_at|date:'Y-m-d H:i' }} UTC">{{ row.source.last_hit_at|naturaltime }}</span>
+                                {% else %}
+                                    <span class="text-slate-400">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-2 py-2">
+                                {% if row.last_run_at %}
+                                    <span title="{{ row.last_run_at|date:'Y-m-d H:i' }} UTC">{{ row.last_run_at|naturaltime }}</span>
+                                {% else %}
+                                    <span class="text-slate-400">never</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-2 py-2">
+                                {% if row.status == "ok" %}
+                                    <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
+                                {% elif row.status == "error" %}
+                                    <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
+                                {% else %}
+                                    <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">never</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-2 py-2">
+                                <div class="flex flex-wrap gap-2">
+                                    <a href="{{ row.open_url }}" class="rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Open</a>
+                                    <a href="{% url 'intel_admin:dark_source_edit' row.source.id %}" class="rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Edit</a>
+                                    <form method="post" action="{% url 'intel_admin:dark_source_toggle' row.source.id %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
+                                        <button type="submit" class="rounded border {% if row.source.enabled %}border-rose-500/50 text-rose-200 hover:bg-rose-500/15{% else %}border-emerald-500/50 text-emerald-200 hover:bg-emerald-500/15{% endif %} px-2 py-1 text-xs">
+                                            {% if row.source.enabled %}Disable{% else %}Enable{% endif %}
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="9" class="px-2 py-6 text-center text-slate-400">No dark sources configured yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+{% endblock %}

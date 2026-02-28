@@ -13,6 +13,7 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ feeds_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Feeds</a>
+                <a href="{% url 'intel_admin:dark_sources' %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Dark</a>
                 <a href="{% url 'intel_admin:source_create' %}" class="rounded-lg bg-sky-500 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-sky-400">New Source</a>
             </div>
         </div>

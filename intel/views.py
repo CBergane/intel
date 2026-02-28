@@ -17,8 +17,15 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import FeedCreateForm, FeedEditForm, SourceCreateForm, SourceEditForm
-from .models import Feed, FetchRun, Item, Source
+from .forms import (
+    DarkSourceCreateForm,
+    DarkSourceEditForm,
+    FeedCreateForm,
+    FeedEditForm,
+    SourceCreateForm,
+    SourceEditForm,
+)
+from .models import DarkFetchRun, DarkHit, DarkSource, Feed, FetchRun, Item, Source
 
 TIME_RANGES = {
     "24h": timedelta(hours=24),
@@ -479,6 +486,71 @@ def sources_view(request):
     )
 
 
+def dark_dashboard_view(request):
+    query = (request.GET.get("q") or "").strip()
+    selected_source = (request.GET.get("source") or "").strip()
+
+    hits = DarkHit.objects.select_related("dark_source").order_by("-detected_at", "-id")
+    if selected_source:
+        hits = hits.filter(dark_source__slug=selected_source)
+    if query:
+        hits = hits.filter(
+            Q(title__icontains=query)
+            | Q(excerpt__icontains=query)
+            | Q(url__icontains=query)
+            | Q(raw__icontains=query)
+            | Q(matched_keywords__icontains=query)
+        )
+
+    sources = list(
+        DarkSource.objects.filter(enabled=True)
+        .annotate(hit_count=Count("hits", distinct=True), last_hit_at=Max("hits__detected_at"))
+        .order_by("name")
+    )
+    latest_run_by_source = {}
+    source_ids = [source.id for source in sources]
+    if source_ids:
+        for run in (
+            DarkFetchRun.objects.filter(dark_source_id__in=source_ids)
+            .only("dark_source_id", "ok", "error", "started_at", "finished_at")
+            .order_by("dark_source_id", "-started_at")
+        ):
+            if run.dark_source_id not in latest_run_by_source:
+                latest_run_by_source[run.dark_source_id] = run
+
+    source_rows = []
+    for source in sources:
+        latest_run = latest_run_by_source.get(source.id)
+        if latest_run is None:
+            status = "never"
+            last_run_at = None
+        else:
+            status = "ok" if latest_run.ok else "error"
+            last_run_at = latest_run.finished_at or latest_run.started_at
+        source_rows.append(
+            {
+                "source": source,
+                "latest_run": latest_run,
+                "status": status,
+                "last_run_at": last_run_at,
+            }
+        )
+
+    return render(
+        request,
+        "intel/dark/dashboard.html",
+        {
+            "page_title": "Dark Intel",
+            "current_page": "dark",
+            "hits": list(hits[:50]),
+            "source_rows": source_rows,
+            "sources": sources,
+            "query": query,
+            "selected_source": selected_source,
+        },
+    )
+
+
 def about_view(request):
     return render(
         request,
@@ -703,6 +775,110 @@ def admin_panel_sources_list(request):
             "sources": sources,
             "feeds_url": reverse("intel_admin:panel"),
         },
+    )
+
+
+@superuser_required
+def admin_panel_dark_sources_list(request):
+    sources = list(
+        DarkSource.objects.annotate(
+            hit_count=Count("hits", distinct=True),
+            last_hit_at=Max("hits__detected_at"),
+        ).order_by("name")
+    )
+    latest_run_by_source = {}
+    source_ids = [source.id for source in sources]
+    if source_ids:
+        for run in (
+            DarkFetchRun.objects.filter(dark_source_id__in=source_ids)
+            .only("dark_source_id", "ok", "error", "started_at", "finished_at", "bytes_received")
+            .order_by("dark_source_id", "-started_at")
+        ):
+            if run.dark_source_id not in latest_run_by_source:
+                latest_run_by_source[run.dark_source_id] = run
+
+    source_rows = []
+    for source in sources:
+        latest_run = latest_run_by_source.get(source.id)
+        if latest_run is None:
+            status = "never"
+            last_run_at = None
+        else:
+            status = "ok" if latest_run.ok else "error"
+            last_run_at = latest_run.finished_at or latest_run.started_at
+        source_rows.append(
+            {
+                "source": source,
+                "latest_run": latest_run,
+                "status": status,
+                "last_run_at": last_run_at,
+                "open_url": f"{reverse('dark-dashboard')}?source={source.slug}",
+            }
+        )
+
+    return render(
+        request,
+        "intel/admin_panel/dark_source_list.html",
+        {
+            "page_title": "Dark Admin",
+            "current_page": "admin",
+            "source_rows": source_rows,
+        },
+    )
+
+
+@superuser_required
+def admin_panel_dark_source_create(request):
+    form = DarkSourceCreateForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        source = form.save()
+        messages.success(request, f"Dark source '{source.name}' created.")
+        return redirect("intel_admin:dark_sources")
+    return render(
+        request,
+        "intel/admin_panel/dark_source_form.html",
+        {
+            "page_title": "Create Dark Source",
+            "current_page": "admin",
+            "form": form,
+            "mode": "create",
+            "cancel_url": reverse("intel_admin:dark_sources"),
+        },
+    )
+
+
+@superuser_required
+def admin_panel_dark_source_edit(request, source_id: int):
+    source = get_object_or_404(DarkSource, id=source_id)
+    form = DarkSourceEditForm(request.POST or None, instance=source)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"Dark source '{source.name}' updated.")
+        return redirect("intel_admin:dark_sources")
+    return render(
+        request,
+        "intel/admin_panel/dark_source_form.html",
+        {
+            "page_title": "Edit Dark Source",
+            "current_page": "admin",
+            "form": form,
+            "mode": "edit",
+            "source": source,
+            "cancel_url": reverse("intel_admin:dark_sources"),
+        },
+    )
+
+
+@superuser_required
+@require_POST
+def admin_panel_dark_source_toggle(request, source_id: int):
+    source = get_object_or_404(DarkSource, id=source_id)
+    source.enabled = not source.enabled
+    source.save(update_fields=["enabled", "updated_at"])
+    state = "enabled" if source.enabled else "disabled"
+    messages.success(request, f"Dark source '{source.name}' {state}.")
+    return redirect(
+        _validated_redirect_target(request, reverse("intel_admin:dark_sources"))
     )
 
 

@@ -40,6 +40,7 @@
                     <a href="/sweden" class="rounded-lg px-3 py-2 {% if current_page == 'sweden' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Sweden</a>
                     <a href="/feed-health" class="rounded-lg px-3 py-2 {% if current_page == 'feed-health' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Feed Health</a>
                     <a href="/sources" class="rounded-lg px-3 py-2 {% if current_page == 'sources' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Sources</a>
+                    <a href="/dark" class="rounded-lg px-3 py-2 {% if current_page == 'dark' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Dark</a>
                     <a href="/about" class="rounded-lg px-3 py-2 {% if current_page == 'about' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">About</a>
                     {% if request.user.is_superuser %}
                         <a href="{% url 'intel_admin:panel' %}" class="rounded-lg px-3 py-2 {% if current_page == 'admin' or current_page == 'ops' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Admin</a>

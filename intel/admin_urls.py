@@ -28,4 +28,20 @@ urlpatterns = [
         views.admin_panel_source_toggle,
         name="source_toggle",
     ),
+    path("admin-panel/dark/", views.admin_panel_dark_sources_list, name="dark_sources"),
+    path(
+        "admin-panel/dark/new/",
+        views.admin_panel_dark_source_create,
+        name="dark_source_create",
+    ),
+    path(
+        "admin-panel/dark/<int:source_id>/edit/",
+        views.admin_panel_dark_source_edit,
+        name="dark_source_edit",
+    ),
+    path(
+        "admin-panel/dark/<int:source_id>/toggle/",
+        views.admin_panel_dark_source_toggle,
+        name="dark_source_toggle",
+    ),
 ]

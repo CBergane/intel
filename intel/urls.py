@@ -9,5 +9,6 @@ urlpatterns = [
     path("sweden/", views.sweden_view, name="sweden"),
     path("feed-health/", views.feed_health_view, name="feed-health"),
     path("sources/", views.sources_view, name="sources"),
+    path("dark/", views.dark_dashboard_view, name="dark-dashboard"),
     path("about/", views.about_view, name="about"),
 ]

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Dark Intel | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="space-y-5">
+    <div class="rounded-2xl border border-line bg-panel/80 p-5 shadow-glow">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <h1 class="text-2xl font-semibold text-white">Dark Intel</h1>
+                <p class="mt-1 text-sm text-slate-400">Read-only hits from allowlisted public pages fetched passively over Tor.</p>
+            </div>
+            <form method="get" class="grid gap-3 sm:grid-cols-3">
+                <div>
+                    <label for="id_source" class="mb-1 block text-xs uppercase tracking-wide text-slate-400">Source</label>
+                    <select id="id_source" name="source" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-sky-400 focus:outline-none">
+                        <option value="">All sources</option>
+                        {% for source in sources %}
+                            <option value="{{ source.slug }}" {% if selected_source == source.slug %}selected{% endif %}>{{ source.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="sm:col-span-2">
+                    <label for="id_q" class="mb-1 block text-xs uppercase tracking-wide text-slate-400">Keyword</label>
+                    <div class="flex gap-2">
+                        <input id="id_q" name="q" value="{{ query }}" placeholder="Search hits" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none">
+                        <button type="submit" class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400">Filter</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-12">
+        <aside class="space-y-4 lg:col-span-4">
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <h2 class="mb-3 text-base font-semibold text-white">Source Health</h2>
+                <div class="space-y-3">
+                    {% for row in source_rows %}
+                        <div class="rounded-xl border border-line/80 bg-slate-900/60 p-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium text-white">{{ row.source.name }}</p>
+                                    <p class="truncate text-xs text-slate-500">{{ row.source.slug }}</p>
+                                </div>
+                                {% if row.status == "ok" %}
+                                    <span class="rounded-full bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">OK</span>
+                                {% elif row.status == "error" %}
+                                    <span class="rounded-full bg-rose-500/20 px-2 py-1 text-xs text-rose-300">Error</span>
+                                {% else %}
+                                    <span class="rounded-full bg-slate-700 px-2 py-1 text-xs text-slate-300">Never</span>
+                                {% endif %}
+                            </div>
+                            <div class="mt-3 flex items-center justify-between gap-3 text-xs text-slate-400">
+                                <span>Last run</span>
+                                {% if row.last_run_at %}
+                                    <span title="{{ row.last_run_at|date:'Y-m-d H:i' }} UTC">{{ row.last_run_at|naturaltime }}</span>
+                                {% else %}
+                                    <span>never</span>
+                                {% endif %}
+                            </div>
+                            <div class="mt-2 flex items-center justify-between gap-3 text-xs text-slate-400">
+                                <span>Hits</span>
+                                <span>{{ row.source.hit_count }}</span>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-sm text-slate-400">No enabled dark sources yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </aside>
+
+        <div class="space-y-4 lg:col-span-8">
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <h2 class="mb-3 text-base font-semibold text-white">Recent Hits</h2>
+                <div class="space-y-3">
+                    {% for hit in hits %}
+                        <article class="rounded-xl border border-line/80 bg-slate-900/60 p-4">
+                            <div class="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                <span class="rounded-full bg-sky-500/15 px-2 py-1 text-sky-200">{{ hit.dark_source.name }}</span>
+                                <span title="{{ hit.detected_at|date:'Y-m-d H:i' }} UTC">{{ hit.detected_at|naturaltime }}</span>
+                            </div>
+                            <h3 class="mt-3 break-words text-lg font-semibold text-white">{{ hit.title }}</h3>
+                            {% if hit.matched_keywords %}
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    {% for keyword in hit.matched_keywords %}
+                                        <span class="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-xs text-cyan-200">{{ keyword }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if hit.excerpt %}
+                                <p class="mt-3 break-words text-sm text-slate-300">{{ hit.excerpt }}</p>
+                            {% endif %}
+                            <div class="mt-4 min-w-0">
+                                <a href="{{ hit.url }}" target="_blank" rel="noopener noreferrer" class="block max-w-full truncate overflow-hidden text-sm text-sky-300 hover:text-sky-200" title="{{ hit.url }}">{{ hit.url }}</a>
+                            </div>
+                        </article>
+                    {% empty %}
+                        <p class="text-sm text-slate-400">No dark hits matched yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
