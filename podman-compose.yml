@@ -11,6 +11,12 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
+  tor:
+    image: docker.io/dperson/torproxy:latest
+    restart: unless-stopped
+    # Ingen ports: Tor ska bara vara åtkomlig internt i compose-nätet
+    # Default lyssnar den på 9050 internt.
+
   web:
     build:
       context: .
@@ -21,10 +27,13 @@ services:
       DB_HOST: db
       DB_PORT: ${DB_PORT}
       DJANGO_SETTINGS_MODULE: config.settings.prod
+      # Viktigt: använd service-namnet "tor" här
+      DARK_TOR_SOCKS_URL: socks5h://tor:9050
     ports:
       - "8000:8000"
     depends_on:
       - db
+      - tor
     restart: unless-stopped
 
 volumes:

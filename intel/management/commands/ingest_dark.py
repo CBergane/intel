@@ -90,14 +90,20 @@ class Command(BaseCommand):
         raise RuntimeError(f"Failed to fetch dark source after {retries} attempt(s): {last_error}")
 
     def _fetch_once(self, dark_source):
+        use_tor = dark_source.url.endswith(".onion")
+
+        proxies = None
+        if use_tor:
+            proxies = {
+                "http": settings.DARK_TOR_SOCKS_URL,
+                "https": settings.DARK_TOR_SOCKS_URL,
+            }
+
         response = requests.get(
             dark_source.url,
             headers={"User-Agent": settings.INTEL_USER_AGENT},
             timeout=settings.DARK_FETCH_TIMEOUT,
-            proxies={
-                "http": settings.DARK_TOR_SOCKS_URL,
-                "https": settings.DARK_TOR_SOCKS_URL,
-            },
+            proxies=proxies,
             stream=True,
         )
         response.raise_for_status()
