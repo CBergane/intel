@@ -56,15 +56,20 @@ def superuser_required(view_func):
 
 def _validated_next_url(request) -> str:
     raw = (request.POST.get("next") or request.GET.get("next") or "").strip()
-    default_target = reverse("intel_admin:panel") 
-
+    default_target = reverse("intel_admin:ops")
     if not raw:
         return default_target
 
-    if raw.startswith("/") and url_has_allowed_host_and_scheme(
+    # Only allow safe relative paths.
+    if not raw.startswith("/"):
+        return default_target
+    if raw.startswith("//") or raw.startswith("/\\") or "\\" in raw:
+        return default_target
+
+    if url_has_allowed_host_and_scheme(
         raw,
         allowed_hosts={request.get_host()},
-        require_https=False,
+        require_https=request.is_secure(),
     ):
         return raw
 
