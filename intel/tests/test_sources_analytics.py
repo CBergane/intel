@@ -96,7 +96,7 @@ class SourcesAnalyticsViewTests(TestCase):
         )
 
     def test_sources_page_renders_analytics_cards(self):
-        response = self.client.get("/sources")
+        response = self.client.get("/sources/")
         self.assertEqual(response.status_code, 200)
 
         cards = {card["source"].slug: card for card in response.context["source_cards"]}
