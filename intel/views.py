@@ -489,7 +489,7 @@ def admin_login_view(request):
     if request.user.is_authenticated and request.user.is_superuser:
         return redirect("intel_admin:ops")
 
-    next_url = _validated_redirect_target(request, reverse("intel_admin:ops"))
+    next_url = _validated_next_url(request)
     form = AuthenticationForm(request=request, data=request.POST or None)
 
     if request.method == "POST":
@@ -498,7 +498,12 @@ def admin_login_view(request):
             if user is not None and user.is_superuser:
                 login(request, user)
                 return redirect(next_url)
-        messages.error(request, "Invalid credentials.")
+
+            # giltiga credentials men inte superuser
+            messages.error(request, "Invalid credentials.")
+        else:
+            # ogiltiga credentials
+            messages.error(request, "Invalid credentials.")
 
     return render(
         request,
