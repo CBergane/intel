@@ -17,7 +17,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import FeedCreateForm, FeedEditForm
+from .forms import FeedCreateForm, FeedEditForm, SourceCreateForm, SourceEditForm
 from .models import Feed, FetchRun, Item, Source
 
 TIME_RANGES = {
@@ -81,6 +81,19 @@ def extract_cve_ids(text: str) -> list[str]:
         seen.add(cve)
         cves.append(cve)
     return cves
+
+
+def _validated_redirect_target(request, default_target: str) -> str:
+    raw = (request.POST.get("next") or request.GET.get("next") or "").strip()
+    if not raw:
+        return default_target
+    if url_has_allowed_host_and_scheme(
+        raw,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ) and raw.startswith("/"):
+        return raw
+    return default_target
 
 
 def _item_text(item) -> str:
@@ -474,9 +487,9 @@ def about_view(request):
 
 def admin_login_view(request):
     if request.user.is_authenticated and request.user.is_superuser:
-        return redirect("intel_admin:panel")
+        return redirect("intel_admin:ops")
 
-    next_url = _validated_next_url(request)
+    next_url = _validated_redirect_target(request, reverse("intel_admin:ops"))
     form = AuthenticationForm(request=request, data=request.POST or None)
 
     if request.method == "POST":
@@ -637,6 +650,7 @@ def admin_panel_view(request):
             "page_title": "Admin Panel",
             "current_page": "admin",
             "feed_rows": feed_rows,
+            "sources_url": reverse("intel_admin:sources"),
         },
     )
 
@@ -658,6 +672,82 @@ def admin_panel_feed_create(request):
             "mode": "create",
             "cancel_url": reverse("intel_admin:panel"),
         },
+    )
+
+
+@superuser_required
+def admin_panel_sources_list(request):
+    sources = list(
+        Source.objects.annotate(
+            feed_count=Count("feeds", distinct=True),
+            item_count=Count("items", distinct=True),
+            last_item_at=Max(Coalesce("items__published_at", "items__created_at")),
+        ).order_by("name")
+    )
+    return render(
+        request,
+        "intel/admin_panel/source_list.html",
+        {
+            "page_title": "Source Admin",
+            "current_page": "admin",
+            "sources": sources,
+            "feeds_url": reverse("intel_admin:panel"),
+        },
+    )
+
+
+@superuser_required
+def admin_panel_source_create(request):
+    form = SourceCreateForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        source = form.save()
+        messages.success(request, f"Source '{source.name}' created.")
+        return redirect("intel_admin:sources")
+    return render(
+        request,
+        "intel/admin_panel/source_form.html",
+        {
+            "page_title": "Create Source",
+            "current_page": "admin",
+            "form": form,
+            "mode": "create",
+            "cancel_url": reverse("intel_admin:sources"),
+        },
+    )
+
+
+@superuser_required
+def admin_panel_source_edit(request, source_id: int):
+    source = get_object_or_404(Source, id=source_id)
+    form = SourceEditForm(request.POST or None, instance=source)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, f"Source '{source.name}' updated.")
+        return redirect("intel_admin:sources")
+    return render(
+        request,
+        "intel/admin_panel/source_form.html",
+        {
+            "page_title": "Edit Source",
+            "current_page": "admin",
+            "form": form,
+            "mode": "edit",
+            "source": source,
+            "cancel_url": reverse("intel_admin:sources"),
+        },
+    )
+
+
+@superuser_required
+@require_POST
+def admin_panel_source_toggle(request, source_id: int):
+    source = get_object_or_404(Source, id=source_id)
+    source.enabled = not source.enabled
+    source.save(update_fields=["enabled", "updated_at"])
+    state = "enabled" if source.enabled else "disabled"
+    messages.success(request, f"Source '{source.name}' {state}.")
+    return redirect(
+        _validated_redirect_target(request, reverse("intel_admin:sources"))
     )
 
 
