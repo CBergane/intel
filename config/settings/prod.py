@@ -1,5 +1,5 @@
 import os
-
+import sys
 from .base import *  # noqa: F401,F403
 
 DEBUG = False
@@ -8,6 +8,11 @@ if not os.getenv("SECRET_KEY") or SECRET_KEY == "replace-this-in-production" or 
     raise RuntimeError(
         "SECRET_KEY must be set in environment and at least 32 characters in production."
     )
+    
+if "test" in sys.argv:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)

@@ -8,6 +8,7 @@ deduplicates and scores items, and presents them in a structured way (not an RSS
 - No user accounts, org management, payments, or multi-tenancy in v1.
 - No “scraping everything”. Prefer official feeds/APIs and an allowlist.
 - No heavy ML/NLP pipeline in v1 (keep it deterministic + explainable).
+- No public/self-service user accounts in v1. A superuser-only admin panel is allowed for managing allowlisted sources/feeds.
 
 ## Product principles
 1. High signal > high volume.
@@ -33,4 +34,13 @@ deduplicates and scores items, and presents them in a structured way (not an RSS
 9. Ops rules:
    - Provide a “Feed Health” view (last success, error, lag)
    - Logging must not include secrets
-10. Deliver with “What changed” + “How to test” in PR descriptions.
+   - Superuser-only routes: /admin-login/, /admin-panel/, /ops/
+   - All mutating actions must be POST + CSRF; logout must be POST.
+   - Prevent open redirects via validated next handling.
+   - Fetch limits must be configurable via env (FEED_MAX_BYTES, timeout, retries).
+10. Darkweb rules:
+   - Darkweb monitoring is isolated from RSS intel (separate views + storage); do not mix into Item feed.
+   - Passive collection only; no authentication, no interaction with illicit marketplaces.
+   - Run with strict network isolation and egress controls.
+
+11. Deliver with “What changed” + “How to test” in PR descriptions.
