@@ -29,6 +29,7 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings.prod
       # Viktigt: använd service-namnet "tor" här
       DARK_TOR_SOCKS_URL: socks5h://tor:9050
+      GUNICORN_CMD_ARGS: "--access-logfile - --error-logfile - --capture-output --log-level info"
     ports:
       - "8000:8000"
     depends_on:

@@ -11,6 +11,7 @@ from intel.dark_utils import (
     extract_title,
     matched_keywords,
     strip_tags,
+    extract_main_html
 )
 from intel.models import DarkFetchRun, DarkHit, DarkSource
 
@@ -33,7 +34,8 @@ class Command(BaseCommand):
                 run.bytes_received = bytes_received
 
                 title = extract_title(markup)
-                text = strip_tags(markup)
+                main_html = extract_main_html(markup)
+                text = strip_tags(main_html)
                 excerpt = build_excerpt(text)
                 matches = matched_keywords(f"{title}\n{text}", dark_source.watch_keywords)
                 content_hash = build_content_hash(
@@ -52,7 +54,7 @@ class Command(BaseCommand):
                             "title": title,
                             "excerpt": excerpt,
                             "url": dark_source.url,
-                            "raw": markup[:4000],
+                            "raw":  main_html[:4000],
                         },
                     )
                     if created:
