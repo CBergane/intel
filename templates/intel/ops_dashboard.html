@@ -11,7 +11,10 @@
                 <h1 class="text-xl font-semibold text-white">Ops Dashboard</h1>
                 <p class="mt-1 text-sm text-slate-400">Internal feed health and operational controls.</p>
             </div>
-            <a href="{{ admin_panel_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Open Admin Panel</a>
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ admin_panel_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Open Admin Panel</a>
+                <a href="{{ django_admin_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Django Admin</a>
+            </div>
         </div>
     </div>
 
@@ -69,9 +72,14 @@
                                 <th class="px-2 py-2">Last Success</th>
                                 <th class="px-2 py-2">Last Run</th>
                                 <th class="px-2 py-2">Status</th>
+                                <th class="px-2 py-2">Mode</th>
                                 <th class="px-2 py-2">HTTP</th>
+                                <th class="px-2 py-2">Fetched</th>
                                 <th class="px-2 py-2">New</th>
                                 <th class="px-2 py-2">Updated</th>
+                                <th class="px-2 py-2">Skip Old</th>
+                                <th class="px-2 py-2">Skip Invalid</th>
+                                <th class="px-2 py-2">Limited</th>
                                 <th class="px-2 py-2">Duration</th>
                                 <th class="px-2 py-2">Error</th>
                             </tr>
@@ -106,9 +114,20 @@
                                             <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">never</span>
                                         {% endif %}
                                     </td>
+                                    <td class="px-2 py-2">
+                                        {% if row.collection_mode == "expanded" %}
+                                            <span class="rounded bg-amber-500/20 px-2 py-1 text-xs text-amber-300">expanded</span>
+                                        {% else %}
+                                            <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">normal</span>
+                                        {% endif %}
+                                    </td>
                                     <td class="px-2 py-2">{{ row.latest_run.http_status|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ row.latest_run.items_fetched|default:"-" }}</td>
                                     <td class="px-2 py-2">{{ row.latest_run.items_new|default:"-" }}</td>
                                     <td class="px-2 py-2">{{ row.latest_run.items_updated|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ row.latest_run.items_skipped_old|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ row.latest_run.items_skipped_invalid|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ row.latest_run.items_limited|default:"-" }}</td>
                                     <td class="px-2 py-2">
                                         {% if row.latest_run and row.latest_run.duration_ms %}
                                             {{ row.latest_run.duration_ms }}ms
@@ -122,7 +141,7 @@
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="12" class="px-2 py-6 text-center text-slate-400">No enabled feeds.</td>
+                                    <td colspan="17" class="px-2 py-6 text-center text-slate-400">No enabled feeds.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -140,8 +159,11 @@
                                 <th class="px-2 py-2">Feed</th>
                                 <th class="px-2 py-2">OK</th>
                                 <th class="px-2 py-2">HTTP</th>
+                                <th class="px-2 py-2">Fetched</th>
                                 <th class="px-2 py-2">New</th>
                                 <th class="px-2 py-2">Updated</th>
+                                <th class="px-2 py-2">Skip Old</th>
+                                <th class="px-2 py-2">Skip Invalid</th>
                                 <th class="px-2 py-2">Duration</th>
                                 <th class="px-2 py-2">Error</th>
                             </tr>
@@ -169,8 +191,11 @@
                                         {% endif %}
                                     </td>
                                     <td class="px-2 py-2">{{ run.http_status|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ run.items_fetched|default:"-" }}</td>
                                     <td class="px-2 py-2">{{ run.items_new }}</td>
                                     <td class="px-2 py-2">{{ run.items_updated }}</td>
+                                    <td class="px-2 py-2">{{ run.items_skipped_old|default:"-" }}</td>
+                                    <td class="px-2 py-2">{{ run.items_skipped_invalid|default:"-" }}</td>
                                     <td class="px-2 py-2">
                                         {% if run.duration_ms %}
                                             {{ run.duration_ms }}ms
@@ -182,7 +207,7 @@
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="8" class="px-2 py-6 text-center text-slate-400">No runs yet.</td>
+                                    <td colspan="11" class="px-2 py-6 text-center text-slate-400">No runs yet.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -202,6 +227,11 @@
                     </form>
                     <form method="post" action="{% url 'intel_admin:ops' %}">
                         {% csrf_token %}
+                        <input type="hidden" name="action" value="ingest_dark">
+                        <button class="w-full rounded-lg border border-cyan-500/50 px-4 py-2 text-sm text-cyan-200 hover:bg-cyan-500/15" type="submit">Run dark ingest now</button>
+                    </form>
+                    <form method="post" action="{% url 'intel_admin:ops' %}">
+                        {% csrf_token %}
                         <input type="hidden" name="action" value="prune">
                         <button class="w-full rounded-lg bg-amber-400 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-amber-300" type="submit">Run prune now</button>
                     </form>
@@ -214,6 +244,11 @@
                         {% csrf_token %}
                         <input type="hidden" name="action" value="seed">
                         <button class="w-full rounded-lg border border-sky-500/50 px-4 py-2 text-sm text-sky-200 hover:bg-sky-500/15" type="submit">Run seed now</button>
+                    </form>
+                    <form method="post" action="{% url 'intel_admin:ops' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="seed_sync">
+                        <button class="w-full rounded-lg border border-amber-500/50 px-4 py-2 text-sm text-amber-200 hover:bg-amber-500/15" type="submit">Run seed sync (overwrite)</button>
                     </form>
                 </div>
             </div>

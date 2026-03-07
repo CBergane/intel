@@ -94,6 +94,9 @@ class AdminPanelFeedCrudTests(TestCase):
                 "feed_type": Feed.FeedType.RSS,
                 "section": Feed.Section.ADVISORIES,
                 "enabled": "on",
+                "priority": "100",
+                "timeout_seconds": "10",
+                "max_bytes": "1500000",
                 "max_age_days": "120",
                 "max_items_per_run": "150",
             },
@@ -103,6 +106,7 @@ class AdminPanelFeedCrudTests(TestCase):
 
         feed = Feed.objects.get(url="https://example.com/managed.xml")
         edit_url = reverse("intel_admin:feed_edit", kwargs={"feed_id": feed.id})
+        delete_url = reverse("intel_admin:feed_delete", kwargs={"feed_id": feed.id})
 
         edit_get = client.get(edit_url)
         self.assertEqual(edit_get.status_code, 200)
@@ -111,8 +115,15 @@ class AdminPanelFeedCrudTests(TestCase):
             edit_url,
             {
                 "csrfmiddlewaretoken": token,
+                "source": str(self.source.id),
+                "name": "Managed Feed Updated",
                 "url": "https://example.com/managed-updated.xml",
+                "feed_type": Feed.FeedType.RSS,
+                "adapter_key": "",
                 "section": Feed.Section.RESEARCH,
+                "priority": "90",
+                "timeout_seconds": "15",
+                "max_bytes": "1500000",
                 "max_age_days": "90",
                 "max_items_per_run": "80",
             },
@@ -121,8 +132,22 @@ class AdminPanelFeedCrudTests(TestCase):
         self.assertEqual(update_response.url, self.panel_url)
 
         feed.refresh_from_db()
+        self.assertEqual(feed.name, "Managed Feed Updated")
         self.assertEqual(feed.url, "https://example.com/managed-updated.xml")
         self.assertFalse(feed.enabled)
+        self.assertEqual(feed.priority, 90)
         self.assertEqual(feed.section, Feed.Section.RESEARCH)
         self.assertEqual(feed.max_age_days, 90)
         self.assertEqual(feed.max_items_per_run, 80)
+
+        token = client.cookies["csrftoken"].value
+        delete_response = client.post(
+            delete_url,
+            {
+                "csrfmiddlewaretoken": token,
+                "next": self.panel_url,
+            },
+        )
+        self.assertEqual(delete_response.status_code, 302)
+        self.assertEqual(delete_response.url, self.panel_url)
+        self.assertFalse(Feed.objects.filter(id=feed.id).exists())

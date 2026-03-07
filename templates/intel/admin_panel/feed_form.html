@@ -22,9 +22,12 @@
         {% endif %}
         <div class="grid gap-4 md:grid-cols-2">
             {% for field in form %}
-                <div class="{% if field.name == 'url' %}md:col-span-2{% endif %}">
+                <div class="{% if field.name == 'url' or field.name == 'adapter_key' %}md:col-span-2{% endif %}">
                     <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
+                    {% if field.help_text %}
+                        <p class="mt-1 text-xs text-slate-500">{{ field.help_text }}</p>
+                    {% endif %}
                     {% if field.errors %}
                         <p class="mt-1 text-xs text-rose-300">{{ field.errors|striptags }}</p>
                     {% endif %}

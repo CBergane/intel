@@ -5,7 +5,18 @@ from intel.tier1_sources import DISABLED_FEED_URLS, TIER1_SOURCES
 
 
 class Command(BaseCommand):
-    help = "Create or update Tier-1 sources and feeds idempotently."
+    help = (
+        "Create or update Tier-1 sources/feeds idempotently. "
+        "By default, existing rows are preserved to avoid overwriting manual operator edits. "
+        "Use --sync to reconcile existing rows to tier defaults."
+    )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--sync",
+            action="store_true",
+            help="Reconcile existing rows to tier defaults (overwrites manual edits).",
+        )
 
     def handle(self, *args, **options):
         source_created = 0
@@ -14,11 +25,12 @@ class Command(BaseCommand):
         feed_updated = 0
         source_errors = 0
         feed_errors = 0
+        sync = bool(options.get("sync"))
         disabled_broken_feeds = self._disable_broken_feeds()
 
         for source_data in TIER1_SOURCES:
             try:
-                source, created, updated = self._upsert_source(source_data)
+                source, created, updated = self._upsert_source(source_data, sync=sync)
                 if created:
                     source_created += 1
                 elif updated:
@@ -34,7 +46,9 @@ class Command(BaseCommand):
 
             for feed_data in source_data["feeds"]:
                 try:
-                    _, was_created, was_updated = self._upsert_feed(source, feed_data)
+                    _, was_created, was_updated = self._upsert_feed(
+                        source, feed_data, sync=sync
+                    )
                     if was_created:
                         feed_created += 1
                     elif was_updated:
@@ -50,6 +64,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 "Seed complete. "
+                f"sync={'yes' if sync else 'no'}, "
                 f"sources_created={source_created}, "
                 f"sources_updated={source_updated}, "
                 f"feeds_created={feed_created}, "
@@ -65,7 +80,7 @@ class Command(BaseCommand):
             enabled=False
         )
 
-    def _upsert_source(self, source_data):
+    def _upsert_source(self, source_data, *, sync: bool):
         seed_slug = source_data["slug"]
         seed_name = source_data["name"]
         desired = {
@@ -86,7 +101,11 @@ class Command(BaseCommand):
                 return source, True, False
 
         changed_fields = []
+        # slug/name are identity-safe to reconcile even without --sync.
+        identity_fields = {"slug", "name"}
         for field, value in desired.items():
+            if not sync and field not in identity_fields:
+                continue
             if getattr(source, field) != value:
                 setattr(source, field, value)
                 changed_fields.append(field)
@@ -96,13 +115,18 @@ class Command(BaseCommand):
             return source, False, True
         return source, False, False
 
-    def _upsert_feed(self, source, feed_data):
+    def _upsert_feed(self, source, feed_data, *, sync: bool):
         defaults = {
             "source": source,
             "name": feed_data["name"],
             "feed_type": feed_data.get("feed_type", Feed.FeedType.RSS),
+            "adapter_key": feed_data.get("adapter_key", ""),
             "section": feed_data["section"],
+            "priority": feed_data.get("priority", 100),
             "enabled": feed_data.get("enabled", True),
+            "expanded_collection": feed_data.get("expanded_collection", False),
+            "expanded_max_items_per_run": feed_data.get("expanded_max_items_per_run"),
+            "expanded_max_age_days": feed_data.get("expanded_max_age_days"),
             "timeout_seconds": feed_data.get("timeout_seconds", 10),
             "max_bytes": feed_data.get("max_bytes", 1_500_000),
             "max_age_days": feed_data.get("max_age_days", 180),
@@ -111,6 +135,9 @@ class Command(BaseCommand):
         feed, created = Feed.objects.get_or_create(url=feed_data["url"], defaults=defaults)
         if created:
             return feed, True, False
+
+        if not sync:
+            return feed, False, False
 
         changed_fields = []
         for field, value in defaults.items():

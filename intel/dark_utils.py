@@ -1,83 +1,53 @@
 import hashlib
 import html
 import re
+from urllib.parse import urljoin, urlsplit
+
 
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
-WHITESPACE_RE = re.compile(r"[ \t\r\f\v]+")
-BLANKLINES_RE = re.compile(r"\n{3,}")
-
-# Remove noisy blocks before stripping tags
-SCRIPT_RE = re.compile(r"(?is)<script[^>]*>.*?</script>")
-STYLE_RE = re.compile(r"(?is)<style[^>]*>.*?</style>")
-NOSCRIPT_RE = re.compile(r"(?is)<noscript[^>]*>.*?</noscript>")
-SVG_RE = re.compile(r"(?is)<svg[^>]*>.*?</svg>")
-HTML_TAG_RE = re.compile(r"(?s)<[^>]+>")
-
-# Optional: drop common boilerplate blocks (light heuristic)
-HEADER_FOOTER_NAV_ASIDE_RE = re.compile(r"(?is)<(header|footer|nav|aside)[^>]*>.*?</\1>")
+TAG_RE = re.compile(r"<[^>]+>")
+HREF_RE = re.compile(
+    r"""<a[^>]+href=["'](?P<href>[^"']+)["'][^>]*>""",
+    re.IGNORECASE,
+)
+WHITESPACE_RE = re.compile(r"\s+")
+CVE_RE = re.compile(r"\bCVE-\d{4}-\d+\b", re.IGNORECASE)
 
 
 def parse_watch_keywords(raw: str) -> list[str]:
     return [part.strip().lower() for part in (raw or "").split(",") if part.strip()]
 
 
-def normalize_text(value: str) -> str:
-    # preserve newlines, normalize spaces
-    s = (value or "").strip()
-    s = s.replace("\xa0", " ").replace("\u200b", " ")
-    s = s.replace("\r\n", "\n").replace("\r", "\n")
-    s = WHITESPACE_RE.sub(" ", s)
-    # cleanup spaces around newlines
-    s = re.sub(r" *\n *", "\n", s)
-    s = BLANKLINES_RE.sub("\n\n", s)
-    return s.strip()
+def parse_watch_regex(raw: str) -> list[str]:
+    patterns = []
+    for line in (raw or "").splitlines():
+        cleaned = line.strip()
+        if cleaned:
+            patterns.append(cleaned)
+    return patterns
 
 
 def extract_title(markup: str) -> str:
     match = TITLE_RE.search(markup or "")
     if not match:
         return "Untitled"
-    # strip tags inside title, unescape, normalize
-    title = html.unescape(match.group(1))
-    title = HTML_TAG_RE.sub(" ", title)
-    return normalize_text(title) or "Untitled"
-
-
-def extract_main_html(markup: str) -> str:
-    """
-    Prefer <main> or <article> content when present.
-    Falls back to full markup if not found.
-    """
-    m = re.search(r"(?is)<main[^>]*>(.*?)</main>", markup or "")
-    if m:
-        return m.group(1)
-    m = re.search(r"(?is)<article[^>]*>(.*?)</article>", markup or "")
-    if m:
-        return m.group(1)
-    return markup or ""
+    return normalize_text(match.group(1)) or "Untitled"
 
 
 def strip_tags(markup: str) -> str:
-    s = html.unescape(markup or "")
+    text = TAG_RE.sub(" ", markup or "")
+    return normalize_text(html.unescape(text))
 
-    # Remove the worst offenders first
-    s = SCRIPT_RE.sub(" ", s)
-    s = STYLE_RE.sub(" ", s)
-    s = NOSCRIPT_RE.sub(" ", s)
-    s = SVG_RE.sub(" ", s)
-    s = HEADER_FOOTER_NAV_ASIDE_RE.sub(" ", s)
 
-    # Drop remaining tags
-    s = HTML_TAG_RE.sub(" ", s)
-
-    return normalize_text(s)
+def normalize_text(value: str) -> str:
+    return WHITESPACE_RE.sub(" ", (value or "").strip())
 
 
 def build_excerpt(text: str, limit: int = 280) -> str:
     cleaned = normalize_text(text)
     if len(cleaned) <= limit:
         return cleaned
-    return cleaned[: limit - 1].rstrip() + "…"
+    return cleaned[: limit - 3].rstrip() + "..."
 
 
 def matched_keywords(text: str, raw_keywords: str) -> list[str]:
@@ -89,7 +59,55 @@ def matched_keywords(text: str, raw_keywords: str) -> list[str]:
     return matches
 
 
-def build_content_hash(*, url: str, title: str, text: str, matched: list[str]) -> str:
-    # Only hash a limited amount of text to avoid huge payloads
-    payload = "\n".join([url or "", title or "", normalize_text(text)[:2000], ",".join(matched or [])])
-    return hashlib.sha256(payload.encode("utf-8", errors="ignore")).hexdigest()
+def matched_regex(text: str, raw_regex: str) -> list[str]:
+    matches = []
+    for pattern in parse_watch_regex(raw_regex):
+        try:
+            if re.search(pattern, text or "", flags=re.IGNORECASE):
+                matches.append(pattern)
+        except re.error:
+            continue
+    return matches
+
+
+def build_content_hash(*, url: str, title: str, text: str) -> str:
+    payload = "\n".join([url or "", title or "", normalize_text(text)])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def extract_links(markup: str, *, base_url: str, max_links: int = 50) -> list[str]:
+    links: list[str] = []
+    seen = set()
+    base_parts = urlsplit(base_url)
+    base_host = (base_parts.hostname or "").lower()
+    for match in HREF_RE.finditer(markup or ""):
+        href = (match.group("href") or "").strip()
+        if not href:
+            continue
+        absolute = urljoin(base_url, href)
+        try:
+            parts = urlsplit(absolute)
+        except ValueError:
+            continue
+        if parts.scheme not in {"http", "https"}:
+            continue
+        host = (parts.hostname or "").lower()
+        if not host:
+            continue
+        # For passive index crawling: only same host + subpaths.
+        if host != base_host:
+            continue
+        normalized = f"{parts.scheme}://{parts.netloc}{parts.path or '/'}"
+        if parts.query:
+            normalized = f"{normalized}?{parts.query}"
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        links.append(normalized)
+        if len(links) >= max_links:
+            break
+    return links
+
+
+def contains_cve(text: str) -> bool:
+    return bool(CVE_RE.search(text or ""))

@@ -17,9 +17,15 @@
                     <th class="px-3 py-2 text-left">Source</th>
                     <th class="px-3 py-2 text-left">Feed</th>
                     <th class="px-3 py-2 text-left">Type</th>
+                    <th class="px-3 py-2 text-left">Mode</th>
                     <th class="px-3 py-2 text-left">Last Success</th>
                     <th class="px-3 py-2 text-left">Last Run</th>
                     <th class="px-3 py-2 text-left">Status</th>
+                    <th class="px-3 py-2 text-left">Fetched</th>
+                    <th class="px-3 py-2 text-left">Stored</th>
+                    <th class="px-3 py-2 text-left">Skip Old</th>
+                    <th class="px-3 py-2 text-left">Skip Invalid</th>
+                    <th class="px-3 py-2 text-left">Limited</th>
                     <th class="px-3 py-2 text-left">Error</th>
                 </tr>
             </thead>
@@ -29,6 +35,13 @@
                         <td class="px-3 py-2">{{ feed.source.name }}</td>
                         <td class="px-3 py-2">{{ feed.name }}</td>
                         <td class="px-3 py-2">{{ feed.feed_type|upper }}</td>
+                        <td class="px-3 py-2">
+                            {% if feed.expanded_collection %}
+                                <span class="rounded bg-amber-500/20 px-2 py-1 text-amber-300">expanded</span>
+                            {% else %}
+                                <span class="rounded bg-slate-700 px-2 py-1 text-slate-300">normal</span>
+                            {% endif %}
+                        </td>
                         <td class="px-3 py-2">
                             {% if feed.last_success_at %}
                                 {{ feed.last_success_at|date:"Y-m-d H:i" }} UTC
@@ -56,11 +69,36 @@
                                 {% endif %}
                             {% endwith %}
                         </td>
+                        <td class="px-3 py-2">
+                            {% with latest=latest_by_feed|get_item:feed.id %}
+                                {{ latest.items_fetched|default:"-" }}
+                            {% endwith %}
+                        </td>
+                        <td class="px-3 py-2">
+                            {% with latest=latest_by_feed|get_item:feed.id %}
+                                {{ latest.items_stored|default:"-" }}
+                            {% endwith %}
+                        </td>
+                        <td class="px-3 py-2">
+                            {% with latest=latest_by_feed|get_item:feed.id %}
+                                {{ latest.items_skipped_old|default:"-" }}
+                            {% endwith %}
+                        </td>
+                        <td class="px-3 py-2">
+                            {% with latest=latest_by_feed|get_item:feed.id %}
+                                {{ latest.items_skipped_invalid|default:"-" }}
+                            {% endwith %}
+                        </td>
+                        <td class="px-3 py-2">
+                            {% with latest=latest_by_feed|get_item:feed.id %}
+                                {{ latest.items_limited|default:"-" }}
+                            {% endwith %}
+                        </td>
                         <td class="px-3 py-2 text-xs text-slate-400">{{ feed.last_error|truncatechars:90|default:"-" }}</td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7" class="px-3 py-6 text-center text-slate-400">No feeds configured yet.</td>
+                        <td colspan="12" class="px-3 py-6 text-center text-slate-400">No feeds configured yet.</td>
                     </tr>
                 {% endfor %}
             </tbody>

@@ -34,7 +34,7 @@ class SeedSourcesCommandTests(TestCase):
         self.assertIn("sources_created=0", output_second.getvalue())
         self.assertIn("feeds_created=0", output_second.getvalue())
 
-    def test_seed_sources_updates_changed_feed_fields(self):
+    def test_seed_sources_sync_updates_changed_feed_fields(self):
         call_command("seed_sources")
 
         feed = Feed.objects.select_related("source").get(source__slug="msrc")
@@ -56,7 +56,18 @@ class SeedSourcesCommandTests(TestCase):
             ]
         )
 
+        # Default run preserves operator edits.
         call_command("seed_sources")
+        feed.refresh_from_db()
+        self.assertEqual(feed.section, Feed.Section.RESEARCH)
+        self.assertFalse(feed.enabled)
+        self.assertEqual(feed.timeout_seconds, 2)
+        self.assertEqual(feed.max_bytes, 512)
+        self.assertEqual(feed.max_age_days, 5)
+        self.assertEqual(feed.max_items_per_run, 5)
+
+        # --sync explicitly reconciles to tier defaults.
+        call_command("seed_sources", "--sync")
         feed.refresh_from_db()
 
         expected = _find_feed_config("msrc")

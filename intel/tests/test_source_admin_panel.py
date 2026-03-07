@@ -25,12 +25,16 @@ class SourceAdminSecurityTests(TestCase):
         self.toggle_url = reverse(
             "intel_admin:source_toggle", kwargs={"source_id": self.source.id}
         )
+        self.delete_url = reverse(
+            "intel_admin:source_delete", kwargs={"source_id": self.source.id}
+        )
 
     def test_reverse_names_resolve(self):
         self.assertEqual(self.list_url, "/admin-panel/sources/")
         self.assertEqual(self.create_url, "/admin-panel/sources/new/")
         self.assertEqual(self.edit_url, f"/admin-panel/sources/{self.source.id}/edit/")
         self.assertEqual(self.toggle_url, f"/admin-panel/sources/{self.source.id}/toggle/")
+        self.assertEqual(self.delete_url, f"/admin-panel/sources/{self.source.id}/delete/")
 
     def test_unauthenticated_user_redirected_to_admin_login(self):
         response = self.client.get(self.list_url)
@@ -65,6 +69,9 @@ class SourceAdminCrudTests(TestCase):
         self.edit_url = reverse("intel_admin:source_edit", kwargs={"source_id": self.source.id})
         self.toggle_url = reverse(
             "intel_admin:source_toggle", kwargs={"source_id": self.source.id}
+        )
+        self.delete_url = reverse(
+            "intel_admin:source_delete", kwargs={"source_id": self.source.id}
         )
 
     def test_superuser_can_view_sources_list(self):
@@ -136,6 +143,18 @@ class SourceAdminCrudTests(TestCase):
 
         self.source.refresh_from_db()
         self.assertFalse(self.source.enabled)
+
+        token = client.cookies["csrftoken"].value
+        delete_response = client.post(
+            self.delete_url,
+            {
+                "csrfmiddlewaretoken": token,
+                "next": self.list_url,
+            },
+        )
+        self.assertEqual(delete_response.status_code, 302)
+        self.assertEqual(delete_response.url, self.list_url)
+        self.assertFalse(Source.objects.filter(id=self.source.id).exists())
 
     def test_csrf_enforced_for_source_toggle(self):
         client = Client(enforce_csrf_checks=True)

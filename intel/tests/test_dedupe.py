@@ -59,3 +59,49 @@ class DedupeTests(TestCase):
         self.assertTrue(created_a)
         self.assertFalse(created_b)
         self.assertEqual(Item.objects.count(), 1)
+
+    def test_external_id_prevents_over_merge_when_url_missing(self):
+        entry_a = {
+            "id": "CVE-2026-1000",
+            "title": "Weekly KEV update",
+            "summary": "first",
+            "published": "2026-02-08T12:00:00+00:00",
+        }
+        entry_b = {
+            "id": "CVE-2026-2000",
+            "title": "Weekly KEV update",
+            "summary": "second",
+            "published": "2026-02-08T12:00:00+00:00",
+        }
+
+        _, created_a = upsert_item(self.feed, entry_a)
+        _, created_b = upsert_item(self.feed, entry_b)
+
+        self.assertTrue(created_a)
+        self.assertTrue(created_b)
+        self.assertEqual(Item.objects.count(), 2)
+        self.assertTrue(Item.objects.filter(external_id="CVE-2026-1000").exists())
+        self.assertTrue(Item.objects.filter(external_id="CVE-2026-2000").exists())
+
+    def test_feed_landing_page_url_does_not_force_merge(self):
+        entry_a = {
+            "id": "post-001",
+            "title": "Security update alpha",
+            "link": self.feed.url,
+            "summary": "alpha",
+            "published": "2026-02-08T01:00:00+00:00",
+        }
+        entry_b = {
+            "id": "post-002",
+            "title": "Security update beta",
+            "link": self.feed.url,
+            "summary": "beta",
+            "published": "2026-02-08T02:00:00+00:00",
+        }
+
+        _, created_a = upsert_item(self.feed, entry_a)
+        _, created_b = upsert_item(self.feed, entry_b)
+
+        self.assertTrue(created_a)
+        self.assertTrue(created_b)
+        self.assertEqual(Item.objects.count(), 2)

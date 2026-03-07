@@ -25,7 +25,7 @@ from .forms import (
     SourceCreateForm,
     SourceEditForm,
 )
-from .models import DarkFetchRun, DarkHit, DarkSource, Feed, FetchRun, Item, Source
+from .models import DarkDocument, DarkFetchRun, DarkHit, DarkSource, Feed, FetchRun, Item, Source
 
 TIME_RANGES = {
     "24h": timedelta(hours=24),
@@ -164,7 +164,9 @@ def build_trending_cves(items, *, limit: int = 10):
 
 
 def _filtered_items(request, section=None, *, balance_per_source=False):
-    queryset = Item.objects.select_related("source", "feed").all()
+    queryset = Item.objects.select_related("source", "feed").annotate(
+        activity_at=Coalesce("published_at", "created_at")
+    )
     if section is not None:
         queryset = queryset.filter(feed__section=section)
 
@@ -174,15 +176,21 @@ def _filtered_items(request, section=None, *, balance_per_source=False):
     if selected_time not in TIME_RANGES:
         selected_time = "7d"
 
+    since = timezone.now() - TIME_RANGES[selected_time]
+    window_queryset = queryset.filter(activity_at__gte=since)
+    window_total = window_queryset.count()
+
     if query:
-        queryset = queryset.filter(Q(title__icontains=query) | Q(summary__icontains=query))
+        window_queryset = window_queryset.filter(
+            Q(title__icontains=query) | Q(summary__icontains=query)
+        )
 
     if source_slug:
-        queryset = queryset.filter(source__slug=source_slug)
+        window_queryset = window_queryset.filter(source__slug=source_slug)
+    filtered_total = window_queryset.count()
+    hidden_by_filters = max(0, window_total - filtered_total)
 
-    since = timezone.now() - TIME_RANGES[selected_time]
-    queryset = queryset.filter(published_at__gte=since)
-    ordered = queryset.order_by("-published_at", "-id")
+    ordered = window_queryset.order_by("-activity_at", "-id")
 
     if balance_per_source and not source_slug:
         source_counts = {}
@@ -204,6 +212,10 @@ def _filtered_items(request, section=None, *, balance_per_source=False):
         "query": query,
         "selected_source": source_slug,
         "selected_time": selected_time,
+        "window_total": window_total,
+        "filtered_total": filtered_total,
+        "hidden_by_filters": hidden_by_filters,
+        "balance_applied": balance_per_source and not source_slug,
         "sources": Source.objects.filter(enabled=True).order_by("name"),
         "time_options": TIME_OPTIONS,
     }
@@ -490,7 +502,10 @@ def dark_dashboard_view(request):
     query = (request.GET.get("q") or "").strip()
     selected_source = (request.GET.get("source") or "").strip()
 
-    hits = DarkHit.objects.select_related("dark_source").order_by("-detected_at", "-id")
+    hits = (
+        DarkHit.objects.select_related("dark_source", "dark_document")
+        .order_by("-last_seen_at", "-id")
+    )
     if selected_source:
         hits = hits.filter(dark_source__slug=selected_source)
     if query:
@@ -500,11 +515,16 @@ def dark_dashboard_view(request):
             | Q(url__icontains=query)
             | Q(raw__icontains=query)
             | Q(matched_keywords__icontains=query)
+            | Q(matched_regex__icontains=query)
         )
 
     sources = list(
         DarkSource.objects.filter(enabled=True)
-        .annotate(hit_count=Count("hits", distinct=True), last_hit_at=Max("hits__detected_at"))
+        .annotate(
+            hit_count=Count("hits", distinct=True),
+            document_count=Count("documents", distinct=True),
+            last_hit_at=Max("hits__last_seen_at"),
+        )
         .order_by("name")
     )
     latest_run_by_source = {}
@@ -641,6 +661,17 @@ def _build_feed_rows(feeds):
                 "latest_run": latest_run,
                 "status": status,
                 "last_run_at": last_run_at,
+                "collection_mode": "expanded" if feed.expanded_collection else "normal",
+                "effective_max_items": (
+                    feed.expanded_max_items_per_run or max(feed.max_items_per_run, 1000)
+                    if feed.expanded_collection
+                    else feed.max_items_per_run
+                ),
+                "effective_max_age_days": (
+                    feed.expanded_max_age_days or max(feed.max_age_days, 365)
+                    if feed.expanded_collection
+                    else feed.max_age_days
+                ),
             }
         )
     return feed_rows
@@ -650,9 +681,11 @@ def _build_feed_rows(feeds):
 def ops_dashboard(request):
     actions = {
         "ingest": ("ingest_sources", [], "Ingest run"),
+        "ingest_dark": ("ingest_dark", [], "Dark ingest run"),
         "prune": ("prune_items", [], "Prune run"),
         "prune_dry_run": ("prune_items", ["--dry-run"], "Prune dry-run"),
         "seed": ("seed_sources", [], "Seed run"),
+        "seed_sync": ("seed_sources", ["--sync"], "Seed sync run"),
     }
 
     if request.method == "POST":
@@ -717,6 +750,7 @@ def ops_dashboard(request):
             "recent_runs": recent_runs,
             "feed_list_url": feed_list_url,
             "admin_panel_url": reverse("intel_admin:panel"),
+            "django_admin_url": reverse("admin:index"),
         },
     )
 
@@ -733,6 +767,8 @@ def admin_panel_view(request):
             "current_page": "admin",
             "feed_rows": feed_rows,
             "sources_url": reverse("intel_admin:sources"),
+            "dark_sources_url": reverse("intel_admin:dark_sources"),
+            "django_admin_url": reverse("admin:index"),
         },
     )
 
@@ -774,6 +810,8 @@ def admin_panel_sources_list(request):
             "current_page": "admin",
             "sources": sources,
             "feeds_url": reverse("intel_admin:panel"),
+            "dark_sources_url": reverse("intel_admin:dark_sources"),
+            "django_admin_url": reverse("admin:index"),
         },
     )
 
@@ -783,7 +821,8 @@ def admin_panel_dark_sources_list(request):
     sources = list(
         DarkSource.objects.annotate(
             hit_count=Count("hits", distinct=True),
-            last_hit_at=Max("hits__detected_at"),
+            document_count=Count("documents", distinct=True),
+            last_hit_at=Max("hits__last_seen_at"),
         ).order_by("name")
     )
     latest_run_by_source = {}
@@ -823,6 +862,9 @@ def admin_panel_dark_sources_list(request):
             "page_title": "Dark Admin",
             "current_page": "admin",
             "source_rows": source_rows,
+            "feeds_url": reverse("intel_admin:panel"),
+            "sources_url": reverse("intel_admin:sources"),
+            "django_admin_url": reverse("admin:index"),
         },
     )
 
@@ -938,6 +980,18 @@ def admin_panel_source_toggle(request, source_id: int):
 
 
 @superuser_required
+@require_POST
+def admin_panel_source_delete(request, source_id: int):
+    source = get_object_or_404(Source, id=source_id)
+    source_name = source.name
+    source.delete()
+    messages.success(request, f"Source '{source_name}' deleted.")
+    return redirect(
+        _validated_redirect_target(request, reverse("intel_admin:sources"))
+    )
+
+
+@superuser_required
 def admin_panel_feed_edit(request, feed_id: int):
     feed = get_object_or_404(Feed.objects.select_related("source"), id=feed_id)
     form = FeedEditForm(request.POST or None, instance=feed)
@@ -970,3 +1024,15 @@ def admin_panel_feed_disable(request, feed_id: int):
     else:
         messages.info(request, f"Feed '{feed.name}' is already disabled.")
     return redirect("intel_admin:panel")
+
+
+@superuser_required
+@require_POST
+def admin_panel_feed_delete(request, feed_id: int):
+    feed = get_object_or_404(Feed, id=feed_id)
+    feed_name = feed.name
+    feed.delete()
+    messages.success(request, f"Feed '{feed_name}' deleted.")
+    return redirect(
+        _validated_redirect_target(request, reverse("intel_admin:panel"))
+    )

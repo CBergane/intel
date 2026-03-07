@@ -5,7 +5,7 @@ Public, read-only cybersecurity intelligence dashboard built with Django.
 ## Stack
 - Django + Tailwind CSS
 - Postgres-ready (defaults to sqlite in local dev if `DB_ENGINE` is empty)
-- RSS/Atom ingestion via `ingest_sources` management command
+- RSS/Atom/JSON ingestion via management commands
 
 ## Quickstart (Local)
 1. Create and activate a virtual environment.
@@ -21,7 +21,7 @@ Public, read-only cybersecurity intelligence dashboard built with Django.
    ```bash
    python manage.py migrate
    ```
-5. (Optional) create admin user:
+5. (Optional) create superuser:
    ```bash
    python manage.py createsuperuser
    ```
@@ -30,7 +30,7 @@ Public, read-only cybersecurity intelligence dashboard built with Django.
    python manage.py runserver
    ```
 
-Dashboard pages:
+Main pages:
 - `/`
 - `/active`
 - `/advisories`
@@ -40,103 +40,182 @@ Dashboard pages:
 - `/sources`
 - `/dark`
 - `/about`
-- `/ops/` (superuser only)
-- `/admin-panel/` (superuser only)
 
-Home dashboard (`/`) includes:
-- High Signal (scored by CVE/keyword/section over last 7 days)
-- Advisories, Research, Sweden blocks with per-source balancing
-- Trending Sources (48h) and Trending CVEs (7d)
-- Feed health mini-panel (ok/error/never + last ingest time)
+Superuser pages:
+- Custom login: `/admin-login/`
+- Custom admin panel: `/admin-panel/`
+- Ops dashboard: `/ops/`
+- Django admin fallback: `/boreal-admin/`
 
-## Tailwind
-Templates are already Tailwind-compatible via CDN in `templates/base.html`.
+## Standard Ingestion Pipeline
 
-Optional local build pipeline:
-1. Install Node.js.
-2. Install dev dependency:
-   ```bash
-   npm install
-   ```
-3. Build CSS:
-   ```bash
-   npm run build:css
-   ```
-
-## Ingestion
-Seed Tier-1 sources/feeds (idempotent create + update):
+### Commands
+Seed tier-1 defaults (non-destructive for existing rows by default):
 ```bash
 python manage.py seed_sources
 ```
-Tier-1 definitions live in `intel/tier1_sources.py`.
 
-Run all enabled feeds:
+Force full seed reconciliation (overwrites existing seeded rows):
+```bash
+python manage.py seed_sources --sync
+```
+
+Run ingest:
 ```bash
 python manage.py ingest_sources
 ```
 
-Run one feed (id, source slug, or exact feed name):
+Run a single feed/source:
 ```bash
 python manage.py ingest_sources --feed cert-se
 ```
 
-Dry-run parse without writing items:
+Dry-run parse:
 ```bash
 python manage.py ingest_sources --dry-run
 ```
 
-Per-feed guardrails:
-- `Feed.max_items_per_run` (default `200`) caps processed entries each run.
-- `Feed.max_age_days` (default `180`) skips entries older than this window.
-- Entries without a published timestamp use fetch time as fallback for age checks.
-- MSRC feeds default to `max_age_days=90` via migration.
-- Global response-size cap is controlled by env `FEED_MAX_BYTES` (default `1500000`).
+Scoped backfill controls:
+```bash
+python manage.py ingest_sources --feed cisa --since-days 365 --max-items 5000
+python manage.py ingest_sources --feed cisa --expanded
+```
 
-## Dark intel
-Dark intel is isolated from the RSS/Atom pipeline and uses separate models plus a separate ingestion command.
+Prune stale items (keeps `FetchRun`):
+```bash
+python manage.py prune_items
+python manage.py prune_items --dry-run
+```
 
-Environment variables:
-- `DARK_TOR_SOCKS_URL` default `socks5h://127.0.0.1:9050`
-- `DARK_FETCH_TIMEOUT` default `20`
-- `DARK_MAX_BYTES` default `750000`
-- `DARK_FETCH_RETRIES` default `3`
+### Observability
+Each `FetchRun` now records:
+- `items_fetched`
+- `items_stored`
+- `items_new`
+- `items_updated` (deduped/merged)
+- `items_skipped_old`
+- `items_skipped_invalid`
+- `items_limited`
 
-Run passive dark source collection:
+These counters are shown in:
+- `/feed-health`
+- `/ops/`
+
+### Why intel may appear “missing”
+- Feed-level limits (`max_items_per_run`, `max_age_days`) can skip old/high-volume entries.
+- UI filters may hide results by source/query/time window.
+- `/` is curated and balanced by design; use section pages for broader timelines.
+
+## Feed/Source Operations (No Redeploy Needed)
+Use `/admin-panel/` for day-to-day ops:
+- Create/edit/disable/delete `Feed`
+- Create/edit/disable/delete `Source`
+- Edit feed URL, type (`rss`/`atom`/`json`), adapter key, limits, and expanded mode
+
+Use `/boreal-admin/` when you need lower-level model access and bulk/manual maintenance.
+
+### Safety/validation
+- Mutations are POST + CSRF protected.
+- URL validation and range checks are enforced in forms.
+- Seed defaults do not overwrite existing operator edits unless `--sync` is used.
+
+## JSON Adapters
+Standard ingest now supports adapter-based parsing:
+- RSS/Atom: normalized through a shared entry layer
+- JSON: normalized through adapter keys
+- Included adapter: `cisa_kev` (CISA Known Exploited Vulnerabilities JSON)
+
+Tier-1 source definitions live in:
+- `intel/tier1_sources.py`
+
+## Darkintel v2 (Isolated Pipeline)
+Darkintel remains isolated from standard `Item` data.
+
+Models:
+- `DarkSource`
+- `DarkFetchRun`
+- `DarkDocument`
+- `DarkHit`
+- `DarkSnapshot`
+
+Source types:
+- `single_page`
+- `index_page`
+- `feed`
+
+Guardrails:
+- allowlist-only sources (superuser-managed)
+- passive HTTP GET only
+- no auth/forms/market interactions
+- timeout/max-bytes/retries
+- sanitized rendering
+
+Tor behavior:
+- `.onion` URLs use Tor (`socks5h`)
+- clearnet uses direct fetch unless `use_tor` is enabled per source
+
+Command:
 ```bash
 python manage.py ingest_dark
 ```
 
-Pages:
-- `/dark` public read-only hit dashboard
-- `/admin-panel/dark/` superuser-only allowlist management
+Views:
+- Public dark dashboard: `/dark`
+- Superuser dark admin: `/admin-panel/dark/`
 
-Notes:
-- Dark sources are allowlist-only and created by a superuser in the custom admin panel.
-- Collection is passive HTTP GET only over Tor SOCKS (`socks5h`).
-- `DARK_MAX_BYTES` is separate from `FEED_MAX_BYTES`.
+## Environment Variables
+Core:
+- `INTEL_FETCH_TIMEOUT` (default `10`)
+- `FEED_MAX_BYTES` (default `1500000`)
+- `INTEL_FETCH_RETRIES` (default `3`)
 
-Admin auth routes:
-- Login: `/admin-login/`
-- Logout (POST only): `/logout/`
+Dark:
+- `DARK_TOR_SOCKS_URL` (default `socks5h://127.0.0.1:9050`)
+- `DARK_FETCH_TIMEOUT` (default `20`)
+- `DARK_MAX_BYTES` (default `750000`)
+- `DARK_FETCH_RETRIES` (default `3`)
+- `DARK_INDEX_MAX_LINKS` (default `30`)
 
-Prune stale items (keeps `FetchRun` history):
+## Podman / Podman Compose Ops
+Examples assume service name `web` (adjust to your compose file).
+
+View logs:
 ```bash
-python manage.py prune_items
+podman compose logs -f web
 ```
 
-Dry-run prune:
+Exec into container:
 ```bash
-python manage.py prune_items --dry-run
+podman compose exec web bash
+```
+
+Run migrations:
+```bash
+podman compose exec web python manage.py migrate
+```
+
+Create superuser:
+```bash
+podman compose exec web python manage.py createsuperuser
+```
+
+Open Django admin:
+- Navigate to `/boreal-admin/` and authenticate as superuser.
+
+Trigger manual ingest:
+```bash
+podman compose exec web python manage.py ingest_sources
+podman compose exec web python manage.py ingest_dark
 ```
 
 ## Deployment (minimal, systemd + gunicorn)
 1. Set `DJANGO_ENV=prod` and Postgres env vars.
-2. Install production deps and run:
+2. Install deps and run:
    ```bash
    python manage.py migrate
    python manage.py collectstatic --noinput
    ```
-3. Create a gunicorn systemd service (example):
+3. Gunicorn systemd example:
    ```ini
    [Unit]
    Description=BorealSec Intel Gunicorn
@@ -153,33 +232,19 @@ python manage.py prune_items --dry-run
    [Install]
    WantedBy=multi-user.target
    ```
+
 4. Enable and start:
    ```bash
    sudo systemctl daemon-reload
    sudo systemctl enable --now borealsec-intel.service
    ```
 
-## Pre-launch checklist
-- Sync and curate feeds:
-  ```bash
-  python manage.py seed_sources
-  ```
-  This disables known broken feeds such as deprecated Debian/Red Hat URLs if they still exist in DB.
-- Set a strong `SECRET_KEY` in environment for `DJANGO_ENV=prod` (required at startup).
-- Run Django deployment checks:
+## Security Notes
+- Keep `/admin-login/`, `/admin-panel/`, `/ops/`, and `/boreal-admin/` superuser-only.
+- Keep admin interfaces behind trusted reverse proxy or internal/private access where possible.
+- For internet exposure, enforce TLS and access controls at proxy/tunnel layer.
+- In prod: set a strong `SECRET_KEY` and run:
   ```bash
   python manage.py check --deploy
-  ```
-- Run dependency audit:
-  ```bash
   python -m pip_audit
   ```
-
-## Optional scheduling notes
-- Cron approach:
-  ```bash
-  */10 * * * * /srv/borealsec-intel/.venv/bin/python /srv/borealsec-intel/manage.py ingest_sources
-  ```
-- Celery approach:
-  - Keep `ingest_sources` logic as reusable ingestion core.
-  - Add celery beat task every 5-10 minutes if queue-based scheduling is needed.

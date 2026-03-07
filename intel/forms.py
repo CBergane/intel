@@ -12,6 +12,64 @@ _CHECKBOX_CLASS = "h-4 w-4 rounded border-slate-700 bg-slate-950 text-sky-400 fo
 
 
 class _BaseFeedForm(forms.ModelForm):
+    ALLOWED_ADAPTER_KEYS = {"", "cisa_kev", "generic_json"}
+
+    def clean_adapter_key(self):
+        normalized = (self.cleaned_data.get("adapter_key") or "").strip().lower()
+        if normalized not in self.ALLOWED_ADAPTER_KEYS:
+            raise ValidationError("Unsupported adapter key.")
+        return normalized
+
+    def clean(self):
+        cleaned = super().clean()
+        feed_type = cleaned.get("feed_type")
+        adapter_key = cleaned.get("adapter_key") or ""
+        if feed_type in {Feed.FeedType.RSS, Feed.FeedType.ATOM} and adapter_key:
+            self.add_error("adapter_key", "Adapter key should be empty for RSS/Atom feeds.")
+        if feed_type == Feed.FeedType.JSON and not adapter_key:
+            cleaned["adapter_key"] = "generic_json"
+        return cleaned
+
+    def clean_max_age_days(self):
+        value = int(self.cleaned_data["max_age_days"])
+        if value < 1 or value > 36500:
+            raise ValidationError("Max age days must be between 1 and 36500.")
+        return value
+
+    def clean_max_items_per_run(self):
+        value = int(self.cleaned_data["max_items_per_run"])
+        if value < 1 or value > 50000:
+            raise ValidationError("Max items per run must be between 1 and 50000.")
+        return value
+
+    def clean_timeout_seconds(self):
+        value = int(self.cleaned_data["timeout_seconds"])
+        if value < 1 or value > 120:
+            raise ValidationError("Timeout must be between 1 and 120 seconds.")
+        return value
+
+    def clean_max_bytes(self):
+        value = int(self.cleaned_data["max_bytes"])
+        if value < 1024 or value > 25_000_000:
+            raise ValidationError("Max bytes must be between 1024 and 25000000.")
+        return value
+
+    def clean_expanded_max_items_per_run(self):
+        value = self.cleaned_data.get("expanded_max_items_per_run")
+        if value is None:
+            return value
+        if value < 1 or value > 200000:
+            raise ValidationError("Expanded max items must be between 1 and 200000.")
+        return value
+
+    def clean_expanded_max_age_days(self):
+        value = self.cleaned_data.get("expanded_max_age_days")
+        if value is None:
+            return value
+        if value < 1 or value > 36500:
+            raise ValidationError("Expanded max age must be between 1 and 36500.")
+        return value
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
@@ -30,8 +88,15 @@ class FeedCreateForm(_BaseFeedForm):
             "name",
             "url",
             "feed_type",
+            "adapter_key",
             "section",
+            "priority",
             "enabled",
+            "expanded_collection",
+            "expanded_max_age_days",
+            "expanded_max_items_per_run",
+            "timeout_seconds",
+            "max_bytes",
             "max_age_days",
             "max_items_per_run",
         ]
@@ -40,7 +105,23 @@ class FeedCreateForm(_BaseFeedForm):
 class FeedEditForm(_BaseFeedForm):
     class Meta:
         model = Feed
-        fields = ["url", "enabled", "section", "max_age_days", "max_items_per_run"]
+        fields = [
+            "source",
+            "name",
+            "url",
+            "feed_type",
+            "adapter_key",
+            "section",
+            "priority",
+            "enabled",
+            "expanded_collection",
+            "expanded_max_age_days",
+            "expanded_max_items_per_run",
+            "timeout_seconds",
+            "max_bytes",
+            "max_age_days",
+            "max_items_per_run",
+        ]
 
 
 class _BaseSourceForm(forms.ModelForm):
@@ -97,12 +178,18 @@ class _BaseDarkSourceForm(forms.ModelForm):
     watch_keywords = forms.CharField(
         required=False, help_text="Comma-separated keywords for passive matching."
     )
+    watch_regex = forms.CharField(
+        required=False,
+        help_text="Optional regex rules, one per line.",
+        widget=forms.Textarea(attrs={"rows": 4}),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance.pk:
             self.fields["tags"].initial = ", ".join(self.instance.tags or [])
             self.fields["watch_keywords"].initial = self.instance.watch_keywords
+            self.fields["watch_regex"].initial = self.instance.watch_regex
         for field in self.fields.values():
             widget = field.widget
             if isinstance(widget, forms.CheckboxInput):
@@ -137,14 +224,45 @@ class _BaseDarkSourceForm(forms.ModelForm):
         normalized = [part.strip().lower() for part in raw.split(",") if part.strip()]
         return ", ".join(normalized)
 
+    def clean_watch_regex(self):
+        raw = self.cleaned_data.get("watch_regex", "")
+        normalized_lines = []
+        for line in str(raw).splitlines():
+            cleaned = line.strip()
+            if not cleaned:
+                continue
+            normalized_lines.append(cleaned)
+        return "\n".join(normalized_lines)
+
 
 class DarkSourceCreateForm(_BaseDarkSourceForm):
     class Meta:
         model = DarkSource
-        fields = ["name", "slug", "homepage", "url", "tags", "watch_keywords"]
+        fields = [
+            "name",
+            "slug",
+            "homepage",
+            "url",
+            "source_type",
+            "use_tor",
+            "tags",
+            "watch_keywords",
+            "watch_regex",
+        ]
 
 
 class DarkSourceEditForm(_BaseDarkSourceForm):
     class Meta:
         model = DarkSource
-        fields = ["name", "slug", "homepage", "url", "tags", "watch_keywords", "enabled"]
+        fields = [
+            "name",
+            "slug",
+            "homepage",
+            "url",
+            "source_type",
+            "use_tor",
+            "tags",
+            "watch_keywords",
+            "watch_regex",
+            "enabled",
+        ]

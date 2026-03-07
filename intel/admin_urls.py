@@ -16,6 +16,11 @@ urlpatterns = [
         views.admin_panel_feed_disable,
         name="feed_disable",
     ),
+    path(
+        "admin-panel/<int:feed_id>/delete/",
+        views.admin_panel_feed_delete,
+        name="feed_delete",
+    ),
     path("admin-panel/sources/", views.admin_panel_sources_list, name="sources"),
     path("admin-panel/sources/new/", views.admin_panel_source_create, name="source_create"),
     path(
@@ -27,6 +32,11 @@ urlpatterns = [
         "admin-panel/sources/<int:source_id>/toggle/",
         views.admin_panel_source_toggle,
         name="source_toggle",
+    ),
+    path(
+        "admin-panel/sources/<int:source_id>/delete/",
+        views.admin_panel_source_delete,
+        name="source_delete",
     ),
     path("admin-panel/dark/", views.admin_panel_dark_sources_list, name="dark_sources"),
     path(

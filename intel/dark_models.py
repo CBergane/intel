@@ -3,13 +3,26 @@ from django.utils import timezone
 
 
 class DarkSource(models.Model):
+    class SourceType(models.TextChoices):
+        SINGLE_PAGE = "single_page", "Single Page"
+        INDEX_PAGE = "index_page", "Index Page"
+        FEED = "feed", "RSS/Atom Feed"
+
     name = models.CharField(max_length=120, unique=True)
     slug = models.SlugField(max_length=120, unique=True)
     homepage = models.URLField(blank=True)
     url = models.URLField(max_length=1500)
+    source_type = models.CharField(
+        max_length=20, choices=SourceType.choices, default=SourceType.SINGLE_PAGE
+    )
     enabled = models.BooleanField(default=True)
+    use_tor = models.BooleanField(
+        default=False,
+        help_text="Force Tor even for clearnet sources. Onion URLs always use Tor.",
+    )
     tags = models.JSONField(default=list, blank=True)
     watch_keywords = models.TextField(blank=True)
+    watch_regex = models.TextField(blank=True, help_text="One regex per line.")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -28,7 +41,14 @@ class DarkFetchRun(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
     ok = models.BooleanField(default=False)
     error = models.TextField(blank=True)
+    http_status = models.PositiveSmallIntegerField(null=True, blank=True)
     bytes_received = models.PositiveIntegerField(default=0)
+    duration_ms = models.PositiveIntegerField(null=True, blank=True)
+    final_url = models.TextField(blank=True)
+    documents_discovered = models.PositiveIntegerField(default=0)
+    documents_fetched = models.PositiveIntegerField(default=0)
+    hits_new = models.PositiveIntegerField(default=0)
+    hits_updated = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["-started_at"]
@@ -37,12 +57,67 @@ class DarkFetchRun(models.Model):
         return f"{self.dark_source.name} @ {self.started_at.isoformat()}"
 
 
+class DarkDocument(models.Model):
+    dark_source = models.ForeignKey(
+        DarkSource, on_delete=models.CASCADE, related_name="documents"
+    )
+    url = models.URLField(max_length=1500)
+    canonical_url = models.URLField(max_length=1500, blank=True, db_index=True)
+    title = models.CharField(max_length=500, blank=True)
+    excerpt = models.TextField(blank=True)
+    content_hash = models.CharField(max_length=64, db_index=True)
+    first_seen = models.DateTimeField(default=timezone.now)
+    last_seen = models.DateTimeField(default=timezone.now)
+    last_fetched_at = models.DateTimeField(null=True, blank=True)
+    last_http_status = models.PositiveSmallIntegerField(null=True, blank=True)
+    last_error = models.TextField(blank=True)
+    active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-last_seen", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["dark_source", "canonical_url"],
+                name="intel_darkdoc_source_canonical_uniq",
+            ),
+            models.UniqueConstraint(
+                fields=["dark_source", "url"],
+                name="intel_darkdoc_source_url_uniq",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.title or self.url
+
+
+class DarkSnapshot(models.Model):
+    dark_document = models.ForeignKey(
+        DarkDocument, on_delete=models.CASCADE, related_name="snapshots"
+    )
+    fetched_at = models.DateTimeField(default=timezone.now, db_index=True)
+    content_hash = models.CharField(max_length=64, db_index=True)
+    title = models.CharField(max_length=500, blank=True)
+    excerpt = models.TextField(blank=True)
+    raw = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-fetched_at", "-id"]
+
+    def __str__(self) -> str:
+        return f"{self.dark_document_id}:{self.content_hash[:12]}"
+
+
 class DarkHit(models.Model):
     dark_source = models.ForeignKey(
         DarkSource, on_delete=models.CASCADE, related_name="hits"
     )
+    dark_document = models.ForeignKey(
+        DarkDocument, on_delete=models.CASCADE, related_name="hits", null=True, blank=True
+    )
     detected_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    last_seen_at = models.DateTimeField(default=timezone.now)
     matched_keywords = models.JSONField(default=list, blank=True)
+    matched_regex = models.JSONField(default=list, blank=True)
     title = models.CharField(max_length=500)
     excerpt = models.TextField(blank=True)
     url = models.TextField()
@@ -53,8 +128,8 @@ class DarkHit(models.Model):
         ordering = ["-detected_at", "-id"]
         constraints = [
             models.UniqueConstraint(
-                fields=["dark_source", "content_hash"],
-                name="intel_darkhit_source_hash_uniq",
+                fields=["dark_document", "content_hash"],
+                name="intel_darkhit_doc_hash_uniq",
             )
         ]
 

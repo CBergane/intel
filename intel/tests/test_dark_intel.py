@@ -6,13 +6,15 @@ from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from intel.models import DarkFetchRun, DarkHit, DarkSource
+from intel.dark_utils import extract_links
+from intel.models import DarkDocument, DarkFetchRun, DarkHit, DarkSource
 
 
 class DummyResponse:
-    def __init__(self, chunks, *, status_code=200):
+    def __init__(self, chunks, *, status_code=200, url="https://example.test/page"):
         self._chunks = chunks
         self.status_code = status_code
+        self.url = url
 
     def raise_for_status(self):
         return None
@@ -38,7 +40,7 @@ class DarkAdminSecurityTests(TestCase):
         self.source = DarkSource.objects.create(
             name="Dark Source",
             slug="dark-source",
-            url="https://exampleonion.test/listing",
+            url="https://example.test/listing",
         )
         self.list_url = reverse("intel_admin:dark_sources")
         self.create_url = reverse("intel_admin:dark_source_create")
@@ -81,9 +83,11 @@ class DarkAdminCrudTests(TestCase):
             name="Alpha Dark",
             slug="alpha-dark",
             homepage="https://alpha.example.com",
-            url="https://alpha-dark.example.com/page",
+            url="https://alpha.example.com/page",
             tags=["onion"],
             watch_keywords="breach, leak",
+            watch_regex=r"CVE-\d{4}-\d+",
+            source_type=DarkSource.SourceType.SINGLE_PAGE,
             enabled=True,
         )
         self.list_url = reverse("intel_admin:dark_sources")
@@ -113,9 +117,12 @@ class DarkAdminCrudTests(TestCase):
                 "name": "Beta Dark",
                 "slug": "beta-dark",
                 "homepage": "https://beta.example.com/home",
-                "url": "https://beta-dark.example.com/index",
+                "url": "https://beta.example.com/index",
+                "source_type": DarkSource.SourceType.INDEX_PAGE,
                 "tags": "leaks, sweden",
                 "watch_keywords": "Breach, Initial Access",
+                "watch_regex": r"CVE-\d{4}-\d+",
+                "use_tor": "on",
             },
         )
         self.assertEqual(create_response.status_code, 302)
@@ -124,6 +131,8 @@ class DarkAdminCrudTests(TestCase):
         created = DarkSource.objects.get(slug="beta-dark")
         self.assertEqual(created.tags, ["leaks", "sweden"])
         self.assertEqual(created.watch_keywords, "breach, initial access")
+        self.assertEqual(created.source_type, DarkSource.SourceType.INDEX_PAGE)
+        self.assertTrue(created.use_tor)
 
         edit_get = client.get(self.edit_url)
         self.assertEqual(edit_get.status_code, 200)
@@ -135,9 +144,11 @@ class DarkAdminCrudTests(TestCase):
                 "name": "Alpha Dark Updated",
                 "slug": "alpha-dark",
                 "homepage": "https://alpha.example.com/reports",
-                "url": "https://alpha-dark.example.com/reports",
+                "url": "https://alpha.example.com/reports",
+                "source_type": DarkSource.SourceType.FEED,
                 "tags": "onion, market",
                 "watch_keywords": "Leak, Broker",
+                "watch_regex": r"ransomware",
                 "enabled": "on",
             },
         )
@@ -148,6 +159,7 @@ class DarkAdminCrudTests(TestCase):
         self.assertEqual(self.source.name, "Alpha Dark Updated")
         self.assertEqual(self.source.tags, ["onion", "market"])
         self.assertEqual(self.source.watch_keywords, "leak, broker")
+        self.assertEqual(self.source.source_type, DarkSource.SourceType.FEED)
 
         toggle_get = client.get(self.toggle_url)
         self.assertEqual(toggle_get.status_code, 405)
@@ -178,13 +190,14 @@ class DarkIngestionTests(TestCase):
         self.source = DarkSource.objects.create(
             name="Gamma Dark",
             slug="gamma-dark",
-            url="https://gamma-dark.example.com/page",
+            url="https://gamma.example.com/page",
+            source_type=DarkSource.SourceType.SINGLE_PAGE,
             watch_keywords="breach, market",
         )
 
     @override_settings(DARK_MAX_BYTES=10, DARK_FETCH_RETRIES=1)
     def test_ingestion_respects_dark_max_bytes_and_records_error_run(self):
-        response = DummyResponse([b"12345678", b"12345678"])
+        response = DummyResponse([b"12345678", b"12345678"], url=self.source.url)
 
         with patch(
             "intel.management.commands.ingest_dark.requests.get",
@@ -197,18 +210,15 @@ class DarkIngestionTests(TestCase):
         self.assertFalse(run.ok)
         self.assertIn("max_bytes=10", run.error)
         self.assertEqual(DarkHit.objects.count(), 0)
-        self.assertEqual(
-            mocked_get.call_args.kwargs["proxies"],
-            {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"},
-        )
+        self.assertNotIn("proxies", mocked_get.call_args.kwargs)
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
-    def test_keyword_matching_creates_dark_hit_and_dedupes(self):
+    def test_single_page_keyword_matching_creates_document_and_deduped_hit(self):
         html = (
             "<html><title>Breach market update</title>"
             "<body>New breach listing posted on the market today.</body></html>"
         ).encode("utf-8")
-        response = DummyResponse([html])
+        response = DummyResponse([html], url=self.source.url)
 
         with patch(
             "intel.management.commands.ingest_dark.requests.get",
@@ -218,8 +228,72 @@ class DarkIngestionTests(TestCase):
             call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
 
         self.assertEqual(DarkFetchRun.objects.filter(dark_source=self.source).count(), 2)
+        self.assertEqual(DarkDocument.objects.filter(dark_source=self.source).count(), 1)
         self.assertEqual(DarkHit.objects.filter(dark_source=self.source).count(), 1)
 
         hit = DarkHit.objects.get(dark_source=self.source)
         self.assertEqual(hit.title, "Breach market update")
         self.assertEqual(hit.matched_keywords, ["breach", "market"])
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_INDEX_MAX_LINKS=5)
+    def test_index_page_discovers_internal_links_only(self):
+        self.source.source_type = DarkSource.SourceType.INDEX_PAGE
+        self.source.url = "https://gamma.example.com/index"
+        self.source.watch_keywords = "ransomware"
+        self.source.save(update_fields=["source_type", "url", "watch_keywords", "updated_at"])
+
+        root_html = (
+            '<html><body>'
+            '<a href="/post-1">Post 1</a>'
+            '<a href="https://gamma.example.com/post-2">Post 2</a>'
+            '<a href="https://other.example.com/ignore">External</a>'
+            "</body></html>"
+        ).encode("utf-8")
+        post_html = (
+            "<html><title>Ransomware bulletin</title>"
+            "<body>Ransomware operators active.</body></html>"
+        ).encode("utf-8")
+
+        def fake_get(url, **kwargs):
+            if url == "https://gamma.example.com/index":
+                return DummyResponse([root_html], url=url)
+            if "post-" in url:
+                return DummyResponse([post_html], url=url)
+            return DummyResponse([b"<html></html>"], url=url)
+
+        with patch("intel.management.commands.ingest_dark.requests.get", side_effect=fake_get):
+            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+
+        run = DarkFetchRun.objects.get(dark_source=self.source)
+        self.assertEqual(run.documents_discovered, 3)  # index + 2 internal links
+        self.assertEqual(DarkDocument.objects.filter(dark_source=self.source).count(), 3)
+        self.assertEqual(DarkHit.objects.filter(dark_source=self.source).count(), 2)
+
+    @override_settings(DARK_FETCH_RETRIES=1)
+    def test_onion_proxy_selection(self):
+        self.source.url = "http://examplehiddenservice.onion/list"
+        self.source.save(update_fields=["url", "updated_at"])
+        response = DummyResponse([b"<html><title>No hit</title></html>"], url=self.source.url)
+
+        with patch(
+            "intel.management.commands.ingest_dark.requests.get",
+            return_value=response,
+        ) as mocked_get:
+            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+
+        self.assertEqual(
+            mocked_get.call_args.kwargs["proxies"],
+            {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"},
+        )
+
+    def test_extract_links_same_host_only(self):
+        markup = (
+            '<a href="/a">A</a>'
+            '<a href="https://gamma.example.com/b">B</a>'
+            '<a href="https://other.example.com/c">C</a>'
+        )
+        links = extract_links(markup, base_url="https://gamma.example.com/index", max_links=10)
+        self.assertEqual(
+            links,
+            ["https://gamma.example.com/a", "https://gamma.example.com/b"],
+        )

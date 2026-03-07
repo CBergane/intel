@@ -12,8 +12,9 @@
                 <p class="mt-1 text-sm text-slate-400">Superuser allowlist for passive dark intel collection.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-                <a href="{% url 'intel_admin:panel' %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Feeds</a>
-                <a href="{% url 'intel_admin:sources' %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Sources</a>
+                <a href="{{ feeds_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Feeds</a>
+                <a href="{{ sources_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Sources</a>
+                <a href="{{ django_admin_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Django Admin</a>
                 <a href="{% url 'intel_admin:dark_source_create' %}" class="rounded-lg bg-sky-500 px-3 py-2 text-xs font-medium text-slate-950 hover:bg-sky-400">New Dark Source</a>
             </div>
         </div>
@@ -36,8 +37,10 @@
                     <tr>
                         <th class="px-2 py-2">Name</th>
                         <th class="px-2 py-2">URL</th>
+                        <th class="px-2 py-2">Type</th>
                         <th class="px-2 py-2">Enabled</th>
                         <th class="px-2 py-2">Keywords</th>
+                        <th class="px-2 py-2">Documents</th>
                         <th class="px-2 py-2">Hits</th>
                         <th class="px-2 py-2">Last Hit</th>
                         <th class="px-2 py-2">Last Run</th>
@@ -55,6 +58,7 @@
                             <td class="max-w-xs min-w-0 px-2 py-2">
                                 <a href="{{ row.source.url }}" target="_blank" rel="noopener noreferrer" class="block max-w-full truncate overflow-hidden text-sky-300 hover:text-sky-200" title="{{ row.source.url }}">{{ row.source.url }}</a>
                             </td>
+                            <td class="px-2 py-2">{{ row.source.get_source_type_display }}</td>
                             <td class="px-2 py-2">
                                 {% if row.source.enabled %}
                                     <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">enabled</span>
@@ -63,6 +67,7 @@
                                 {% endif %}
                             </td>
                             <td class="max-w-xs px-2 py-2 text-xs text-slate-300 break-words">{{ row.source.watch_keywords|default:"-"|truncatechars:120 }}</td>
+                            <td class="px-2 py-2">{{ row.source.document_count }}</td>
                             <td class="px-2 py-2">{{ row.source.hit_count }}</td>
                             <td class="px-2 py-2">
                                 {% if row.source.last_hit_at %}
@@ -103,7 +108,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="9" class="px-2 py-6 text-center text-slate-400">No dark sources configured yet.</td>
+                            <td colspan="11" class="px-2 py-6 text-center text-slate-400">No dark sources configured yet.</td>
                         </tr>
                     {% endfor %}
                 </tbody>

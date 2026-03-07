@@ -37,6 +37,17 @@
         </div>
     </form>
 
+    <div class="rounded-xl border border-line bg-slate-900/60 p-3 text-xs text-slate-300">
+        Showing <span class="font-semibold text-white">{{ filtered_total }}</span> items in
+        <span class="font-semibold text-white">{{ selected_time }}</span> window.
+        {% if hidden_by_filters > 0 %}
+            <span class="text-amber-300">{{ hidden_by_filters }} hidden by current source/search filters.</span>
+        {% endif %}
+        {% if balance_applied %}
+            <span class="text-sky-300">Balanced view is active to avoid one source dominating results.</span>
+        {% endif %}
+    </div>
+
     <div class="space-y-4">
         {% for item in page_obj.object_list %}
             {% include "intel/_item_card.html" with compact=False %}

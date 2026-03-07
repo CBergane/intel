@@ -84,10 +84,18 @@ def sanitize_summary(value: str) -> str:
 
 
 def build_stable_id(
-    *, feed_id: int, canonical_url: str, normalized_title: str, published_at: datetime
+    *,
+    feed_id: int,
+    canonical_url: str,
+    normalized_title: str,
+    published_at: datetime,
+    external_id: str = "",
+    summary: str = "",
 ) -> str:
     if canonical_url:
         raw = canonical_url
+    elif external_id:
+        raw = f"{feed_id}:ext:{normalize_title(external_id).lower()}"
     else:
         if published_at.tzinfo is None:
             published_at = published_at.replace(tzinfo=timezone.utc)
