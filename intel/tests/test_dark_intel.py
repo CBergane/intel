@@ -1,6 +1,7 @@
 from io import StringIO
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
@@ -269,7 +270,7 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(DarkDocument.objects.filter(dark_source=self.source).count(), 3)
         self.assertEqual(DarkHit.objects.filter(dark_source=self.source).count(), 2)
 
-    @override_settings(DARK_FETCH_RETRIES=1)
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_TOR_SOCKS_URL="socks5h://tor:9050")
     def test_onion_proxy_selection(self):
         self.source.url = "http://examplehiddenservice.onion/list"
         self.source.save(update_fields=["url", "updated_at"])
@@ -283,7 +284,10 @@ class DarkIngestionTests(TestCase):
 
         self.assertEqual(
             mocked_get.call_args.kwargs["proxies"],
-            {"http": "socks5h://127.0.0.1:9050", "https": "socks5h://127.0.0.1:9050"},
+            {
+                "http": settings.DARK_TOR_SOCKS_URL,
+                "https": settings.DARK_TOR_SOCKS_URL,
+            },
         )
 
     def test_extract_links_same_host_only(self):

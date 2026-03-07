@@ -219,6 +219,9 @@
         <aside class="space-y-4 lg:col-span-4">
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <h2 class="mb-3 text-base font-semibold text-white">Actions</h2>
+                <p class="mb-3 text-xs text-slate-400">
+                    Actions queue background jobs. The HTTP request returns immediately; no inline ingest runs in web workers.
+                </p>
                 <div class="space-y-3">
                     <form method="post" action="{% url 'intel_admin:ops' %}">
                         {% csrf_token %}
@@ -253,6 +256,97 @@
                 </div>
             </div>
         </aside>
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-12">
+        <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow lg:col-span-8">
+            <h2 class="mb-3 text-base font-semibold text-white">Recent Ops Jobs</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
+                        <tr>
+                            <th class="px-2 py-2">Job</th>
+                            <th class="px-2 py-2">Command</th>
+                            <th class="px-2 py-2">Requested By</th>
+                            <th class="px-2 py-2">Created</th>
+                            <th class="px-2 py-2">Started</th>
+                            <th class="px-2 py-2">Finished</th>
+                            <th class="px-2 py-2">Status</th>
+                            <th class="px-2 py-2">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in recent_jobs %}
+                            <tr class="border-b border-line/60 align-top text-slate-200">
+                                <td class="px-2 py-2">#{{ job.id }}</td>
+                                <td class="px-2 py-2">{{ job.command_name }}</td>
+                                <td class="px-2 py-2">{{ job.requested_by.username|default:"-" }}</td>
+                                <td class="px-2 py-2">
+                                    <span title="{{ job.created_at|date:'Y-m-d H:i' }} UTC">{{ job.created_at|naturaltime }}</span>
+                                </td>
+                                <td class="px-2 py-2">
+                                    {% if job.started_at %}
+                                        <span title="{{ job.started_at|date:'Y-m-d H:i' }} UTC">{{ job.started_at|naturaltime }}</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="px-2 py-2">
+                                    {% if job.finished_at %}
+                                        <span title="{{ job.finished_at|date:'Y-m-d H:i' }} UTC">{{ job.finished_at|naturaltime }}</span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="px-2 py-2">
+                                    {% if job.status == "success" %}
+                                        <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">success</span>
+                                    {% elif job.status == "failed" %}
+                                        <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">failed</span>
+                                    {% elif job.status == "running" %}
+                                        <span class="rounded bg-amber-500/20 px-2 py-1 text-xs text-amber-300">running</span>
+                                    {% else %}
+                                        <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">queued</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-2 py-2">
+                                    <a href="{% url 'intel_admin:ops' %}?job={{ job.id }}" class="text-sky-300 hover:text-sky-200">Open</a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8" class="px-2 py-6 text-center text-slate-400">No jobs queued yet.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow lg:col-span-4">
+            <h2 class="mb-3 text-base font-semibold text-white">Job Output</h2>
+            {% if selected_job %}
+                <div class="space-y-3 text-xs">
+                    <div class="rounded border border-line bg-slate-900/60 p-3 text-slate-300">
+                        <p><span class="text-slate-500">Job:</span> #{{ selected_job.id }}</p>
+                        <p><span class="text-slate-500">Command:</span> {{ selected_job.command_name }}</p>
+                        <p><span class="text-slate-500">Status:</span> {{ selected_job.status }}</p>
+                        {% if selected_job.error_summary %}
+                            <p class="mt-2 text-rose-300">{{ selected_job.error_summary }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <p class="mb-1 text-slate-500">stdout</p>
+                        <pre class="max-h-64 overflow-auto rounded border border-line bg-slate-950 p-2 text-slate-200 whitespace-pre-wrap break-words">{{ selected_job.stdout|default:"-" }}</pre>
+                    </div>
+                    <div>
+                        <p class="mb-1 text-slate-500">stderr</p>
+                        <pre class="max-h-64 overflow-auto rounded border border-line bg-slate-950 p-2 text-slate-200 whitespace-pre-wrap break-words">{{ selected_job.stderr|default:"-" }}</pre>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-sm text-slate-400">Select a job from the table to inspect output.</p>
+            {% endif %}
+        </div>
     </div>
 </section>
 {% endblock %}

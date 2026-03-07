@@ -5,7 +5,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from intel.models import Feed, FetchRun, Source
+from intel.models import Feed, FetchRun, OpsJob, Source
 
 
 class OpsDashboardTests(TestCase):
@@ -38,22 +38,47 @@ class OpsDashboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Ops Dashboard")
 
-    def test_actions_require_post_and_csrf(self):
+    def test_actions_require_post_and_csrf_and_queue_job(self):
         self.client.force_login(self.superuser)
 
-        with patch("intel.views.call_command") as mocked_call:
+        with patch("intel.views.launch_ops_job_subprocess") as mocked_launch:
             response = self.client.get(f"{self.url}?action=seed")
             self.assertEqual(response.status_code, 200)
-            mocked_call.assert_not_called()
+            mocked_launch.assert_not_called()
+            self.assertEqual(OpsJob.objects.count(), 0)
 
-            response = self.client.post(self.url, {"action": "seed"}, follow=True)
-            self.assertEqual(response.status_code, 200)
-            mocked_call.assert_called_once()
+            response = self.client.post(self.url, {"action": "seed"})
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.url, self.url)
+            mocked_launch.assert_called_once()
+
+        self.assertEqual(OpsJob.objects.count(), 1)
+        job = OpsJob.objects.get()
+        self.assertEqual(job.command_name, "seed_sources")
+        self.assertEqual(job.status, OpsJob.Status.QUEUED)
 
         csrf_client = Client(enforce_csrf_checks=True)
         csrf_client.force_login(self.superuser)
         forbidden = csrf_client.post(self.url, {"action": "seed"}, follow=True)
         self.assertEqual(forbidden.status_code, 403)
+
+    def test_failed_job_does_not_crash_ops_page(self):
+        job = OpsJob.objects.create(
+            command_name="ingest_sources",
+            command_args=[],
+            status=OpsJob.Status.FAILED,
+            started_at=timezone.now(),
+            finished_at=timezone.now(),
+            error_summary="Cisco timeout",
+            stderr="Failed to fetch feed",
+            requested_by=self.superuser,
+        )
+
+        self.client.force_login(self.superuser)
+        response = self.client.get(f"{self.url}?job={job.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Recent Ops Jobs")
+        self.assertContains(response, "Cisco timeout")
 
     def test_summary_counts_render_correctly(self):
         source = Source.objects.create(name="Ops Source", slug="ops-source")

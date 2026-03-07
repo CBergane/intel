@@ -47,6 +47,9 @@ Superuser pages:
 - Ops dashboard: `/ops/`
 - Django admin fallback: `/boreal-admin/`
 
+Ops actions are queued as background jobs (`OpsJob`) and do not execute inline in HTTP requests.
+This avoids Gunicorn worker timeouts when ingest takes longer than request timeouts.
+
 ## Standard Ingestion Pipeline
 
 ### Commands
@@ -207,6 +210,11 @@ Trigger manual ingest:
 podman compose exec web python manage.py ingest_sources
 podman compose exec web python manage.py ingest_dark
 ```
+
+### Timeout note
+- Increasing Gunicorn `--timeout` may reduce timeout symptoms.
+- It is not the real fix for ingest-triggered 500s.
+- The primary fix is queued background ops jobs from `/ops/`.
 
 ## Deployment (minimal, systemd + gunicorn)
 1. Set `DJANGO_ENV=prod` and Postgres env vars.

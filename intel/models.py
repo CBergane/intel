@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.db.models import Index
 from django.utils import timezone
@@ -130,6 +131,44 @@ class FetchRun(models.Model):
 
     def __str__(self) -> str:
         return f"{self.feed.name} @ {self.started_at.isoformat()}"
+
+
+class OpsJob(models.Model):
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        RUNNING = "running", "Running"
+        SUCCESS = "success", "Success"
+        FAILED = "failed", "Failed"
+
+    command_name = models.CharField(max_length=120)
+    command_args = models.JSONField(default=list, blank=True)
+    command_options = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.QUEUED,
+        db_index=True,
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ops_jobs",
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    stdout = models.TextField(blank=True)
+    stderr = models.TextField(blank=True)
+    error_summary = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.command_name} #{self.id} ({self.status})"
 
 
 from .dark_models import (  # noqa: E402,F401

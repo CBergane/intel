@@ -9,6 +9,7 @@ from .models import (
     Feed,
     FetchRun,
     Item,
+    OpsJob,
     Source,
 )
 
@@ -64,6 +65,30 @@ class FetchRunAdmin(admin.ModelAdmin):
     list_filter = ("ok",)
     search_fields = ("feed__name", "error")
     readonly_fields = ("started_at", "finished_at", "duration_ms")
+
+
+@admin.register(OpsJob)
+class OpsJobAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "command_name",
+        "status",
+        "requested_by",
+        "created_at",
+        "started_at",
+        "finished_at",
+    )
+    list_filter = ("status", "command_name")
+    search_fields = ("command_name", "requested_by__username", "stdout", "stderr", "error_summary")
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "started_at",
+        "finished_at",
+        "stdout",
+        "stderr",
+        "error_summary",
+    )
 
 
 @admin.register(DarkSource)

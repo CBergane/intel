@@ -1,14 +1,12 @@
 import re
 from collections import Counter
 from datetime import timedelta
-from io import StringIO
 
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.paginator import Paginator
-from django.core.management import call_command
 from django.db.models import Count, Max, Q
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
@@ -25,7 +23,17 @@ from .forms import (
     SourceCreateForm,
     SourceEditForm,
 )
-from .models import DarkDocument, DarkFetchRun, DarkHit, DarkSource, Feed, FetchRun, Item, Source
+from .models import (
+    DarkFetchRun,
+    DarkHit,
+    DarkSource,
+    Feed,
+    FetchRun,
+    Item,
+    OpsJob,
+    Source,
+)
+from .ops_jobs import OPS_ACTIONS, launch_ops_job_subprocess, queue_ops_job
 
 TIME_RANGES = {
     "24h": timedelta(hours=24),
@@ -615,18 +623,6 @@ def admin_logout_view(request):
     return redirect("intel_admin:login")
 
 
-def _run_ops_command(request, *, command_name: str, args: list[str], label: str):
-    output = StringIO()
-    try:
-        call_command(command_name, *args, stdout=output, stderr=output)
-        text = output.getvalue().strip() or f"{label} completed."
-        messages.success(request, f"{label} completed.\n{text[:8000]}")
-    except Exception as exc:
-        base = output.getvalue().strip()
-        detail = f"{base}\n{exc}" if base else str(exc)
-        messages.error(request, f"{label} failed.\n{detail[:8000]}")
-
-
 def _build_feed_rows(feeds):
     latest_run_by_feed = {}
     feed_ids = [feed.id for feed in feeds]
@@ -679,25 +675,33 @@ def _build_feed_rows(feeds):
 
 @superuser_required
 def ops_dashboard(request):
-    actions = {
-        "ingest": ("ingest_sources", [], "Ingest run"),
-        "ingest_dark": ("ingest_dark", [], "Dark ingest run"),
-        "prune": ("prune_items", [], "Prune run"),
-        "prune_dry_run": ("prune_items", ["--dry-run"], "Prune dry-run"),
-        "seed": ("seed_sources", [], "Seed run"),
-        "seed_sync": ("seed_sources", ["--sync"], "Seed sync run"),
-    }
-
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
-        if action in actions:
-            command_name, args, label = actions[action]
-            _run_ops_command(
-                request,
-                command_name=command_name,
-                args=args,
-                label=label,
-            )
+        if action in OPS_ACTIONS:
+            job, label = queue_ops_job(action=action, requested_by=request.user)
+            try:
+                launch_ops_job_subprocess(job.id)
+                messages.success(
+                    request,
+                    f"{label} queued as job #{job.id}. Refresh this page to follow status/output.",
+                )
+            except Exception as exc:
+                job.status = OpsJob.Status.FAILED
+                job.started_at = timezone.now()
+                job.finished_at = timezone.now()
+                job.error_summary = f"Failed to start background runner: {exc}"[:2000]
+                job.stderr = job.error_summary
+                job.save(
+                    update_fields=[
+                        "status",
+                        "started_at",
+                        "finished_at",
+                        "error_summary",
+                        "stderr",
+                        "updated_at",
+                    ]
+                )
+                messages.error(request, f"{label} failed to queue: {exc}")
         else:
             messages.error(request, "Unknown action.")
         return redirect("intel_admin:ops")
@@ -728,6 +732,17 @@ def ops_dashboard(request):
     recent_runs = list(
         FetchRun.objects.select_related("feed", "feed__source").order_by("-started_at")[:50]
     )
+    recent_jobs = list(
+        OpsJob.objects.select_related("requested_by").order_by("-created_at")[:30]
+    )
+    selected_job = None
+    selected_job_id = (request.GET.get("job") or "").strip()
+    if selected_job_id.isdigit():
+        selected_job = (
+            OpsJob.objects.select_related("requested_by")
+            .filter(id=int(selected_job_id))
+            .first()
+        )
 
     feed_list_url = None
     try:
@@ -748,6 +763,8 @@ def ops_dashboard(request):
             "last_ingest_at": latest_finished,
             "feed_rows": feed_rows,
             "recent_runs": recent_runs,
+            "recent_jobs": recent_jobs,
+            "selected_job": selected_job,
             "feed_list_url": feed_list_url,
             "admin_panel_url": reverse("intel_admin:panel"),
             "django_admin_url": reverse("admin:index"),
