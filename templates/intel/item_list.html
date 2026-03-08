@@ -4,9 +4,9 @@
 
 {% block content %}
 <section class="space-y-5">
-    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-        <h1 class="text-xl font-semibold text-white">{{ page_title }}</h1>
-        <p class="mt-1 text-sm text-slate-400">Fresh items from trusted feeds with safe text-only summaries.</p>
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
+        <h1 class="text-lg font-semibold text-white sm:text-xl">{{ page_title }}</h1>
+        <p class="mt-1 text-sm leading-relaxed text-slate-400">Fresh items from trusted feeds with safe text-only summaries.</p>
     </div>
 
     <form method="get" class="grid gap-3 rounded-2xl border border-line bg-panel/80 p-4 md:grid-cols-4">
@@ -31,13 +31,13 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="md:col-span-4 flex flex-wrap gap-2">
-            <button type="submit" class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400">Apply filters</button>
-            <a href="{{ request.path }}" class="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800">Reset</a>
+        <div class="md:col-span-4 flex flex-col gap-2 sm:flex-row">
+            <button type="submit" class="w-full rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-medium text-slate-950 hover:bg-sky-400 sm:w-auto">Apply filters</button>
+            <a href="{{ request.path }}" class="w-full rounded-lg border border-slate-600 px-4 py-2.5 text-center text-sm text-slate-200 hover:bg-slate-800 sm:w-auto">Reset</a>
         </div>
     </form>
 
-    <div class="rounded-xl border border-line bg-slate-900/60 p-3 text-xs text-slate-300">
+    <div class="rounded-xl border border-line bg-slate-900/60 p-3 text-xs leading-relaxed text-slate-300">
         Showing <span class="font-semibold text-white">{{ filtered_total }}</span> items in
         <span class="font-semibold text-white">{{ selected_time }}</span> window.
         {% if hidden_by_filters > 0 %}
@@ -59,14 +59,14 @@
     </div>
 
     {% if page_obj.paginator.count > 0 %}
-        <div class="flex items-center justify-between rounded-2xl border border-line bg-panel/80 p-4 text-sm text-slate-300">
-            <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} items)</span>
-            <div class="flex gap-2">
+        <div class="flex flex-col gap-3 rounded-2xl border border-line bg-panel/80 p-4 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+            <span class="break-words">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} items)</span>
+            <div class="flex w-full gap-2 sm:w-auto">
                 {% if page_obj.has_previous %}
-                    <a class="rounded border border-slate-600 px-3 py-1 hover:bg-slate-800" href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.previous_page_number }}">Newer</a>
+                    <a class="w-full rounded border border-slate-600 px-3 py-2 text-center hover:bg-slate-800 sm:w-auto sm:py-1" href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.previous_page_number }}">Newer</a>
                 {% endif %}
                 {% if page_obj.has_next %}
-                    <a class="rounded border border-slate-600 px-3 py-1 hover:bg-slate-800" href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.next_page_number }}">Older</a>
+                    <a class="w-full rounded border border-slate-600 px-3 py-2 text-center hover:bg-slate-800 sm:w-auto sm:py-1" href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.next_page_number }}">Older</a>
                 {% endif %}
             </div>
         </div>

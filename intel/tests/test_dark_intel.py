@@ -8,7 +8,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from intel.dark_utils import extract_links
-from intel.models import DarkDocument, DarkFetchRun, DarkHit, DarkSource
+from intel.models import DarkDocument, DarkFetchRun, DarkHit, DarkSource, OpsJob
 
 
 class DummyResponse:
@@ -51,6 +51,15 @@ class DarkAdminSecurityTests(TestCase):
         self.toggle_url = reverse(
             "intel_admin:dark_source_toggle", kwargs={"source_id": self.source.id}
         )
+        self.ingest_url = reverse(
+            "intel_admin:dark_source_ingest", kwargs={"source_id": self.source.id}
+        )
+        self.duplicate_url = reverse(
+            "intel_admin:dark_source_duplicate", kwargs={"source_id": self.source.id}
+        )
+        self.test_url = reverse(
+            "intel_admin:dark_source_test", kwargs={"source_id": self.source.id}
+        )
         self.login_url = reverse("intel_admin:login")
 
     def test_reverse_names_resolve(self):
@@ -58,6 +67,9 @@ class DarkAdminSecurityTests(TestCase):
         self.assertEqual(self.create_url, "/admin-panel/dark/new/")
         self.assertEqual(self.edit_url, f"/admin-panel/dark/{self.source.id}/edit/")
         self.assertEqual(self.toggle_url, f"/admin-panel/dark/{self.source.id}/toggle/")
+        self.assertEqual(self.ingest_url, f"/admin-panel/dark/{self.source.id}/ingest/")
+        self.assertEqual(self.duplicate_url, f"/admin-panel/dark/{self.source.id}/duplicate/")
+        self.assertEqual(self.test_url, f"/admin-panel/dark/{self.source.id}/test/")
 
     def test_unauthenticated_user_redirected_to_admin_login(self):
         response = self.client.get(self.list_url)
@@ -99,6 +111,15 @@ class DarkAdminCrudTests(TestCase):
         self.toggle_url = reverse(
             "intel_admin:dark_source_toggle", kwargs={"source_id": self.source.id}
         )
+        self.ingest_url = reverse(
+            "intel_admin:dark_source_ingest", kwargs={"source_id": self.source.id}
+        )
+        self.duplicate_url = reverse(
+            "intel_admin:dark_source_duplicate", kwargs={"source_id": self.source.id}
+        )
+        self.test_url = reverse(
+            "intel_admin:dark_source_test", kwargs={"source_id": self.source.id}
+        )
 
     def test_superuser_can_view_create_edit_and_toggle_dark_source(self):
         client = Client(enforce_csrf_checks=True)
@@ -120,10 +141,14 @@ class DarkAdminCrudTests(TestCase):
                 "homepage": "https://beta.example.com/home",
                 "url": "https://beta.example.com/index",
                 "source_type": DarkSource.SourceType.INDEX_PAGE,
+                "enabled": "on",
                 "tags": "leaks, sweden",
                 "watch_keywords": "Breach, Initial Access",
                 "watch_regex": r"CVE-\d{4}-\d+",
                 "use_tor": "on",
+                "timeout_seconds": "12",
+                "max_bytes": "650000",
+                "fetch_retries": "2",
             },
         )
         self.assertEqual(create_response.status_code, 302)
@@ -134,6 +159,9 @@ class DarkAdminCrudTests(TestCase):
         self.assertEqual(created.watch_keywords, "breach, initial access")
         self.assertEqual(created.source_type, DarkSource.SourceType.INDEX_PAGE)
         self.assertTrue(created.use_tor)
+        self.assertEqual(created.timeout_seconds, 12)
+        self.assertEqual(created.max_bytes, 650000)
+        self.assertEqual(created.fetch_retries, 2)
 
         edit_get = client.get(self.edit_url)
         self.assertEqual(edit_get.status_code, 200)
@@ -151,6 +179,9 @@ class DarkAdminCrudTests(TestCase):
                 "watch_keywords": "Leak, Broker",
                 "watch_regex": r"ransomware",
                 "enabled": "on",
+                "timeout_seconds": "9",
+                "max_bytes": "720000",
+                "fetch_retries": "4",
             },
         )
         self.assertEqual(edit_response.status_code, 302)
@@ -161,6 +192,9 @@ class DarkAdminCrudTests(TestCase):
         self.assertEqual(self.source.tags, ["onion", "market"])
         self.assertEqual(self.source.watch_keywords, "leak, broker")
         self.assertEqual(self.source.source_type, DarkSource.SourceType.FEED)
+        self.assertEqual(self.source.timeout_seconds, 9)
+        self.assertEqual(self.source.max_bytes, 720000)
+        self.assertEqual(self.source.fetch_retries, 4)
 
         toggle_get = client.get(self.toggle_url)
         self.assertEqual(toggle_get.status_code, 405)
@@ -179,11 +213,80 @@ class DarkAdminCrudTests(TestCase):
         self.source.refresh_from_db()
         self.assertFalse(self.source.enabled)
 
+        self.source.enabled = True
+        self.source.save(update_fields=["enabled", "updated_at"])
+        token = client.cookies["csrftoken"].value
+        with patch("intel.views.launch_ops_job_subprocess") as mocked_launch:
+            ingest_response = client.post(
+                self.ingest_url,
+                {
+                    "csrfmiddlewaretoken": token,
+                    "next": self.list_url,
+                },
+            )
+        self.assertEqual(ingest_response.status_code, 302)
+        self.assertEqual(ingest_response.url, self.list_url)
+        self.assertEqual(OpsJob.objects.filter(command_name="ingest_dark").count(), 1)
+        job = OpsJob.objects.get(command_name="ingest_dark")
+        self.assertEqual(job.command_args, ["--source", self.source.slug])
+        mocked_launch.assert_called_once_with(job.id)
+
+        token = client.cookies["csrftoken"].value
+        duplicate_response = client.post(
+            self.duplicate_url,
+            {
+                "csrfmiddlewaretoken": token,
+            },
+        )
+        self.assertEqual(duplicate_response.status_code, 302)
+        duplicated = DarkSource.objects.filter(slug__contains="copy").latest("id")
+        self.assertFalse(duplicated.enabled)
+        self.assertIn("copy", duplicated.slug)
+
+        token = client.cookies["csrftoken"].value
+        with patch("intel.views._build_dark_source_preview") as mocked_preview:
+            mocked_preview.return_value = {
+                "source_name": self.source.name,
+                "source_id": self.source.id,
+                "http_status": 200,
+                "final_url": self.source.url,
+                "title": "Preview title",
+                "excerpt": "Preview excerpt",
+                "link_count": 1,
+                "bytes_received": 123,
+            }
+            test_response = client.post(
+                self.test_url,
+                {
+                    "csrfmiddlewaretoken": token,
+                    "next": self.list_url,
+                },
+            )
+        self.assertEqual(test_response.status_code, 302)
+        self.assertEqual(test_response.url, self.list_url)
+        preview = client.session.get("dark_source_test_preview")
+        self.assertIsNotNone(preview)
+        self.assertEqual(preview["title"], "Preview title")
+
     def test_csrf_enforced_for_dark_source_toggle(self):
         client = Client(enforce_csrf_checks=True)
         client.force_login(self.superuser)
         response = client.post(self.toggle_url, {"next": self.list_url})
         self.assertEqual(response.status_code, 403)
+
+    def test_post_only_enforced_for_dark_quick_actions(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.superuser)
+        self.assertEqual(client.get(self.ingest_url).status_code, 405)
+        self.assertEqual(client.get(self.duplicate_url).status_code, 405)
+        self.assertEqual(client.get(self.test_url).status_code, 405)
+
+    def test_csrf_enforced_for_dark_quick_actions(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.superuser)
+        self.assertEqual(client.post(self.ingest_url, {"next": self.list_url}).status_code, 403)
+        self.assertEqual(client.post(self.duplicate_url, {}).status_code, 403)
+        self.assertEqual(client.post(self.test_url, {"next": self.list_url}).status_code, 403)
 
 
 class DarkIngestionTests(TestCase):

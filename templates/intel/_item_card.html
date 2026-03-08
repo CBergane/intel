@@ -1,6 +1,6 @@
 {% load humanize %}
-<article class="min-w-0 overflow-hidden rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-    <div class="mb-2 flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-400">
+<article class="min-w-0 overflow-hidden rounded-2xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4">
+    <div class="mb-2 flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-slate-400 sm:text-xs">
         <span class="max-w-[14rem] truncate rounded bg-slate-800 px-2 py-1 text-slate-300">
             {{ item.source.name }}
         </span>
@@ -9,7 +9,7 @@
             {{ item.activity_at|naturaltime }}
         </time>
     </div>
-    <h2 class="{% if compact %}text-base{% else %}text-lg{% endif %} min-w-0 break-words font-medium text-white">
+    <h2 class="{% if compact %}text-[15px] sm:text-base{% else %}text-base sm:text-lg{% endif %} min-w-0 break-words font-medium text-white">
         {% if item.url %}
             <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block overflow-hidden break-words hover:text-accent">{{ item.title|truncatechars:170 }}</a>
         {% else %}

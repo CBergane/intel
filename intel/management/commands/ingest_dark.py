@@ -6,6 +6,7 @@ import requests
 from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from intel.dark_utils import (
@@ -27,8 +28,23 @@ class Command(BaseCommand):
         "GET requests only; no auth, no forms, no interactions."
     )
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--source",
+            action="append",
+            dest="source_filters",
+            default=[],
+            help="Dark source slug/name to ingest. May be used multiple times.",
+        )
+
     def handle(self, *args, **options):
         sources = DarkSource.objects.filter(enabled=True).order_by("name")
+        source_filters = [value.strip() for value in options.get("source_filters", []) if value.strip()]
+        if source_filters:
+            source_query = Q()
+            for value in source_filters:
+                source_query |= Q(slug=value) | Q(name=value)
+            sources = sources.filter(source_query)
         if not sources.exists():
             self.stdout.write(self.style.WARNING("No enabled dark sources matched."))
             return
@@ -239,7 +255,7 @@ class Command(BaseCommand):
             return False, True
 
     def _fetch_with_retries(self, url: str, source: DarkSource):
-        retries = max(settings.DARK_FETCH_RETRIES, 1)
+        retries = max(source.effective_fetch_retries(), 1)
         last_error = None
         for attempt in range(1, retries + 1):
             try:
@@ -255,15 +271,16 @@ class Command(BaseCommand):
         response = requests.get(url, **kwargs)
         response.raise_for_status()
 
+        max_bytes = source.effective_max_bytes()
         size = 0
         chunks = []
         for chunk in response.iter_content(chunk_size=8192):
             if not chunk:
                 continue
             size += len(chunk)
-            if size > settings.DARK_MAX_BYTES:
+            if size > max_bytes:
                 raise ValueError(
-                    f"Dark source response exceeded max_bytes={settings.DARK_MAX_BYTES}"
+                    f"Dark source response exceeded max_bytes={max_bytes}"
                 )
             chunks.append(chunk)
         markup = b"".join(chunks).decode("utf-8", errors="replace")
@@ -272,7 +289,7 @@ class Command(BaseCommand):
     def _request_kwargs(self, url: str, source: DarkSource):
         kwargs = {
             "headers": {"User-Agent": settings.INTEL_USER_AGENT},
-            "timeout": settings.DARK_FETCH_TIMEOUT,
+            "timeout": source.effective_timeout_seconds(),
             "stream": True,
         }
         if self._should_use_tor(url, source):

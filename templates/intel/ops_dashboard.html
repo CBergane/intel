@@ -5,11 +5,11 @@
 
 {% block content %}
 <section class="space-y-5">
-    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <h1 class="text-xl font-semibold text-white">Ops Dashboard</h1>
-                <p class="mt-1 text-sm text-slate-400">Internal feed health and operational controls.</p>
+                <h1 class="text-lg font-semibold text-white sm:text-xl">Ops Dashboard</h1>
+                <p class="mt-1 text-sm leading-relaxed text-slate-400">Internal feed health and operational controls.</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <a href="{{ admin_panel_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Open Admin Panel</a>
@@ -28,7 +28,7 @@
         </div>
     {% endif %}
 
-    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <div class="rounded-xl border border-line bg-panel/80 p-4 shadow-glow">
             <p class="text-xs uppercase tracking-wide text-slate-400">Enabled Feeds</p>
             <p class="mt-2 text-2xl font-semibold text-white">{{ enabled_feeds_count }}</p>
@@ -58,10 +58,57 @@
     </div>
 
     <div class="grid gap-5 lg:grid-cols-12">
-        <div class="space-y-4 lg:col-span-8">
+        <div class="order-2 space-y-4 lg:order-1 lg:col-span-8">
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <h2 class="mb-3 text-base font-semibold text-white">Feed Health (Enabled)</h2>
-                <div class="overflow-x-auto">
+                <div class="space-y-3 md:hidden">
+                    {% for row in feed_rows %}
+                        <article class="rounded-xl border border-line/80 bg-slate-900/60 p-3">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium text-white">{{ row.feed.name }}</p>
+                                    <p class="truncate text-xs text-slate-400">{{ row.feed.source.name|default:"-" }}</p>
+                                </div>
+                                <div class="flex flex-wrap gap-1">
+                                    {% if row.status == "ok" %}
+                                        <span class="rounded bg-emerald-500/20 px-2 py-1 text-[11px] text-emerald-300">ok</span>
+                                    {% elif row.status == "error" %}
+                                        <span class="rounded bg-rose-500/20 px-2 py-1 text-[11px] text-rose-300">error</span>
+                                    {% else %}
+                                        <span class="rounded bg-slate-700 px-2 py-1 text-[11px] text-slate-300">never</span>
+                                    {% endif %}
+                                    {% if row.collection_mode == "expanded" %}
+                                        <span class="rounded bg-amber-500/20 px-2 py-1 text-[11px] text-amber-300">expanded</span>
+                                    {% else %}
+                                        <span class="rounded bg-slate-700 px-2 py-1 text-[11px] text-slate-300">normal</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-300">
+                                <p>Type: <span class="text-white">{{ row.feed.feed_type|upper }}</span></p>
+                                <p>Section: <span class="text-white">{{ row.feed.get_section_display }}</span></p>
+                                <p>Fetched: <span class="text-white">{{ row.latest_run.items_fetched|default:"-" }}</span></p>
+                                <p>New: <span class="text-white">{{ row.latest_run.items_new|default:"-" }}</span></p>
+                                <p>Updated: <span class="text-white">{{ row.latest_run.items_updated|default:"-" }}</span></p>
+                                <p>Limited: <span class="text-white">{{ row.latest_run.items_limited|default:"-" }}</span></p>
+                            </div>
+                            <p class="mt-2 text-xs text-slate-400">
+                                Last run:
+                                {% if row.last_run_at %}
+                                    <span class="text-slate-200" title="{{ row.last_run_at|date:'Y-m-d H:i' }} UTC">{{ row.last_run_at|naturaltime }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </p>
+                            {% if row.latest_run.error or row.feed.last_error %}
+                                <p class="mt-2 break-words text-xs text-rose-300">{{ row.latest_run.error|default:row.feed.last_error|truncatechars:160 }}</p>
+                            {% endif %}
+                        </article>
+                    {% empty %}
+                        <p class="rounded-xl border border-line/80 bg-slate-900/60 p-4 text-sm text-slate-400">No enabled feeds.</p>
+                    {% endfor %}
+                </div>
+                <div class="hidden overflow-x-auto md:block">
                     <table class="min-w-full text-sm">
                         <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
                             <tr>
@@ -151,7 +198,37 @@
 
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <h2 class="mb-3 text-base font-semibold text-white">Recent Runs</h2>
-                <div class="overflow-x-auto">
+                <div class="space-y-3 md:hidden">
+                    {% for run in recent_runs %}
+                        <article class="rounded-xl border border-line/80 bg-slate-900/60 p-3">
+                            <div class="flex items-start justify-between gap-2">
+                                <p class="min-w-0 truncate text-sm font-medium text-white">{{ run.feed.name }}</p>
+                                {% if run.ok %}
+                                    <span class="rounded bg-emerald-500/20 px-2 py-1 text-[11px] text-emerald-300">ok</span>
+                                {% else %}
+                                    <span class="rounded bg-rose-500/20 px-2 py-1 text-[11px] text-rose-300">error</span>
+                                {% endif %}
+                            </div>
+                            <div class="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-300">
+                                <p>HTTP: <span class="text-white">{{ run.http_status|default:"-" }}</span></p>
+                                <p>Fetched: <span class="text-white">{{ run.items_fetched|default:"-" }}</span></p>
+                                <p>New: <span class="text-white">{{ run.items_new }}</span></p>
+                                <p>Updated: <span class="text-white">{{ run.items_updated }}</span></p>
+                            </div>
+                            <p class="mt-2 text-xs text-slate-400">
+                                {% with when=run.finished_at|default:run.started_at %}
+                                    <span title="{{ when|date:'Y-m-d H:i' }} UTC">{{ when|naturaltime }}</span>
+                                {% endwith %}
+                            </p>
+                            {% if run.error %}
+                                <p class="mt-2 break-words text-xs text-rose-300">{{ run.error|truncatechars:160 }}</p>
+                            {% endif %}
+                        </article>
+                    {% empty %}
+                        <p class="rounded-xl border border-line/80 bg-slate-900/60 p-4 text-sm text-slate-400">No runs yet.</p>
+                    {% endfor %}
+                </div>
+                <div class="hidden overflow-x-auto md:block">
                     <table class="min-w-full text-sm">
                         <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
                             <tr>
@@ -216,7 +293,7 @@
             </div>
         </div>
 
-        <aside class="space-y-4 lg:col-span-4">
+        <aside class="order-1 space-y-4 lg:order-2 lg:col-span-4">
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <h2 class="mb-3 text-base font-semibold text-white">Actions</h2>
                 <p class="mb-3 text-xs text-slate-400">
@@ -261,7 +338,32 @@
     <div class="grid gap-5 lg:grid-cols-12">
         <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow lg:col-span-8">
             <h2 class="mb-3 text-base font-semibold text-white">Recent Ops Jobs</h2>
-            <div class="overflow-x-auto">
+            <div class="space-y-3 md:hidden">
+                {% for job in recent_jobs %}
+                    <article class="rounded-xl border border-line/80 bg-slate-900/60 p-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <p class="text-sm font-medium text-white">#{{ job.id }} · {{ job.command_name }}</p>
+                                <p class="text-xs text-slate-400">{{ job.requested_by.username|default:"-" }}</p>
+                            </div>
+                            {% if job.status == "success" %}
+                                <span class="rounded bg-emerald-500/20 px-2 py-1 text-[11px] text-emerald-300">success</span>
+                            {% elif job.status == "failed" %}
+                                <span class="rounded bg-rose-500/20 px-2 py-1 text-[11px] text-rose-300">failed</span>
+                            {% elif job.status == "running" %}
+                                <span class="rounded bg-amber-500/20 px-2 py-1 text-[11px] text-amber-300">running</span>
+                            {% else %}
+                                <span class="rounded bg-slate-700 px-2 py-1 text-[11px] text-slate-300">queued</span>
+                            {% endif %}
+                        </div>
+                        <p class="mt-2 text-xs text-slate-400" title="{{ job.created_at|date:'Y-m-d H:i' }} UTC">{{ job.created_at|naturaltime }}</p>
+                        <a href="{% url 'intel_admin:ops' %}?job={{ job.id }}" class="mt-3 inline-block rounded border border-slate-600 px-3 py-2 text-xs text-sky-300 hover:bg-slate-800">Open details</a>
+                    </article>
+                {% empty %}
+                    <p class="rounded-xl border border-line/80 bg-slate-900/60 p-4 text-sm text-slate-400">No jobs queued yet.</p>
+                {% endfor %}
+            </div>
+            <div class="hidden overflow-x-auto md:block">
                 <table class="min-w-full text-sm">
                     <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
                         <tr>

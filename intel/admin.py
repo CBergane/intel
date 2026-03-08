@@ -93,7 +93,17 @@ class OpsJobAdmin(admin.ModelAdmin):
 
 @admin.register(DarkSource)
 class DarkSourceAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "source_type", "enabled", "use_tor", "created_at")
+    list_display = (
+        "name",
+        "slug",
+        "source_type",
+        "enabled",
+        "use_tor",
+        "timeout_seconds",
+        "max_bytes",
+        "fetch_retries",
+        "created_at",
+    )
     list_filter = ("source_type", "enabled", "use_tor")
     search_fields = ("name", "slug", "url")
     readonly_fields = ("created_at", "updated_at")

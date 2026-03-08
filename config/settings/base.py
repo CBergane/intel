@@ -45,6 +45,17 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+WHITENOISE_ENABLED = env_bool("WHITENOISE_ENABLED", True)
+try:
+    import whitenoise  # noqa: F401
+except Exception:  # pragma: no cover - optional import fallback for local environments
+    _HAS_WHITENOISE = False
+else:
+    _HAS_WHITENOISE = True
+
+if WHITENOISE_ENABLED and _HAS_WHITENOISE:
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
@@ -109,6 +120,11 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+if WHITENOISE_ENABLED and _HAS_WHITENOISE and not DEBUG:
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

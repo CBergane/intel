@@ -114,6 +114,7 @@ Use `/admin-panel/` for day-to-day ops:
 - Create/edit/disable/delete `Feed`
 - Create/edit/disable/delete `Source`
 - Edit feed URL, type (`rss`/`atom`/`json`), adapter key, limits, and expanded mode
+- Manage dark sources in `/admin-panel/dark/` with guided source-type hints, quick test fetch, per-source ingest queueing, duplicate, and enable/disable
 
 Use `/boreal-admin/` when you need lower-level model access and bulk/manual maintenance.
 
@@ -150,7 +151,7 @@ Guardrails:
 - allowlist-only sources (superuser-managed)
 - passive HTTP GET only
 - no auth/forms/market interactions
-- timeout/max-bytes/retries
+- timeout/max-bytes/retries (global env defaults + optional per-source overrides in admin)
 - sanitized rendering
 
 Tor behavior:
@@ -178,6 +179,9 @@ Dark:
 - `DARK_MAX_BYTES` (default `750000`)
 - `DARK_FETCH_RETRIES` (default `3`)
 - `DARK_INDEX_MAX_LINKS` (default `30`)
+
+Static/admin:
+- `WHITENOISE_ENABLED` (default `1`)
 
 ## Podman / Podman Compose Ops
 Examples assume service name `web` (adjust to your compose file).
@@ -246,6 +250,27 @@ podman compose exec web python manage.py ingest_dark
    sudo systemctl daemon-reload
    sudo systemctl enable --now borealsec-intel.service
    ```
+
+### Static Files in Production (/boreal-admin/ styling)
+- The app uses WhiteNoise middleware in production when `WHITENOISE_ENABLED=1`.
+- `collectstatic` must be run for admin CSS/JS:
+  ```bash
+  python manage.py collectstatic --noinput
+  ```
+- The provided `Containerfile` runs `collectstatic` during image build, so `/static/admin/...` is available in Podman/Gunicorn deployments.
+- If admin appears unstyled, verify:
+  1. `python manage.py collectstatic --noinput` completed successfully
+  2. `/static/admin/css/base.css` is reachable through your proxy/tunnel
+  3. `WHITENOISE_ENABLED=1` in runtime environment
+
+### Dark Admin Workflow
+- Use `/admin-panel/dark/` as the operational UI:
+  - **New Dark Source** with source type guidance (`single_page` / `index_page` / `feed`)
+  - **Test** action for fetch preview (title/excerpt/link count) without full ingest
+  - **Run ingest** action queues a background dark ingest job for one source
+  - **Duplicate** action for safe copy-and-adjust workflows
+  - **Disable/Enable** toggles allowlist activation
+- Use `/ops/` for full queued job output and history.
 
 ## Security Notes
 - Keep `/admin-login/`, `/admin-panel/`, `/ops/`, and `/boreal-admin/` superuser-only.

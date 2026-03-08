@@ -5,9 +5,9 @@
 
 {% block content %}
 <section class="space-y-5">
-    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-        <h1 class="text-xl font-semibold text-white">Now</h1>
-        <p class="mt-1 text-sm text-slate-400">High-signal cybersecurity intelligence overview across advisories, research, and Sweden-focused sources.</p>
+    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
+        <h1 class="text-lg font-semibold text-white sm:text-xl">Now</h1>
+        <p class="mt-1 text-sm leading-relaxed text-slate-400">High-signal cybersecurity intelligence overview across advisories, research, and Sweden-focused sources.</p>
         <p class="mt-2 text-xs text-slate-300">
             This page is curated: High Signal shows last 7 days and section blocks are balanced per source.
             Use section pages for broader, filterable timelines.
@@ -15,9 +15,9 @@
     </div>
 
     <div class="grid gap-5 lg:grid-cols-12">
-        <div class="space-y-4 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow lg:col-span-8">
-            <div class="flex items-center justify-between gap-3">
-                <h2 class="text-lg font-semibold text-white">High Signal (Last 7 days)</h2>
+        <div class="space-y-4 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow lg:col-span-8 sm:p-5">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-base font-semibold text-white sm:text-lg">High Signal (Last 7 days)</h2>
                 <a href="/active" class="text-sm text-sky-300 hover:text-sky-200">View active page</a>
             </div>
             <div class="space-y-3">
@@ -55,8 +55,8 @@
                 <h2 class="mb-3 text-base font-semibold text-white">Trending Sources (48h)</h2>
                 <ul class="space-y-2 text-sm text-slate-300">
                     {% for row in trending_sources %}
-                        <li class="flex items-center justify-between gap-3">
-                            <a href="/advisories?source={{ row.source__slug|urlencode }}" class="hover:text-sky-300">{{ row.source__name }}</a>
+                        <li class="flex min-w-0 items-center justify-between gap-3">
+                            <a href="/advisories?source={{ row.source__slug|urlencode }}" class="min-w-0 truncate hover:text-sky-300">{{ row.source__name }}</a>
                             <span class="rounded bg-slate-800 px-2 py-1 text-xs">{{ row.item_count }}</span>
                         </li>
                     {% empty %}
@@ -82,8 +82,8 @@
     </div>
 
     <div class="grid gap-5 lg:grid-cols-3">
-        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0">
-            <div class="flex items-center justify-between gap-3">
+        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0 sm:p-5">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-base font-semibold text-white">Advisories</h2>
                 <a href="/advisories" class="text-sm text-sky-300 hover:text-sky-200">All advisories</a>
             </div>
@@ -94,8 +94,8 @@
             {% endfor %}
         </div>
 
-        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0">
-            <div class="flex items-center justify-between gap-3">
+        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0 sm:p-5">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-base font-semibold text-white">Research</h2>
                 <a href="/research" class="text-sm text-sky-300 hover:text-sky-200">All research</a>
             </div>
@@ -106,8 +106,8 @@
             {% endfor %}
         </div>
 
-        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0">
-            <div class="flex items-center justify-between gap-3">
+        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0 sm:p-5">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-base font-semibold text-white">Sweden</h2>
                 <a href="/sweden" class="text-sm text-sky-300 hover:text-sky-200">All Sweden items</a>
             </div>

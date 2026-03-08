@@ -2,6 +2,8 @@ import re
 from collections import Counter
 from datetime import timedelta
 
+import feedparser
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import user_passes_test
@@ -12,9 +14,11 @@ from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.text import slugify
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from .dark_utils import build_excerpt, extract_links, extract_title, strip_tags
 from .forms import (
     DarkSourceCreateForm,
     DarkSourceEditForm,
@@ -58,6 +62,54 @@ HIGH_SIGNAL_KEYWORDS = (
     "critical",
     "remote code",
     "authentication bypass",
+)
+
+DARK_SOURCE_PRESETS = (
+    {
+        "key": "cisa-alerts-index",
+        "label": "CISA Alerts Index (safe test)",
+        "description": "Index page crawl on an official public site (same-host links only).",
+        "initial": {
+            "name": "CISA Alerts Index",
+            "slug": "cisa-alerts-index",
+            "url": "https://www.cisa.gov/news-events/cybersecurity-advisories",
+            "source_type": DarkSource.SourceType.INDEX_PAGE,
+            "watch_keywords": "actively exploited, zero-day, cve",
+            "watch_regex": r"CVE-\d{4}-\d+",
+            "use_tor": False,
+            "enabled": True,
+        },
+    },
+    {
+        "key": "krebs-feed",
+        "label": "Krebs Feed (safe test)",
+        "description": "RSS/Atom feed mode for passive allowlisted link ingestion.",
+        "initial": {
+            "name": "Krebs Feed",
+            "slug": "krebs-feed",
+            "url": "https://krebsonsecurity.com/feed/",
+            "source_type": DarkSource.SourceType.FEED,
+            "watch_keywords": "ransomware, exploit, breach",
+            "watch_regex": r"CVE-\d{4}-\d+",
+            "use_tor": False,
+            "enabled": True,
+        },
+    },
+    {
+        "key": "single-page-watch",
+        "label": "Single Page Watch (safe test)",
+        "description": "Single-page mode for one URL only.",
+        "initial": {
+            "name": "Example Single Page",
+            "slug": "example-single-page",
+            "url": "https://www.cisa.gov/news-events/alerts",
+            "source_type": DarkSource.SourceType.SINGLE_PAGE,
+            "watch_keywords": "alert, vulnerability",
+            "watch_regex": r"CVE-\d{4}-\d+",
+            "use_tor": False,
+            "enabled": True,
+        },
+    },
 )
 
 
@@ -833,8 +885,7 @@ def admin_panel_sources_list(request):
     )
 
 
-@superuser_required
-def admin_panel_dark_sources_list(request):
+def _dark_source_rows():
     sources = list(
         DarkSource.objects.annotate(
             hit_count=Count("hits", distinct=True),
@@ -847,7 +898,17 @@ def admin_panel_dark_sources_list(request):
     if source_ids:
         for run in (
             DarkFetchRun.objects.filter(dark_source_id__in=source_ids)
-            .only("dark_source_id", "ok", "error", "started_at", "finished_at", "bytes_received")
+            .only(
+                "dark_source_id",
+                "ok",
+                "error",
+                "started_at",
+                "finished_at",
+                "bytes_received",
+                "http_status",
+                "hits_new",
+                "hits_updated",
+            )
             .order_by("dark_source_id", "-started_at")
         ):
             if run.dark_source_id not in latest_run_by_source:
@@ -859,18 +920,118 @@ def admin_panel_dark_sources_list(request):
         if latest_run is None:
             status = "never"
             last_run_at = None
+            last_error = ""
+            latest_hit_count = 0
         else:
             status = "ok" if latest_run.ok else "error"
             last_run_at = latest_run.finished_at or latest_run.started_at
+            last_error = (latest_run.error or "").strip()
+            latest_hit_count = int(latest_run.hits_new or 0) + int(latest_run.hits_updated or 0)
         source_rows.append(
             {
                 "source": source,
                 "latest_run": latest_run,
                 "status": status,
                 "last_run_at": last_run_at,
+                "last_error": last_error,
+                "latest_hit_count": latest_hit_count,
                 "open_url": f"{reverse('dark-dashboard')}?source={source.slug}",
             }
         )
+    return source_rows
+
+
+def _queue_custom_ops_job(*, command_name: str, args: list[str], requested_by, label: str):
+    job = OpsJob.objects.create(
+        command_name=command_name,
+        command_args=list(args),
+        command_options={},
+        requested_by=requested_by,
+    )
+    try:
+        launch_ops_job_subprocess(job.id)
+        return job
+    except Exception as exc:
+        job.status = OpsJob.Status.FAILED
+        job.started_at = timezone.now()
+        job.finished_at = timezone.now()
+        job.error_summary = f"Failed to start background runner: {exc}"[:2000]
+        job.stderr = job.error_summary
+        job.save(
+            update_fields=[
+                "status",
+                "started_at",
+                "finished_at",
+                "error_summary",
+                "stderr",
+                "updated_at",
+            ]
+        )
+        raise RuntimeError(f"{label} failed to queue: {exc}") from exc
+
+
+def _next_dark_copy_slug(base_slug: str) -> str:
+    stem = f"{slugify(base_slug) or 'dark-source'}-copy"
+    slug = stem
+    index = 2
+    while DarkSource.objects.filter(slug=slug).exists():
+        slug = f"{stem}-{index}"
+        index += 1
+    return slug
+
+
+def _next_dark_copy_name(base_name: str) -> str:
+    stem = f"{(base_name or 'Dark Source').strip()} (copy)"
+    name = stem
+    index = 2
+    while DarkSource.objects.filter(name=name).exists():
+        name = f"{stem} {index}"
+        index += 1
+    return name
+
+
+def _build_dark_source_preview(source: DarkSource):
+    from intel.management.commands.ingest_dark import Command as IngestDarkCommand
+
+    command = IngestDarkCommand()
+    markup, http_status, final_url, bytes_received = command._fetch_once(source.url, source)
+    title = extract_title(markup)
+    excerpt = build_excerpt(strip_tags(markup), limit=220)
+
+    if source.source_type == DarkSource.SourceType.INDEX_PAGE:
+        link_count = len(
+            extract_links(
+                markup,
+                base_url=final_url or source.url,
+                max_links=settings.DARK_INDEX_MAX_LINKS,
+            )
+        )
+    elif source.source_type == DarkSource.SourceType.FEED:
+        parsed = feedparser.parse(markup)
+        feed_links = [
+            (entry.get("link") or entry.get("id") or "").strip()
+            for entry in (parsed.entries or [])
+        ]
+        link_count = len([link for link in feed_links if link])
+    else:
+        link_count = 1
+
+    return {
+        "source_name": source.name,
+        "source_id": source.id,
+        "http_status": http_status,
+        "final_url": final_url or source.url,
+        "title": title,
+        "excerpt": excerpt,
+        "link_count": link_count,
+        "bytes_received": bytes_received,
+    }
+
+
+@superuser_required
+def admin_panel_dark_sources_list(request):
+    source_rows = _dark_source_rows()
+    test_preview = request.session.pop("dark_source_test_preview", None)
 
     return render(
         request,
@@ -882,13 +1043,21 @@ def admin_panel_dark_sources_list(request):
             "feeds_url": reverse("intel_admin:panel"),
             "sources_url": reverse("intel_admin:sources"),
             "django_admin_url": reverse("admin:index"),
+            "test_preview": test_preview,
         },
     )
 
 
 @superuser_required
 def admin_panel_dark_source_create(request):
-    form = DarkSourceCreateForm(request.POST or None)
+    preset_key = (request.GET.get("preset") or "").strip()
+    initial = {}
+    if request.method == "GET":
+        for preset in DARK_SOURCE_PRESETS:
+            if preset["key"] == preset_key:
+                initial = dict(preset["initial"])
+                break
+    form = DarkSourceCreateForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
         source = form.save()
         messages.success(request, f"Dark source '{source.name}' created.")
@@ -902,6 +1071,8 @@ def admin_panel_dark_source_create(request):
             "form": form,
             "mode": "create",
             "cancel_url": reverse("intel_admin:dark_sources"),
+            "presets": DARK_SOURCE_PRESETS,
+            "selected_preset": preset_key,
         },
     )
 
@@ -924,6 +1095,7 @@ def admin_panel_dark_source_edit(request, source_id: int):
             "mode": "edit",
             "source": source,
             "cancel_url": reverse("intel_admin:dark_sources"),
+            "presets": DARK_SOURCE_PRESETS,
         },
     )
 
@@ -936,6 +1108,80 @@ def admin_panel_dark_source_toggle(request, source_id: int):
     source.save(update_fields=["enabled", "updated_at"])
     state = "enabled" if source.enabled else "disabled"
     messages.success(request, f"Dark source '{source.name}' {state}.")
+    return redirect(
+        _validated_redirect_target(request, reverse("intel_admin:dark_sources"))
+    )
+
+
+@superuser_required
+@require_POST
+def admin_panel_dark_source_ingest(request, source_id: int):
+    source = get_object_or_404(DarkSource, id=source_id)
+    if not source.enabled:
+        messages.error(request, f"Dark source '{source.name}' is disabled.")
+        return redirect(
+            _validated_redirect_target(request, reverse("intel_admin:dark_sources"))
+        )
+
+    try:
+        job = _queue_custom_ops_job(
+            command_name="ingest_dark",
+            args=["--source", source.slug],
+            requested_by=request.user,
+            label="Dark ingest run",
+        )
+    except Exception as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(
+            request,
+            (
+                f"Queued dark ingest for '{source.name}' as job #{job.id}. "
+                f"Open Ops for full output."
+            ),
+        )
+    return redirect(
+        _validated_redirect_target(request, reverse("intel_admin:dark_sources"))
+    )
+
+
+@superuser_required
+@require_POST
+def admin_panel_dark_source_duplicate(request, source_id: int):
+    source = get_object_or_404(DarkSource, id=source_id)
+    duplicated = DarkSource.objects.create(
+        name=_next_dark_copy_name(source.name),
+        slug=_next_dark_copy_slug(source.slug),
+        homepage=source.homepage,
+        url=source.url,
+        source_type=source.source_type,
+        enabled=False,
+        use_tor=source.use_tor,
+        timeout_seconds=source.timeout_seconds,
+        max_bytes=source.max_bytes,
+        fetch_retries=source.fetch_retries,
+        tags=list(source.tags or []),
+        watch_keywords=source.watch_keywords,
+        watch_regex=source.watch_regex,
+    )
+    messages.success(
+        request,
+        f"Duplicated '{source.name}' into '{duplicated.name}' (disabled by default).",
+    )
+    return redirect("intel_admin:dark_source_edit", source_id=duplicated.id)
+
+
+@superuser_required
+@require_POST
+def admin_panel_dark_source_test(request, source_id: int):
+    source = get_object_or_404(DarkSource, id=source_id)
+    try:
+        preview = _build_dark_source_preview(source)
+    except Exception as exc:
+        messages.error(request, f"Test failed for '{source.name}': {exc}")
+    else:
+        request.session["dark_source_test_preview"] = preview
+        messages.success(request, f"Test fetch succeeded for '{source.name}'.")
     return redirect(
         _validated_redirect_target(request, reverse("intel_admin:dark_sources"))
     )

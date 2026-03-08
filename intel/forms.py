@@ -190,6 +190,19 @@ class _BaseDarkSourceForm(forms.ModelForm):
             self.fields["tags"].initial = ", ".join(self.instance.tags or [])
             self.fields["watch_keywords"].initial = self.instance.watch_keywords
             self.fields["watch_regex"].initial = self.instance.watch_regex
+        self.fields["source_type"].help_text = (
+            "single_page = one page, index_page = same-host discovery, feed = RSS/Atom links."
+        )
+        self.fields["use_tor"].help_text = "Onion URLs always use Tor. Enable to force Tor for clearnet."
+        self.fields["timeout_seconds"].help_text = (
+            "Optional per-source timeout override. Leave blank to use DARK_FETCH_TIMEOUT."
+        )
+        self.fields["max_bytes"].help_text = (
+            "Optional per-source max response bytes. Leave blank to use DARK_MAX_BYTES."
+        )
+        self.fields["fetch_retries"].help_text = (
+            "Optional retry override. Leave blank to use DARK_FETCH_RETRIES."
+        )
         for field in self.fields.values():
             widget = field.widget
             if isinstance(widget, forms.CheckboxInput):
@@ -234,6 +247,33 @@ class _BaseDarkSourceForm(forms.ModelForm):
             normalized_lines.append(cleaned)
         return "\n".join(normalized_lines)
 
+    def clean_timeout_seconds(self):
+        value = self.cleaned_data.get("timeout_seconds")
+        if value in (None, ""):
+            return None
+        value = int(value)
+        if value < 1 or value > 120:
+            raise ValidationError("Timeout must be between 1 and 120 seconds.")
+        return value
+
+    def clean_max_bytes(self):
+        value = self.cleaned_data.get("max_bytes")
+        if value in (None, ""):
+            return None
+        value = int(value)
+        if value < 1024 or value > 25_000_000:
+            raise ValidationError("Max bytes must be between 1024 and 25000000.")
+        return value
+
+    def clean_fetch_retries(self):
+        value = self.cleaned_data.get("fetch_retries")
+        if value in (None, ""):
+            return None
+        value = int(value)
+        if value < 1 or value > 10:
+            raise ValidationError("Retries must be between 1 and 10.")
+        return value
+
 
 class DarkSourceCreateForm(_BaseDarkSourceForm):
     class Meta:
@@ -244,7 +284,11 @@ class DarkSourceCreateForm(_BaseDarkSourceForm):
             "homepage",
             "url",
             "source_type",
+            "enabled",
             "use_tor",
+            "timeout_seconds",
+            "max_bytes",
+            "fetch_retries",
             "tags",
             "watch_keywords",
             "watch_regex",
@@ -260,9 +304,12 @@ class DarkSourceEditForm(_BaseDarkSourceForm):
             "homepage",
             "url",
             "source_type",
+            "enabled",
             "use_tor",
+            "timeout_seconds",
+            "max_bytes",
+            "fetch_retries",
             "tags",
             "watch_keywords",
             "watch_regex",
-            "enabled",
         ]

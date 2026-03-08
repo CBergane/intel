@@ -5,13 +5,51 @@
 {% block content %}
 <section class="mx-auto max-w-3xl space-y-5">
     <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-        <h1 class="text-xl font-semibold text-white">{{ page_title }}</h1>
-        {% if mode == "edit" %}
-            <p class="mt-1 text-sm text-slate-400">Editing: {{ source.name }}</p>
-        {% else %}
-            <p class="mt-1 text-sm text-slate-400">Create an allowlisted passive source for dark intel collection.</p>
-        {% endif %}
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+                <h1 class="text-xl font-semibold text-white">{{ page_title }}</h1>
+                {% if mode == "edit" %}
+                    <p class="mt-1 text-sm text-slate-400">Editing: {{ source.name }}</p>
+                {% else %}
+                    <p class="mt-1 text-sm text-slate-400">Create an allowlisted passive source for dark intel collection.</p>
+                {% endif %}
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'intel_admin:dark_sources' %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Back to list</a>
+                {% if mode == "edit" %}
+                    <form method="post" action="{% url 'intel_admin:dark_source_test' source.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
+                        <button type="submit" class="rounded-lg border border-cyan-500/50 px-3 py-2 text-xs text-cyan-200 hover:bg-cyan-500/15">Test source</button>
+                    </form>
+                    <form method="post" action="{% url 'intel_admin:dark_source_ingest' source.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
+                        <button type="submit" class="rounded-lg border border-sky-500/50 px-3 py-2 text-xs text-sky-200 hover:bg-sky-500/15">Run ingest</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+        <div class="mt-3 rounded-lg border border-amber-500/30 bg-amber-900/10 p-3 text-xs text-amber-100">
+            <p class="font-medium">Guardrails</p>
+            <p class="mt-1 text-amber-200">Allowlist-only, passive HTTP GET only. No auth, no forms, no posting, no marketplace interaction.</p>
+            <p class="mt-1 text-amber-200">`index_page` discovers same-host links only. Onion URLs use Tor automatically.</p>
+        </div>
     </div>
+
+    {% if mode == "create" and presets %}
+        <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+            <h2 class="text-sm font-semibold text-white">Starter Presets</h2>
+            <div class="mt-3 grid gap-2 md:grid-cols-3">
+                {% for preset in presets %}
+                    <a href="{% url 'intel_admin:dark_source_create' %}?preset={{ preset.key }}" class="rounded-lg border {% if selected_preset == preset.key %}border-sky-400/60 bg-sky-500/10{% else %}border-slate-700{% endif %} p-3 text-xs text-slate-200 hover:bg-slate-800">
+                        <p class="font-medium text-white">{{ preset.label }}</p>
+                        <p class="mt-1 text-slate-400">{{ preset.description }}</p>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
 
     <form method="post" class="rounded-2xl border border-line bg-panel/80 p-5 shadow-glow">
         {% csrf_token %}

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -20,6 +21,21 @@ class DarkSource(models.Model):
         default=False,
         help_text="Force Tor even for clearnet sources. Onion URLs always use Tor.",
     )
+    timeout_seconds = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Optional per-source timeout override (seconds).",
+    )
+    max_bytes = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Optional per-source response size cap in bytes.",
+    )
+    fetch_retries = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Optional per-source retry count override.",
+    )
     tags = models.JSONField(default=list, blank=True)
     watch_keywords = models.TextField(blank=True)
     watch_regex = models.TextField(blank=True, help_text="One regex per line.")
@@ -31,6 +47,15 @@ class DarkSource(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def effective_timeout_seconds(self) -> int:
+        return int(self.timeout_seconds or settings.DARK_FETCH_TIMEOUT)
+
+    def effective_max_bytes(self) -> int:
+        return int(self.max_bytes or settings.DARK_MAX_BYTES)
+
+    def effective_fetch_retries(self) -> int:
+        return int(self.fetch_retries or settings.DARK_FETCH_RETRIES)
 
 
 class DarkFetchRun(models.Model):
