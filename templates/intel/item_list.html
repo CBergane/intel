@@ -4,7 +4,7 @@
 
 {% block content %}
 <section class="space-y-4 sm:space-y-5">
-    <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+    <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4">
         <div class="flex items-start justify-between gap-3">
             <div>
                 <h1 class="text-base font-semibold text-white sm:text-lg">{{ page_title }}</h1>
@@ -14,7 +14,7 @@
         </div>
     </div>
 
-    <details class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow md:hidden" {% if query or selected_source or selected_time != "7d" %}open{% endif %}>
+    <details class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow md:hidden" {% if query or selected_source or selected_time != "7d" %}open{% endif %}>
         <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-white">
             Filters
             <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ selected_time }}</span>
@@ -81,14 +81,14 @@
             Showing <span class="font-semibold text-white">{{ filtered_total }}</span> items in
             <span class="font-semibold text-white">{{ selected_time }}</span> window.
         </p>
-        <div class="mt-2 flex flex-wrap gap-1.5">
+        <div class="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
             {% if query %}
-                <span class="rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">q: {{ query }}</span>
+                <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">q: {{ query }}</span>
             {% endif %}
             {% if selected_source %}
-                <span class="rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">source: {{ selected_source }}</span>
+                <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">source: {{ selected_source }}</span>
             {% endif %}
-            <span class="rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">time: {{ selected_time }}</span>
+            <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">time: {{ selected_time }}</span>
         </div>
         {% if hidden_by_filters > 0 %}
             <p class="mt-2 text-amber-300">{{ hidden_by_filters }} hidden by current source/search filters.</p>

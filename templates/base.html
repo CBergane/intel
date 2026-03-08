@@ -68,53 +68,50 @@
                     </button>
                 </div>
             </div>
-
-            <div class="pb-2 md:hidden">
-                <nav class="no-scrollbar flex gap-1.5 overflow-x-auto pr-2 text-xs">
-                    <a href="/active" class="shrink-0 rounded-lg px-2.5 py-1.5 {% if current_page == 'active' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Active</a>
-                    <a href="/research" class="shrink-0 rounded-lg px-2.5 py-1.5 {% if current_page == 'research' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Research</a>
-                    <a href="/sweden" class="shrink-0 rounded-lg px-2.5 py-1.5 {% if current_page == 'sweden' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Sweden</a>
-                    <a href="/feed-health" class="shrink-0 rounded-lg px-2.5 py-1.5 {% if current_page == 'feed-health' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Feed Health</a>
-                    <a href="/sources" class="shrink-0 rounded-lg px-2.5 py-1.5 {% if current_page == 'sources' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Sources</a>
-                    <a href="/dark" class="shrink-0 rounded-lg px-2.5 py-1.5 {% if current_page == 'dark' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Dark</a>
-                    <a href="/about" class="shrink-0 rounded-lg px-2.5 py-1.5 {% if current_page == 'about' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">About</a>
-                </nav>
-            </div>
         </div>
     </header>
 
     <div id="mobile-nav-shell" class="pointer-events-none fixed inset-0 z-[60] hidden md:hidden">
-        <button id="mobile-nav-backdrop" type="button" class="absolute inset-0 bg-slate-950/60 opacity-0 transition-opacity"></button>
-        <aside id="mobile-nav-panel" class="absolute right-0 top-0 h-full w-[84%] max-w-xs translate-x-full border-l border-line bg-slate-950 p-4 shadow-glow transition-transform duration-200">
+        <button id="mobile-nav-backdrop" type="button" class="absolute inset-0 bg-slate-950/75 opacity-0 transition-opacity backdrop-blur-[1px]"></button>
+        <aside id="mobile-nav-panel" class="absolute right-0 top-0 h-full w-[88%] max-w-sm translate-x-full border-l border-line bg-slate-950 pt-[max(1rem,env(safe-area-inset-top))] shadow-glow transition-transform duration-200">
+            <div class="flex h-full flex-col overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
             <div class="mb-4 flex items-center justify-between">
                 <p class="text-sm font-semibold text-white">Navigation</p>
                 <button id="mobile-nav-close" type="button" class="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800">Close</button>
             </div>
-            <div class="grid gap-1.5 text-sm">
-                <a href="/" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Now</a>
-                <a href="/active" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Active</a>
-                <a href="/advisories" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Advisories</a>
-                <a href="/research" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Research</a>
-                <a href="/sweden" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Sweden</a>
-                <a href="/feed-health" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Feed Health</a>
-                <a href="/sources" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Sources</a>
-                <a href="/dark" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Dark</a>
-                <a href="/about" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">About</a>
+            <div class="space-y-4 text-sm">
+                <div>
+                    <p class="px-3 pb-1 text-[11px] uppercase tracking-wide text-slate-500">Explore</p>
+                    <div class="grid gap-1.5">
+                        <a href="/active" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Active</a>
+                        <a href="/research" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Research</a>
+                        <a href="/sweden" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Sweden</a>
+                        <a href="/feed-health" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Feed Health</a>
+                        <a href="/sources" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Sources</a>
+                        <a href="/dark" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Dark</a>
+                        <a href="/about" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">About</a>
+                    </div>
+                </div>
                 {% if request.user.is_superuser %}
-                    <hr class="my-2 border-line">
-                    <a href="{% url 'intel_admin:panel' %}" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Admin Panel</a>
-                    <a href="{% url 'intel_admin:ops' %}" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Ops</a>
-                    <a href="{% url 'admin:index' %}" class="rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800">Django Admin</a>
-                    <form method="post" action="{% url 'intel_admin:logout' %}">
-                        {% csrf_token %}
-                        <button type="submit" class="mt-1 w-full rounded-lg border border-slate-700 px-3 py-2 text-left text-slate-200 hover:bg-slate-800">Logout</button>
-                    </form>
+                    <div class="border-t border-line/80 pt-4">
+                        <p class="px-3 pb-1 text-[11px] uppercase tracking-wide text-slate-500">Operations</p>
+                        <div class="grid gap-1.5">
+                            <a href="{% url 'intel_admin:panel' %}" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Admin Panel</a>
+                            <a href="{% url 'intel_admin:ops' %}" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Ops</a>
+                            <a href="{% url 'admin:index' %}" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Django Admin</a>
+                            <form method="post" action="{% url 'intel_admin:logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="mt-1 w-full rounded-lg border border-slate-700 px-3 py-2.5 text-left text-slate-200 hover:bg-slate-800">Logout</button>
+                            </form>
+                        </div>
+                    </div>
                 {% endif %}
+            </div>
             </div>
         </aside>
     </div>
 
-    <div class="mx-auto max-w-7xl px-3 pb-8 pt-4 sm:px-6 sm:pt-5 lg:px-8">
+    <div class="mx-auto max-w-7xl px-3 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-5 lg:px-8">
         <main>
             {% block content %}{% endblock %}
         </main>
