@@ -34,10 +34,10 @@
     </style>
 </head>
 <body class="min-h-full overflow-x-hidden bg-gradient-to-b from-night via-slate-950 to-slate-900 text-slate-100">
-    <header class="sticky top-0 z-50 border-b border-line/80 bg-night/90 backdrop-blur supports-[backdrop-filter]:bg-night/70">
+    <header class="sticky top-0 z-50 border-b border-line/80 bg-night/95 backdrop-blur supports-[backdrop-filter]:bg-night/75">
         <div class="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
-            <div class="flex h-14 items-center gap-2 sm:h-16">
-                <a href="/" class="shrink-0 text-base font-semibold tracking-tight text-white sm:text-lg">BorealSec Intel</a>
+            <div class="flex h-11 items-center gap-2 sm:h-16">
+                <a href="/" class="shrink-0 text-sm font-semibold tracking-tight text-white sm:text-lg">BorealSec Intel</a>
                 <p class="hidden text-xs text-slate-400 sm:block">Cybersecurity intelligence dashboard</p>
 
                 <nav class="ml-auto hidden items-center gap-1.5 text-sm md:flex">
@@ -61,9 +61,7 @@
                 </nav>
 
                 <div class="ml-auto flex items-center gap-2 md:hidden">
-                    <a href="/" class="rounded-lg px-2.5 py-1.5 text-xs font-medium {% if current_page == 'now' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Now</a>
-                    <a href="/advisories" class="rounded-lg px-2.5 py-1.5 text-xs font-medium {% if current_page == 'advisories' %}bg-sky-500/20 text-sky-200{% else %}text-slate-300 hover:bg-slate-800{% endif %}">Advisories</a>
-                    <button id="mobile-nav-toggle" type="button" class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800" aria-expanded="false" aria-controls="mobile-nav-shell">
+                    <button id="mobile-nav-toggle" type="button" class="rounded-lg border border-slate-700 px-2.5 py-1 text-[11px] font-medium text-slate-200 hover:bg-slate-800/90" aria-expanded="false" aria-controls="mobile-nav-shell">
                         Menu
                     </button>
                 </div>
@@ -83,6 +81,8 @@
                 <div>
                     <p class="px-3 pb-1 text-[11px] uppercase tracking-wide text-slate-500">Explore</p>
                     <div class="grid gap-1.5">
+                        <a href="/" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Now</a>
+                        <a href="/advisories" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Advisories</a>
                         <a href="/active" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Active</a>
                         <a href="/research" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Research</a>
                         <a href="/sweden" class="rounded-lg px-3 py-2.5 text-slate-200 hover:bg-slate-800">Sweden</a>
@@ -111,7 +111,7 @@
         </aside>
     </div>
 
-    <div class="mx-auto max-w-7xl px-3 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-5 lg:px-8">
+    <div class="mx-auto max-w-7xl px-3 pb-[max(2.75rem,env(safe-area-inset-bottom))] pt-1.5 sm:px-6 sm:pt-5 lg:px-8">
         <main>
             {% block content %}{% endblock %}
         </main>
