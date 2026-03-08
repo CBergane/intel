@@ -1,6 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 
+from .dark_utils import dark_source_suitability_warning
 from .models import DarkSource, Feed, Source
 
 
@@ -186,12 +187,16 @@ class _BaseDarkSourceForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.suitability_hint = ""
         if self.instance.pk:
             self.fields["tags"].initial = ", ".join(self.instance.tags or [])
             self.fields["watch_keywords"].initial = self.instance.watch_keywords
             self.fields["watch_regex"].initial = self.instance.watch_regex
         self.fields["source_type"].help_text = (
             "single_page = one page, index_page = same-host discovery, feed = RSS/Atom links."
+        )
+        self.fields["url"].help_text = (
+            "Use dark allowlisted endpoints. Normal public news/research/advisory feeds should usually use standard intel feeds."
         )
         self.fields["use_tor"].help_text = "Onion URLs always use Tor. Enable to force Tor for clearnet."
         self.fields["timeout_seconds"].help_text = (
@@ -209,6 +214,17 @@ class _BaseDarkSourceForm(forms.ModelForm):
                 widget.attrs["class"] = _CHECKBOX_CLASS
             else:
                 widget.attrs["class"] = _INPUT_CLASS
+
+        url_value = self._bound_or_initial("url")
+        source_type = self._bound_or_initial("source_type")
+        self.suitability_hint = dark_source_suitability_warning(url_value, source_type)
+
+    def _bound_or_initial(self, name: str):
+        if self.is_bound:
+            return self.data.get(self.add_prefix(name), "")
+        if name in self.initial:
+            return self.initial.get(name) or ""
+        return getattr(self.instance, name, "") or ""
 
     def clean_name(self):
         name = self.cleaned_data["name"].strip()

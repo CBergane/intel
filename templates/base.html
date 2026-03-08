@@ -34,10 +34,12 @@
     </style>
 </head>
 <body class="min-h-full overflow-x-hidden bg-gradient-to-b from-night via-slate-950 to-slate-900 text-slate-100">
-    <header class="sticky top-0 z-50 border-b border-line/80 bg-night/95 backdrop-blur supports-[backdrop-filter]:bg-night/75">
+    <header class="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md supports-[backdrop-filter]:bg-slate-950/75">
         <div class="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
             <div class="flex h-11 items-center gap-2 sm:h-16">
-                <a href="/" class="shrink-0 text-sm font-semibold tracking-tight text-white sm:text-lg">BorealSec Intel</a>
+                <a href="/" class="shrink-0 text-[13px] font-semibold tracking-tight text-white sm:text-lg">
+                    BorealSec Intel
+                </a>
                 <p class="hidden text-xs text-slate-400 sm:block">Cybersecurity intelligence dashboard</p>
 
                 <nav class="ml-auto hidden items-center gap-1.5 text-sm md:flex">
@@ -61,7 +63,13 @@
                 </nav>
 
                 <div class="ml-auto flex items-center gap-2 md:hidden">
-                    <button id="mobile-nav-toggle" type="button" class="rounded-lg border border-slate-700 px-2.5 py-1 text-[11px] font-medium text-slate-200 hover:bg-slate-800/90" aria-expanded="false" aria-controls="mobile-nav-shell">
+                    <button
+                        id="mobile-nav-toggle"
+                        type="button"
+                        class="inline-flex h-8 items-center rounded-md border border-slate-700/80 px-2.5 text-[11px] font-medium text-slate-200 transition hover:bg-slate-800/90"
+                        aria-expanded="false"
+                        aria-controls="mobile-nav-shell"
+                    >
                         Menu
                     </button>
                 </div>
@@ -71,11 +79,20 @@
 
     <div id="mobile-nav-shell" class="pointer-events-none fixed inset-0 z-[60] hidden md:hidden">
         <button id="mobile-nav-backdrop" type="button" class="absolute inset-0 bg-slate-950/75 opacity-0 transition-opacity backdrop-blur-[1px]"></button>
-        <aside id="mobile-nav-panel" class="absolute right-0 top-0 h-full w-[88%] max-w-sm translate-x-full border-l border-line bg-slate-950 pt-[max(1rem,env(safe-area-inset-top))] shadow-glow transition-transform duration-200">
+            <aside
+                id="mobile-nav-panel"
+                class="absolute right-0 top-0 h-full w-[84%] max-w-[20rem] translate-x-full border-l border-slate-800 bg-slate-950/98 pt-[max(0.75rem,env(safe-area-inset-top))] shadow-2xl transition-transform duration-200"
+            >
             <div class="flex h-full flex-col overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-            <div class="mb-4 flex items-center justify-between">
-                <p class="text-sm font-semibold text-white">Navigation</p>
-                <button id="mobile-nav-close" type="button" class="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800">Close</button>
+            <div class="mb-3 flex items-center justify-between">
+                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Menu</p>
+                <button
+                    id="mobile-nav-close"
+                    type="button"
+                    class="inline-flex h-8 items-center rounded-md border border-slate-700/80 px-2.5 text-[11px] text-slate-300 hover:bg-slate-800"
+                >
+                    Close
+                </button>
             </div>
             <div class="space-y-4 text-sm">
                 <div>

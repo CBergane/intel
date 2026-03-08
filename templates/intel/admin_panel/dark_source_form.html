@@ -34,6 +34,7 @@
             <p class="font-medium">Guardrails</p>
             <p class="mt-1 text-amber-200">Allowlist-only, passive HTTP GET only. No auth, no forms, no posting, no marketplace interaction.</p>
             <p class="mt-1 text-amber-200">`index_page` discovers same-host links only. Onion URLs use Tor automatically.</p>
+            <p class="mt-1 text-amber-200">For normal advisory/news/research sites, prefer standard intel feeds (`/admin-panel/`) instead of dark intel.</p>
         </div>
     </div>
 
@@ -56,6 +57,19 @@
         {% if form.non_field_errors %}
             <div class="mb-4 rounded-lg border border-rose-500/40 bg-rose-900/30 p-3 text-sm text-rose-100">
                 {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+        <div class="mb-4 rounded-lg border border-line/80 bg-slate-900/60 p-3 text-xs text-slate-300">
+            <p class="font-medium text-white">Source type quick guide</p>
+            <ul class="mt-2 space-y-1">
+                <li><span class="text-slate-100">`feed`:</span> structured RSS/Atom endpoint (preferred for regular advisories/research/news).</li>
+                <li><span class="text-slate-100">`index_page`:</span> page that lists links to same-host documents.</li>
+                <li><span class="text-slate-100">`single_page`:</span> monitor one specific page only.</li>
+            </ul>
+        </div>
+        {% if form.suitability_hint %}
+            <div class="mb-4 rounded-lg border border-amber-500/40 bg-amber-900/20 p-3 text-xs text-amber-100">
+                {{ form.suitability_hint }}
             </div>
         {% endif %}
         <div class="grid gap-4 md:grid-cols-2">

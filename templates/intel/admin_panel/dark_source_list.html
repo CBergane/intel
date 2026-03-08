@@ -21,6 +21,7 @@
         </div>
         <p class="mt-3 text-xs text-slate-500">
             Index mode only discovers same-host links. Use Tor for onion targets or when explicitly required.
+            Use standard intel feeds for regular advisories/news/research sources.
         </p>
     </div>
 
@@ -35,18 +36,45 @@
     {% endif %}
 
     {% if test_preview %}
-        <div class="rounded-2xl border border-cyan-500/40 bg-cyan-900/10 p-4 shadow-glow">
-            <h2 class="text-sm font-semibold text-cyan-100">Test Source Preview</h2>
-            <div class="mt-2 grid gap-2 text-xs text-cyan-50 md:grid-cols-2">
-                <p><span class="text-cyan-300">Source:</span> {{ test_preview.source_name }}</p>
-                <p><span class="text-cyan-300">HTTP:</span> {{ test_preview.http_status }}</p>
-                <p><span class="text-cyan-300">Bytes:</span> {{ test_preview.bytes_received }}</p>
-                <p><span class="text-cyan-300">Links:</span> {{ test_preview.link_count }}</p>
+        {% if test_preview.ok %}
+            <div class="rounded-2xl border border-cyan-500/40 bg-cyan-900/10 p-4 shadow-glow">
+                <h2 class="text-sm font-semibold text-cyan-100">Test Source Preview</h2>
+                <div class="mt-2 grid gap-2 text-xs text-cyan-50 md:grid-cols-2">
+                    <p><span class="text-cyan-300">Source:</span> {{ test_preview.source_name }}</p>
+                    <p><span class="text-cyan-300">HTTP:</span> {{ test_preview.http_status }}</p>
+                    <p><span class="text-cyan-300">Bytes:</span> {{ test_preview.bytes_received }}</p>
+                    <p><span class="text-cyan-300">Candidate links:</span> {{ test_preview.link_count }}</p>
+                    <p><span class="text-cyan-300">Extracted chars:</span> {{ test_preview.text_length }}</p>
+                </div>
+                <p class="mt-2 break-all text-xs text-cyan-200">Final URL: {{ test_preview.final_url }}</p>
+                <p class="mt-2 text-sm font-medium text-cyan-50">{{ test_preview.title }}</p>
+                <p class="mt-1 break-words text-xs text-cyan-100">{{ test_preview.excerpt|default:"-" }}</p>
+                {% if test_preview.candidate_links %}
+                    <div class="mt-2 space-y-1">
+                        <p class="text-xs font-medium text-cyan-200">Sample links</p>
+                        {% for link in test_preview.candidate_links|slice:":4" %}
+                            <p class="truncate text-xs text-cyan-100" title="{{ link }}">{{ link }}</p>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if test_preview.notes %}
+                    <ul class="mt-2 space-y-1 text-xs text-amber-200">
+                        {% for note in test_preview.notes %}
+                            <li>{{ note }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
             </div>
-            <p class="mt-2 break-all text-xs text-cyan-200">URL: {{ test_preview.final_url }}</p>
-            <p class="mt-2 text-sm font-medium text-cyan-50">{{ test_preview.title }}</p>
-            <p class="mt-1 break-words text-xs text-cyan-100">{{ test_preview.excerpt|default:"-" }}</p>
-        </div>
+        {% else %}
+            <div class="rounded-2xl border border-rose-500/40 bg-rose-900/20 p-4 shadow-glow">
+                <h2 class="text-sm font-semibold text-rose-100">Test Source Failed</h2>
+                <div class="mt-2 grid gap-2 text-xs text-rose-50 md:grid-cols-2">
+                    <p><span class="text-rose-300">Source:</span> {{ test_preview.source_name }}</p>
+                    <p><span class="text-rose-300">Reason:</span> {{ test_preview.failure_reason }}</p>
+                </div>
+                <p class="mt-2 break-words text-xs text-rose-100">{{ test_preview.failure_detail }}</p>
+            </div>
+        {% endif %}
     {% endif %}
 
     <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
@@ -84,6 +112,9 @@
                             </td>
                             <td class="max-w-xs min-w-0 px-2 py-2">
                                 <a href="{{ row.source.url }}" target="_blank" rel="noopener noreferrer" class="block max-w-full truncate overflow-hidden text-sky-300 hover:text-sky-200" title="{{ row.source.url }}">{{ row.source.url }}</a>
+                                {% if row.suitability_warning %}
+                                    <p class="mt-1 break-words text-xs text-amber-300">{{ row.suitability_warning }}</p>
+                                {% endif %}
                             </td>
                             <td class="px-2 py-2">{{ row.source.get_source_type_display }}</td>
                             <td class="px-2 py-2">
@@ -120,6 +151,8 @@
                             <td class="px-2 py-2">
                                 {% if row.status == "ok" %}
                                     <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
+                                {% elif row.partial_success %}
+                                    <span class="rounded bg-amber-500/20 px-2 py-1 text-xs text-amber-300">partial</span>
                                 {% elif row.status == "error" %}
                                     <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
                                 {% else %}

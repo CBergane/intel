@@ -288,6 +288,36 @@ class DarkAdminCrudTests(TestCase):
         self.assertEqual(client.post(self.duplicate_url, {}).status_code, 403)
         self.assertEqual(client.post(self.test_url, {"next": self.list_url}).status_code, 403)
 
+    def test_dark_source_test_shows_failure_reason(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.superuser)
+        client.get(self.list_url)
+        token = client.cookies["csrftoken"].value
+        with patch(
+            "intel.views._build_dark_source_preview",
+            side_effect=TimeoutError("timed out while connecting"),
+        ):
+            response = client.post(
+                self.test_url,
+                {"csrfmiddlewaretoken": token, "next": self.list_url},
+                follow=True,
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Test Source Failed")
+        self.assertContains(response, "Timeout while fetching source.")
+
+    def test_dark_source_list_shows_standard_feed_suitability_warning(self):
+        DarkSource.objects.create(
+            name="News Site",
+            slug="news-site",
+            url="https://news.example.com/security/advisories",
+            source_type=DarkSource.SourceType.INDEX_PAGE,
+        )
+        self.client.force_login(self.superuser)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Prefer standard intel feeds")
+
 
 class DarkIngestionTests(TestCase):
     def setUp(self):
@@ -404,3 +434,29 @@ class DarkIngestionTests(TestCase):
             links,
             ["https://gamma.example.com/a", "https://gamma.example.com/b"],
         )
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_extraction_removes_style_and_boilerplate_noise(self):
+        self.source.watch_keywords = "breach"
+        self.source.save(update_fields=["watch_keywords", "updated_at"])
+        noisy_html = (
+            "<html><head><style>.menu{display:none} body{font-family:sans-serif;}</style>"
+            "<script>var x = 'noise';</script></head>"
+            "<body><nav>Home Privacy Policy Subscribe</nav>"
+            "<article><h1>Breach bulletin</h1>"
+            "<p>Breach details for operators were published with indicators and timeline.</p>"
+            "<p>Analysts confirmed the disclosure and scoped affected systems.</p>"
+            "</article></body></html>"
+        ).encode("utf-8")
+        response = DummyResponse([noisy_html], url=self.source.url)
+
+        with patch(
+            "intel.management.commands.ingest_dark.requests.get",
+            return_value=response,
+        ):
+            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+
+        hit = DarkHit.objects.get(dark_source=self.source)
+        self.assertIn("Breach details for operators", hit.excerpt)
+        self.assertNotIn("font-family", hit.excerpt.lower())
+        self.assertNotIn("privacy policy", hit.excerpt.lower())

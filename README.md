@@ -143,9 +143,14 @@ Models:
 - `DarkSnapshot`
 
 Source types:
-- `single_page`
-- `index_page`
-- `feed`
+- `feed`: structured RSS/Atom source (preferred for normal advisory/news/research content)
+- `index_page`: allowlisted index/list page where same-host links are discovered
+- `single_page`: one monitored page only
+
+Suitability guidance:
+- Use darkintel for allowlisted passive monitoring targets.
+- If the source is a normal public advisory/news/research site, add it to standard intel feeds (`/admin-panel/`) instead of darkintel.
+- Dark admin now shows suitability hints when a URL looks like a standard site or when a non-feed URL appears to be an RSS/Atom endpoint.
 
 Guardrails:
 - allowlist-only sources (superuser-managed)
@@ -266,7 +271,8 @@ podman compose exec web python manage.py ingest_dark
 ### Dark Admin Workflow
 - Use `/admin-panel/dark/` as the operational UI:
   - **New Dark Source** with source type guidance (`single_page` / `index_page` / `feed`)
-  - **Test** action for fetch preview (title/excerpt/link count) without full ingest
+  - **Test** action for fetch preview (clean title/excerpt, candidate link count, sample links) without full ingest
+  - Test failures now show reason categories (timeout, blocked endpoint, parse issue, oversized response, no useful content)
   - **Run ingest** action queues a background dark ingest job for one source
   - **Duplicate** action for safe copy-and-adjust workflows
   - **Disable/Enable** toggles allowlist activation

@@ -18,7 +18,13 @@ from django.utils.text import slugify
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .dark_utils import build_excerpt, extract_links, extract_title, strip_tags
+from .dark_utils import (
+    build_excerpt,
+    dark_source_suitability_warning,
+    extract_links,
+    extract_title,
+    strip_tags,
+)
 from .forms import (
     DarkSourceCreateForm,
     DarkSourceEditForm,
@@ -906,6 +912,7 @@ def _dark_source_rows():
                 "finished_at",
                 "bytes_received",
                 "http_status",
+                "documents_fetched",
                 "hits_new",
                 "hits_updated",
             )
@@ -927,6 +934,14 @@ def _dark_source_rows():
             last_run_at = latest_run.finished_at or latest_run.started_at
             last_error = (latest_run.error or "").strip()
             latest_hit_count = int(latest_run.hits_new or 0) + int(latest_run.hits_updated or 0)
+        partial_success = (
+            status == "error"
+            and latest_run is not None
+            and (
+                int(latest_run.documents_fetched or 0) > 0
+                or latest_hit_count > 0
+            )
+        )
         source_rows.append(
             {
                 "source": source,
@@ -935,6 +950,10 @@ def _dark_source_rows():
                 "last_run_at": last_run_at,
                 "last_error": last_error,
                 "latest_hit_count": latest_hit_count,
+                "partial_success": partial_success,
+                "suitability_warning": dark_source_suitability_warning(
+                    source.url, source.source_type
+                ),
                 "open_url": f"{reverse('dark-dashboard')}?source={source.slug}",
             }
         )
@@ -994,38 +1013,77 @@ def _build_dark_source_preview(source: DarkSource):
     from intel.management.commands.ingest_dark import Command as IngestDarkCommand
 
     command = IngestDarkCommand()
-    markup, http_status, final_url, bytes_received = command._fetch_once(source.url, source)
+    markup, http_status, final_url, bytes_received = command._fetch_with_retries(
+        source.url, source
+    )
     title = extract_title(markup)
-    excerpt = build_excerpt(strip_tags(markup), limit=220)
+    extracted_text = strip_tags(markup)
+    excerpt = build_excerpt(extracted_text, limit=220)
+    if len(excerpt) < 40:
+        raise ValueError("No useful content extracted from response.")
+
+    preview_notes = []
+    suitability_warning = dark_source_suitability_warning(source.url, source.source_type)
+    if suitability_warning:
+        preview_notes.append(suitability_warning)
 
     if source.source_type == DarkSource.SourceType.INDEX_PAGE:
-        link_count = len(
-            extract_links(
-                markup,
-                base_url=final_url or source.url,
-                max_links=settings.DARK_INDEX_MAX_LINKS,
-            )
+        candidate_links = extract_links(
+            markup,
+            base_url=final_url or source.url,
+            max_links=settings.DARK_INDEX_MAX_LINKS,
         )
+        link_count = len(candidate_links)
+        if link_count == 0:
+            preview_notes.append("No same-host candidate links were discovered.")
     elif source.source_type == DarkSource.SourceType.FEED:
         parsed = feedparser.parse(markup)
+        if getattr(parsed, "bozo", False) and not getattr(parsed, "entries", None):
+            raise ValueError(f"Feed parse issue: {parsed.bozo_exception}")
         feed_links = [
             (entry.get("link") or entry.get("id") or "").strip()
             for entry in (parsed.entries or [])
         ]
         link_count = len([link for link in feed_links if link])
+        candidate_links = [link for link in feed_links if link][:5]
+        if link_count == 0:
+            preview_notes.append("Feed payload parsed, but no usable entry links were found.")
     else:
         link_count = 1
+        candidate_links = [final_url or source.url]
 
     return {
         "source_name": source.name,
         "source_id": source.id,
+        "source_type": source.source_type,
         "http_status": http_status,
         "final_url": final_url or source.url,
         "title": title,
         "excerpt": excerpt,
+        "text_length": len(extracted_text),
         "link_count": link_count,
+        "candidate_links": candidate_links,
         "bytes_received": bytes_received,
+        "notes": preview_notes,
     }
+
+
+def _dark_preview_failure_info(exc: Exception) -> dict:
+    detail = str(exc).strip() or exc.__class__.__name__
+    lowered = detail.lower()
+    if "timeout" in lowered or "timed out" in lowered:
+        reason = "Timeout while fetching source."
+    elif "403" in lowered or "401" in lowered or "forbidden" in lowered:
+        reason = "Remote endpoint blocked the request."
+    elif "max_bytes" in lowered:
+        reason = "Response exceeded configured max bytes."
+    elif "parse" in lowered or "feed" in lowered:
+        reason = "Parse issue in response payload."
+    elif "no useful content" in lowered:
+        reason = "No useful content extracted from response."
+    else:
+        reason = "Fetch or processing failed."
+    return {"reason": reason, "detail": detail[:500]}
 
 
 @superuser_required
@@ -1178,8 +1236,17 @@ def admin_panel_dark_source_test(request, source_id: int):
     try:
         preview = _build_dark_source_preview(source)
     except Exception as exc:
-        messages.error(request, f"Test failed for '{source.name}': {exc}")
+        failure = _dark_preview_failure_info(exc)
+        request.session["dark_source_test_preview"] = {
+            "ok": False,
+            "source_name": source.name,
+            "source_id": source.id,
+            "failure_reason": failure["reason"],
+            "failure_detail": failure["detail"],
+        }
+        messages.error(request, f"Test failed for '{source.name}': {failure['reason']}")
     else:
+        preview["ok"] = True
         request.session["dark_source_test_preview"] = preview
         messages.success(request, f"Test fetch succeeded for '{source.name}'.")
     return redirect(
