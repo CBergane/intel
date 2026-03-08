@@ -4,23 +4,36 @@
 {% block title %}Now | BorealSec Intel{% endblock %}
 
 {% block content %}
-<section class="space-y-5">
-    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
-        <h1 class="text-lg font-semibold text-white sm:text-xl">Now</h1>
-        <p class="mt-1 text-sm leading-relaxed text-slate-400">High-signal cybersecurity intelligence overview across advisories, research, and Sweden-focused sources.</p>
-        <p class="mt-2 text-xs text-slate-300">
-            This page is curated: High Signal shows last 7 days and section blocks are balanced per source.
-            Use section pages for broader, filterable timelines.
-        </p>
+<section class="space-y-4 sm:space-y-5">
+    <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h1 class="text-base font-semibold text-white sm:text-lg">Now</h1>
+                <p class="mt-1 text-xs leading-5 text-slate-400 sm:text-sm">
+                    Curated high-signal view. High Signal uses a 7-day window and section blocks are balanced by source.
+                </p>
+            </div>
+            <a href="/advisories" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-800">Browse list</a>
+        </div>
     </div>
 
-    <div class="grid gap-5 lg:grid-cols-12">
-        <div class="space-y-4 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow lg:col-span-8 sm:p-5">
+    <nav class="no-scrollbar sticky top-[5.25rem] z-30 -mx-3 border-y border-line/80 bg-night/90 px-3 py-2 backdrop-blur sm:top-24 lg:hidden">
+        <div class="no-scrollbar flex gap-1.5 overflow-x-auto text-xs">
+            <a href="#high-signal" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">High Signal</a>
+            <a href="#advisories-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Advisories</a>
+            <a href="#research-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Research</a>
+            <a href="#sweden-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Sweden</a>
+            <a href="#trending-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Trending</a>
+        </div>
+    </nav>
+
+    <div class="grid gap-4 lg:grid-cols-12 lg:gap-5">
+        <div id="high-signal" class="space-y-3 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow lg:col-span-8 sm:space-y-4 sm:p-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h2 class="text-base font-semibold text-white sm:text-lg">High Signal (Last 7 days)</h2>
-                <a href="/active" class="text-sm text-sky-300 hover:text-sky-200">View active page</a>
+                <h2 class="text-sm font-semibold text-white sm:text-base">High Signal (Last 7 days)</h2>
+                <a href="/active" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">View active page</a>
             </div>
-            <div class="space-y-3">
+            <div class="space-y-2.5 sm:space-y-3">
                 {% for item in high_signal_items %}
                     {% include "intel/_item_card.html" with compact=False %}
                 {% empty %}
@@ -29,35 +42,47 @@
             </div>
         </div>
 
-        <aside class="space-y-4 lg:col-span-4">
-            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+        <aside id="trending-block" class="space-y-3 lg:col-span-4 lg:space-y-4">
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
                 <div class="mb-3 flex items-center justify-between gap-3">
-                    <h2 class="text-base font-semibold text-white">Feed Health</h2>
-                    <a href="/feed-health" class="text-sm text-sky-300 hover:text-sky-200">Open panel</a>
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Feed Health</h2>
+                    <a href="/feed-health" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">Open panel</a>
                 </div>
-                <div class="space-y-2 text-sm text-slate-300">
-                    <p>Enabled feeds: <span class="font-medium text-white">{{ enabled_feed_count }}</span></p>
-                    <p>OK: <span class="font-medium text-emerald-300">{{ feed_status_counts.ok }}</span></p>
-                    <p>Error: <span class="font-medium text-rose-300">{{ feed_status_counts.error }}</span></p>
-                    <p>Never run: <span class="font-medium text-amber-300">{{ feed_status_counts.never }}</span></p>
-                    <p>
-                        Last ingest:
-                        {% if last_ingest_finished_at %}
-                            <span class="font-medium text-white" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
-                        {% else %}
-                            <span class="font-medium text-slate-400">never</span>
-                        {% endif %}
-                    </p>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                        Enabled
+                        <p class="mt-1 text-sm font-semibold text-white">{{ enabled_feed_count }}</p>
+                    </div>
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                        OK
+                        <p class="mt-1 text-sm font-semibold text-emerald-300">{{ feed_status_counts.ok }}</p>
+                    </div>
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                        Error
+                        <p class="mt-1 text-sm font-semibold text-rose-300">{{ feed_status_counts.error }}</p>
+                    </div>
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                        Never
+                        <p class="mt-1 text-sm font-semibold text-amber-300">{{ feed_status_counts.never }}</p>
+                    </div>
                 </div>
+                <p class="mt-3 text-xs text-slate-400">
+                    Last ingest:
+                    {% if last_ingest_finished_at %}
+                        <span class="font-medium text-white" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
+                    {% else %}
+                        <span class="font-medium text-slate-400">never</span>
+                    {% endif %}
+                </p>
             </div>
 
-            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-                <h2 class="mb-3 text-base font-semibold text-white">Trending Sources (48h)</h2>
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+                <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending Sources (48h)</h2>
                 <ul class="space-y-2 text-sm text-slate-300">
                     {% for row in trending_sources %}
-                        <li class="flex min-w-0 items-center justify-between gap-3">
-                            <a href="/advisories?source={{ row.source__slug|urlencode }}" class="min-w-0 truncate hover:text-sky-300">{{ row.source__name }}</a>
-                            <span class="rounded bg-slate-800 px-2 py-1 text-xs">{{ row.item_count }}</span>
+                        <li class="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
+                            <a href="/advisories?source={{ row.source__slug|urlencode }}" class="min-w-0 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
+                            <span class="rounded bg-slate-800 px-2 py-0.5 text-xs">{{ row.item_count }}</span>
                         </li>
                     {% empty %}
                         <li class="text-slate-400">No recent source activity.</li>
@@ -65,11 +90,11 @@
                 </ul>
             </div>
 
-            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-                <h2 class="mb-3 text-base font-semibold text-white">Trending CVEs (7d)</h2>
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+                <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending CVEs (7d)</h2>
                 <div class="flex flex-wrap gap-2">
                     {% for cve, count in trending_cves %}
-                        <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded bg-sky-500/15 px-2 py-1 text-xs font-medium text-sky-200 hover:bg-sky-500/25">
+                        <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/15 px-2.5 py-1.5 text-xs font-medium text-sky-200 hover:bg-sky-500/25">
                             <span>{{ cve }}</span>
                             <span class="text-sky-100/80">({{ count }})</span>
                         </a>
@@ -81,11 +106,11 @@
         </aside>
     </div>
 
-    <div class="grid gap-5 lg:grid-cols-3">
-        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0 sm:p-5">
+    <div class="grid gap-4 lg:grid-cols-3 lg:gap-5">
+        <div id="advisories-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h2 class="text-base font-semibold text-white">Advisories</h2>
-                <a href="/advisories" class="text-sm text-sky-300 hover:text-sky-200">All advisories</a>
+                <h2 class="text-sm font-semibold text-white sm:text-base">Advisories</h2>
+                <a href="/advisories" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All advisories</a>
             </div>
             {% for item in advisories_items %}
                 {% include "intel/_item_card.html" with compact=True %}
@@ -94,10 +119,10 @@
             {% endfor %}
         </div>
 
-        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0 sm:p-5">
+        <div id="research-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h2 class="text-base font-semibold text-white">Research</h2>
-                <a href="/research" class="text-sm text-sky-300 hover:text-sky-200">All research</a>
+                <h2 class="text-sm font-semibold text-white sm:text-base">Research</h2>
+                <a href="/research" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All research</a>
             </div>
             {% for item in research_items %}
                 {% include "intel/_item_card.html" with compact=True %}
@@ -106,10 +131,10 @@
             {% endfor %}
         </div>
 
-        <div class="space-y-3 rounded-2xl border border-line bg-panel/80 p-4 shadow-glow min-w-0 sm:p-5">
+        <div id="sweden-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h2 class="text-base font-semibold text-white">Sweden</h2>
-                <a href="/sweden" class="text-sm text-sky-300 hover:text-sky-200">All Sweden items</a>
+                <h2 class="text-sm font-semibold text-white sm:text-base">Sweden</h2>
+                <a href="/sweden" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All Sweden items</a>
             </div>
             {% for item in sweden_items %}
                 {% include "intel/_item_card.html" with compact=True %}

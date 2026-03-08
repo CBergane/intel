@@ -1,31 +1,56 @@
 {% load humanize %}
-<article class="min-w-0 overflow-hidden rounded-2xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4">
-    <div class="mb-2 flex min-w-0 flex-wrap items-center gap-2 text-[11px] text-slate-400 sm:text-xs">
-        <span class="max-w-[14rem] truncate rounded bg-slate-800 px-2 py-1 text-slate-300">
-            {{ item.source.name }}
-        </span>
-        <span class="rounded bg-slate-800 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
-        <time datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
+<article class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3.5 shadow-glow sm:p-4">
+    <div class="flex min-w-0 items-start justify-between gap-2">
+        <div class="min-w-0 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span class="max-w-[10rem] truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300 sm:max-w-[12rem]">
+                {{ item.source.name }}
+            </span>
+            <span class="rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
+            {% if compact and item.cves %}
+                <span class="rounded-md border border-sky-500/40 bg-sky-500/15 px-2 py-1 text-sky-200">
+                    {{ item.cves|length }} CVE{% if item.cves|length != 1 %}s{% endif %}
+                </span>
+            {% endif %}
+        </div>
+        <time class="shrink-0 text-[11px] text-slate-500" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
             {{ item.activity_at|naturaltime }}
         </time>
     </div>
-    <h2 class="{% if compact %}text-[15px] sm:text-base{% else %}text-base sm:text-lg{% endif %} min-w-0 break-words font-medium text-white">
+
+    <h2 class="{% if compact %}text-[15px] sm:text-base{% else %}text-base sm:text-lg{% endif %} mt-2 min-w-0 break-words font-medium leading-tight text-white">
         {% if item.url %}
-            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block overflow-hidden break-words hover:text-accent">{{ item.title|truncatechars:170 }}</a>
+            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block hover:text-accent">
+                <span class="block overflow-hidden break-words [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact %}[-webkit-line-clamp:2]{% else %}[-webkit-line-clamp:3]{% endif %}">
+                    {{ item.title }}
+                </span>
+            </a>
         {% else %}
-            {{ item.title|truncatechars:170 }}
+            <span class="block overflow-hidden break-words [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact %}[-webkit-line-clamp:2]{% else %}[-webkit-line-clamp:3]{% endif %}">
+                {{ item.title }}
+            </span>
         {% endif %}
     </h2>
-    {% if item.cves %}
-        <div class="mt-2 flex flex-wrap gap-2">
+
+    {% if item.cves and not compact %}
+        <div class="mt-2 flex flex-wrap gap-1.5">
             {% for cve in item.cves|slice:":3" %}
-                <a href="/advisories?q={{ cve|urlencode }}" class="rounded bg-sky-500/15 px-2 py-1 text-xs font-medium text-sky-200 hover:bg-sky-500/25">{{ cve }}</a>
+                <a href="/advisories?q={{ cve|urlencode }}" class="rounded-md border border-sky-500/30 bg-sky-500/15 px-2 py-1 text-[11px] font-medium text-sky-200 hover:bg-sky-500/25">{{ cve }}</a>
             {% endfor %}
         </div>
     {% endif %}
-{% if item.summary %}
-  <p class="mt-2 max-h-28 overflow-hidden break-words text-sm leading-6 text-slate-300">
-    {{ item.summary|striptags|truncatechars:380 }}
-  </p>
-{% endif %}
+
+    {% if item.summary %}
+        <p class="mt-2 overflow-hidden break-words text-sm leading-5 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact %}[-webkit-line-clamp:2]{% else %}[-webkit-line-clamp:3]{% endif %}">
+            {{ item.summary|striptags }}
+        </p>
+    {% endif %}
+
+    <div class="mt-3 flex items-center justify-between gap-2">
+        <p class="min-w-0 truncate text-[11px] text-slate-500">{{ item.feed.name }}</p>
+        {% if item.url %}
+            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex shrink-0 items-center rounded-lg border border-slate-600 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800">
+                Open
+            </a>
+        {% endif %}
+    </div>
 </article>
