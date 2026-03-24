@@ -187,4 +187,109 @@ TIER1_SOURCES = [
             }
         ],
     },
+    {
+        "name": "Bleeping Computer",
+        "slug": "bleeping-computer",
+        "homepage": "https://www.bleepingcomputer.com",
+        "tags": ["news", "ransomware", "incident"],
+        "enabled": True,
+        "feeds": [
+            {
+                "name": "Bleeping Computer Feed",
+                "url": "https://www.bleepingcomputer.com/feed/",
+                "feed_type": "rss",
+                "adapter_key": "",
+                "section": "active",
+                "enabled": True,
+                "timeout_seconds": 10,
+                "max_bytes": 1_500_000,
+                "max_age_days": 14,
+                "max_items_per_run": 50,
+            }
+        ],
+    },
+    {
+        "name": "Fortinet PSIRT",
+        "slug": "fortinet",
+        "homepage": "https://www.fortiguard.com/psirt",
+        "tags": ["vendor", "network", "firewall"],
+        "enabled": True,
+        "feeds": [
+            {
+                "name": "Fortinet PSIRT Feed",
+                "url": "https://filestore.fortinet.com/fortiguard/rss/ir.xml",
+                "feed_type": "rss",
+                "adapter_key": "",
+                "section": "advisories",
+                "enabled": True,
+                "timeout_seconds": 10,
+                "max_bytes": 1_500_000,
+                "max_age_days": 180,
+                "max_items_per_run": 100,
+            }
+        ],
+    },
+    {
+        "name": "Palo Alto Networks PSIRT",
+        "slug": "palo-alto",
+        "homepage": "https://security.paloaltonetworks.com",
+        "tags": ["vendor", "network", "firewall"],
+        "enabled": True,
+        "feeds": [
+            {
+                "name": "Palo Alto Networks PSIRT Feed",
+                "url": "https://security.paloaltonetworks.com/rss.xml",
+                "feed_type": "rss",
+                "adapter_key": "",
+                "section": "advisories",
+                "enabled": True,
+                "timeout_seconds": 10,
+                "max_bytes": 1_500_000,
+                "max_age_days": 180,
+                "max_items_per_run": 100,
+            }
+        ],
+    },
+    {
+        "name": "FIRST.org EPSS",
+        "slug": "epss",
+        "homepage": "https://www.first.org/epss",
+        "tags": ["threat-intel", "cve", "scoring"],
+        "enabled": True,
+        "feeds": [
+            {
+                "name": "EPSS Top CVEs (7 days)",
+                "url": "https://api.first.org/data/v1/epss?days=7&limit=200&order=!epss",
+                "feed_type": "json",
+                "adapter_key": "epss",
+                "section": "active",
+                "enabled": True,
+                "timeout_seconds": 15,
+                "max_bytes": 2_000_000,
+                "max_age_days": 14,
+                "max_items_per_run": 200,
+            }
+        ],
+    },
+    {
+        "name": "Exploit-DB",
+        "slug": "exploit-db",
+        "homepage": "https://www.exploit-db.com",
+        "tags": ["research", "offensive", "poc"],
+        "enabled": True,
+        "feeds": [
+            {
+                "name": "Exploit-DB Feed",
+                "url": "https://www.exploit-db.com/rss.xml",
+                "feed_type": "rss",
+                "adapter_key": "",
+                "section": "research",
+                "enabled": True,
+                "timeout_seconds": 10,
+                "max_bytes": 1_500_000,
+                "max_age_days": 90,
+                "max_items_per_run": 100,
+            }
+        ],
+    },
 ]
