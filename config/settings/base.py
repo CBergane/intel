@@ -146,3 +146,14 @@ DARK_FETCH_TIMEOUT = int(os.getenv("DARK_FETCH_TIMEOUT", "20"))
 DARK_MAX_BYTES = int(os.getenv("DARK_MAX_BYTES", "750000"))
 DARK_FETCH_RETRIES = int(os.getenv("DARK_FETCH_RETRIES", "3"))
 DARK_INDEX_MAX_LINKS = int(os.getenv("DARK_INDEX_MAX_LINKS", "30"))
+
+EPSS_MAX_RESULTS = int(os.getenv("EPSS_MAX_RESULTS", "200"))
+EPSS_MIN_SCORE = float(os.getenv("EPSS_MIN_SCORE", "0.1"))
+
+DARK_DISCORD_WEBHOOK = os.getenv("DARK_DISCORD_WEBHOOK", "")
+INTEL_DISCORD_WEBHOOK = os.getenv("INTEL_DISCORD_WEBHOOK", "")
+EPSS_ALERT_THRESHOLD = float(os.getenv("EPSS_ALERT_THRESHOLD", "0.7"))
+
+TOR_SOCKS_HOST = os.getenv("TOR_SOCKS_HOST", "127.0.0.1")
+TOR_SOCKS_PORT = int(os.getenv("TOR_SOCKS_PORT", "9050"))
+TOR_ENABLED = os.getenv("TOR_ENABLED", "true").lower() == "true"

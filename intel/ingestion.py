@@ -1,5 +1,6 @@
 import calendar
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -7,12 +8,15 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import feedparser
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone as django_timezone
 from django.utils.dateparse import parse_datetime
 
 from .models import Feed, Item
 from .utils import build_stable_id, canonicalize_url, normalize_title, sanitize_summary
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -213,6 +217,8 @@ def parse_json_payload(feed: Feed, payload: bytes, *, fetched_at: datetime) -> l
     adapter_key = (feed.adapter_key or "").strip().lower() or _infer_json_adapter(feed)
     if adapter_key == "cisa_kev":
         return _parse_cisa_kev(feed, parsed, fetched_at=fetched_at)
+    if adapter_key == "epss":
+        return _parse_epss(feed, parsed, fetched_at=fetched_at)
 
     return _parse_generic_json_entries(feed, parsed, fetched_at=fetched_at)
 
@@ -269,6 +275,79 @@ def _parse_cisa_kev(feed: Feed, payload: Any, *, fetched_at: datetime) -> list[N
                 external_id=cve_id,
             )
         )
+    return results
+
+
+def _parse_epss(feed: Feed, payload: Any, *, fetched_at: datetime) -> list[NormalizedEntry]:
+    if not isinstance(payload, dict):
+        raise ValueError("EPSS payload must be an object.")
+    data = payload.get("data")
+    if not isinstance(data, list):
+        raise ValueError("EPSS payload missing data list.")
+
+    min_score = getattr(settings, "EPSS_MIN_SCORE", 0.1)
+    results: list[NormalizedEntry] = []
+    skipped = 0
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        try:
+            epss_score = float(entry.get("epss", 0))
+        except (TypeError, ValueError):
+            continue
+        if epss_score < min_score:
+            skipped += 1
+            continue
+
+        cve_id = str(entry.get("cve") or "").strip()
+        if not cve_id:
+            continue
+
+        try:
+            percentile = float(entry.get("percentile", 0))
+        except (TypeError, ValueError):
+            percentile = 0.0
+
+        title = f"{cve_id} \u2014 EPSS {epss_score:.1%}"
+        url = f"https://www.cve.org/CVERecord?id={cve_id}"
+        canonical_url = canonicalize_url(url)
+        summary = sanitize_summary(
+            f"EPSS score: {epss_score:.1%} (percentile: {percentile:.1%}). "
+            "High likelihood of exploitation in the wild within 30 days."
+        )
+
+        date_raw = entry.get("date")
+        if date_raw:
+            try:
+                published_at = datetime.fromisoformat(str(date_raw)).replace(tzinfo=timezone.utc)
+            except (TypeError, ValueError):
+                published_at = django_timezone.now()
+        else:
+            published_at = django_timezone.now()
+
+        results.append(
+            NormalizedEntry(
+                title=title,
+                url=url,
+                canonical_url=canonical_url,
+                published_at=published_at,
+                summary=summary,
+                raw_payload={
+                    "cve": cve_id,
+                    "epss": str(entry.get("epss")),
+                    "percentile": str(entry.get("percentile")),
+                    "date": date_raw,
+                },
+                external_id=cve_id,
+            )
+        )
+
+    logger.info(
+        "EPSS adapter: %d entries parsed, %d below min_score (%.2f) filtered out.",
+        len(results),
+        skipped,
+        min_score,
+    )
     return results
 
 
