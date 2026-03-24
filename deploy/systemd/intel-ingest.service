@@ -1,0 +1,15 @@
+[Unit]
+Description=BorealSec Intel — ingest_sources (oneshot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=appuser
+WorkingDirectory=/opt/intel/borealsec-intel
+EnvironmentFile=/opt/intel/.env
+ExecStart=/opt/intel/venv/bin/python manage.py ingest_sources \
+    --settings=config.settings.prod
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=BorealSec Intel — prune_items (oneshot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=appuser
+WorkingDirectory=/opt/intel/borealsec-intel
+EnvironmentFile=/opt/intel/.env
+ExecStart=/opt/intel/venv/bin/python manage.py prune_items \
+    --settings=config.settings.prod
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=BorealSec Intel — run ingest_dark every 30 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+Persistent=true
+Unit=intel-dark-ingest.service
+
+[Install]
+WantedBy=timers.target

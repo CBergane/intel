@@ -1,0 +1,10 @@
+[Unit]
+Description=BorealSec Intel — run prune_items daily at 03:00
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+Unit=intel-prune.service
+
+[Install]
+WantedBy=timers.target
