@@ -13,6 +13,7 @@ from intel.ingestion import (
     upsert_normalized_item,
 )
 from intel.models import Feed, FetchRun
+from intel.notifications import send_high_epss_alert
 
 
 class Command(BaseCommand):
@@ -100,9 +101,11 @@ class Command(BaseCommand):
                     if options["dry_run"]:
                         continue
 
-                    _, created = upsert_normalized_item(feed, entry)
+                    item, created = upsert_normalized_item(feed, entry)
                     if created:
                         items_new += 1
+                        if feed.adapter_key == "epss":
+                            send_high_epss_alert(item)
                     else:
                         items_updated += 1
 

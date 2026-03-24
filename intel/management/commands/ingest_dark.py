@@ -19,6 +19,7 @@ from intel.dark_utils import (
     strip_tags,
 )
 from intel.models import DarkDocument, DarkFetchRun, DarkHit, DarkSnapshot, DarkSource
+from intel.notifications import send_dark_hit_alert
 from intel.utils import canonicalize_url, sanitize_summary
 
 
@@ -242,6 +243,7 @@ class Command(BaseCommand):
                 },
             )
             if hit_created:
+                send_dark_hit_alert(hit)
                 return True, False
 
             hit.matched_keywords = keyword_matches
@@ -292,10 +294,13 @@ class Command(BaseCommand):
             "timeout": source.effective_timeout_seconds(),
             "stream": True,
         }
-        if self._should_use_tor(url, source):
+        if self._should_use_tor(url, source) and settings.TOR_ENABLED:
+            socks_url = (
+                f"socks5h://{settings.TOR_SOCKS_HOST}:{settings.TOR_SOCKS_PORT}"
+            )
             kwargs["proxies"] = {
-                "http": settings.DARK_TOR_SOCKS_URL,
-                "https": settings.DARK_TOR_SOCKS_URL,
+                "http": socks_url,
+                "https": socks_url,
             }
         return kwargs
 
