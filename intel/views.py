@@ -564,13 +564,21 @@ def sources_view(request):
     )
 
 
+@superuser_required
 def dark_dashboard_view(request):
     query = (request.GET.get("q") or "").strip()
     selected_source = (request.GET.get("source") or "").strip()
 
+    _valid_days = {"7", "30", "90"}
+    days_param = request.GET.get("days", "30")
+    if days_param not in _valid_days:
+        days_param = "30"
+    since = timezone.now() - timedelta(days=int(days_param))
+
     hits = (
         DarkHit.objects.select_related("dark_source", "dark_document")
-        .order_by("-last_seen_at", "-id")
+        .filter(detected_at__gte=since)
+        .order_by("-detected_at", "-id")
     )
     if selected_source:
         hits = hits.filter(dark_source__slug=selected_source)
@@ -583,6 +591,9 @@ def dark_dashboard_view(request):
             | Q(matched_keywords__icontains=query)
             | Q(matched_regex__icontains=query)
         )
+
+    paginator = Paginator(hits, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
 
     sources = list(
         DarkSource.objects.filter(enabled=True)
@@ -628,11 +639,13 @@ def dark_dashboard_view(request):
         {
             "page_title": "Dark Intel",
             "current_page": "dark",
-            "hits": list(hits[:50]),
+            "hits": page_obj,
+            "page_obj": page_obj,
             "source_rows": source_rows,
             "sources": sources,
             "query": query,
             "selected_source": selected_source,
+            "days": days_param,
         },
     )
 
