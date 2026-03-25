@@ -2,6 +2,9 @@ DISABLED_FEED_URLS = {
     "https://www.debian.org/security/dsa.en.rdf",
     "https://access.redhat.com/security/data/metrics/recently-published-cve.rss",
     "https://security.access.redhat.com/data/metrics/recently-published-cve.rss",
+    "https://access.redhat.com/security/data/metrics/recently-released-rhsa.rss",
+    "https://api.first.org/data/v1/epss?days=7&limit=200&order=!epss",
+    "https://leakix.net/rss/scope:public",
 }
 
 TIER1_SOURCES = [
@@ -112,7 +115,7 @@ TIER1_SOURCES = [
         "feeds": [
             {
                 "name": "Red Hat RHSA Feed",
-                "url": "https://access.redhat.com/security/data/metrics/recently-released-rhsa.rss",
+                "url": "https://security.access.redhat.com/data/metrics/rhsa.rss",
                 "feed_type": "rss",
                 "adapter_key": "",
                 "section": "advisories",
@@ -280,7 +283,7 @@ TIER1_SOURCES = [
         "feeds": [
             {
                 "name": "EPSS Top CVEs (7 days)",
-                "url": "https://api.first.org/data/v1/epss?days=7&limit=200&order=!epss",
+                "url": "https://api.first.org/data/v1/epss?days=7&limit=200&sort=-epss",
                 "feed_type": "json",
                 "adapter_key": "epss",
                 "section": "active",
@@ -300,12 +303,13 @@ TIER1_SOURCES = [
         "enabled": True,
         "feeds": [
             {
+                # LeakIX no longer exposes the old public RSS endpoint; migrate to API/hooks instead.
                 "name": "LeakIX Public Feed",
                 "url": "https://leakix.net/rss/scope:public",
                 "feed_type": "rss",
                 "adapter_key": "",
                 "section": "active",
-                "enabled": True,
+                "enabled": False,
                 "timeout_seconds": 10,
                 "max_bytes": 1_500_000,
                 "max_age_days": 7,
@@ -321,6 +325,7 @@ TIER1_SOURCES = [
         "enabled": True,
         "feeds": [
             {
+                # DNS failures here are often environmental/network issues, not necessarily an endpoint bug.
                 "name": "psbdmp Credential Search",
                 "url": "https://psbdmp.ws/api/v3/search/sweden+credentials",
                 "feed_type": "json",

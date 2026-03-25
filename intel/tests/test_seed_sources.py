@@ -16,6 +16,33 @@ def _find_feed_config(source_slug: str):
 
 
 class SeedSourcesCommandTests(TestCase):
+    def test_tier1_sources_use_current_feed_urls(self):
+        red_hat = _find_feed_config("red-hat")
+        epss = _find_feed_config("epss")
+        leakix = _find_feed_config("leakix")
+
+        self.assertEqual(
+            red_hat["url"],
+            "https://security.access.redhat.com/data/metrics/rhsa.rss",
+        )
+        self.assertEqual(
+            epss["url"],
+            "https://api.first.org/data/v1/epss?days=7&limit=200&sort=-epss",
+        )
+        self.assertEqual(leakix["url"], "https://leakix.net/rss/scope:public")
+        self.assertFalse(leakix["enabled"])
+
+    def test_disabled_feed_urls_include_retired_or_invalid_endpoints(self):
+        self.assertIn(
+            "https://access.redhat.com/security/data/metrics/recently-released-rhsa.rss",
+            DISABLED_FEED_URLS,
+        )
+        self.assertIn(
+            "https://api.first.org/data/v1/epss?days=7&limit=200&order=!epss",
+            DISABLED_FEED_URLS,
+        )
+        self.assertIn("https://leakix.net/rss/scope:public", DISABLED_FEED_URLS)
+
     def test_seed_sources_is_idempotent(self):
         expected_sources = len(TIER1_SOURCES)
         expected_feeds = sum(len(source["feeds"]) for source in TIER1_SOURCES)
