@@ -724,6 +724,7 @@ def _build_feed_rows(feeds):
     feed_rows = []
     for feed in feeds:
         latest_run = latest_run_by_feed.get(feed.id)
+        display_error = ""
         if latest_run is not None:
             if latest_run.ok:
                 status = "ok"
@@ -732,6 +733,7 @@ def _build_feed_rows(feeds):
             else:
                 status = "error"
             last_run_at = latest_run.finished_at or latest_run.started_at
+            display_error = (latest_run.error or "").strip()
         else:
             if feed.last_success_at is None:
                 status = "never"
@@ -740,6 +742,8 @@ def _build_feed_rows(feeds):
             else:
                 status = "ok"
             last_run_at = None
+        if not display_error:
+            display_error = (feed.last_error or "").strip()
 
         feed_rows.append(
             {
@@ -747,6 +751,7 @@ def _build_feed_rows(feeds):
                 "latest_run": latest_run,
                 "status": status,
                 "last_run_at": last_run_at,
+                "display_error": display_error,
                 "collection_mode": "expanded" if feed.expanded_collection else "normal",
                 "effective_max_items": (
                     feed.expanded_max_items_per_run or max(feed.max_items_per_run, 1000)
@@ -864,8 +869,46 @@ def ops_dashboard(request):
 
 @superuser_required
 def admin_panel_view(request):
-    feeds = list(Feed.objects.select_related("source").order_by("source__name", "name"))
+    query = (request.GET.get("q") or "").strip()
+    selected_section = (request.GET.get("section") or "").strip()
+    selected_enabled = (request.GET.get("enabled") or "all").strip().lower()
+    selected_status = (request.GET.get("status") or "all").strip().lower()
+
+    valid_sections = {value for value, _label in Feed.Section.choices}
+    if selected_section not in valid_sections:
+        selected_section = ""
+
+    if selected_enabled not in {"all", "enabled", "disabled"}:
+        selected_enabled = "all"
+
+    if selected_status not in {"all", "ok", "error", "never"}:
+        selected_status = "all"
+
+    feeds_qs = Feed.objects.select_related("source")
+    if query:
+        feeds_qs = feeds_qs.filter(
+            Q(source__name__icontains=query)
+            | Q(name__icontains=query)
+            | Q(url__icontains=query)
+            | Q(adapter_key__icontains=query)
+        )
+    if selected_section:
+        feeds_qs = feeds_qs.filter(section=selected_section)
+    if selected_enabled == "enabled":
+        feeds_qs = feeds_qs.filter(enabled=True)
+    elif selected_enabled == "disabled":
+        feeds_qs = feeds_qs.filter(enabled=False)
+
+    feeds = list(feeds_qs.order_by("source__name", "name"))
     feed_rows = _build_feed_rows(feeds)
+    if selected_status != "all":
+        feed_rows = [row for row in feed_rows if row["status"] == selected_status]
+
+    total_feeds_count = len(feed_rows)
+    enabled_feeds_count = sum(1 for row in feed_rows if row["feed"].enabled)
+    disabled_feeds_count = total_feeds_count - enabled_feeds_count
+    error_feeds_count = sum(1 for row in feed_rows if row["status"] == "error")
+
     return render(
         request,
         "intel/admin_panel/feed_list.html",
@@ -873,6 +916,21 @@ def admin_panel_view(request):
             "page_title": "Admin Panel",
             "current_page": "admin",
             "feed_rows": feed_rows,
+            "total_feeds_count": total_feeds_count,
+            "enabled_feeds_count": enabled_feeds_count,
+            "disabled_feeds_count": disabled_feeds_count,
+            "error_feeds_count": error_feeds_count,
+            "query": query,
+            "selected_section": selected_section,
+            "selected_enabled": selected_enabled,
+            "selected_status": selected_status,
+            "section_options": Feed.Section.choices,
+            "has_active_filters": bool(
+                query
+                or selected_section
+                or selected_enabled != "all"
+                or selected_status != "all"
+            ),
             "sources_url": reverse("intel_admin:sources"),
             "dark_sources_url": reverse("intel_admin:dark_sources"),
             "django_admin_url": reverse("admin:index"),

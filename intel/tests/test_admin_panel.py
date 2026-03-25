@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from intel.models import Feed, Source
 
@@ -151,3 +152,107 @@ class AdminPanelFeedCrudTests(TestCase):
         self.assertEqual(delete_response.status_code, 302)
         self.assertEqual(delete_response.url, self.panel_url)
         self.assertFalse(Feed.objects.filter(id=feed.id).exists())
+
+
+class AdminPanelFeedListTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.superuser = user_model.objects.create_superuser(
+            username="panel-admin",
+            password="panel-pass-123",
+        )
+        self.client.force_login(self.superuser)
+        self.panel_url = reverse("intel_admin:panel")
+
+        now = timezone.now()
+        alpha = Source.objects.create(name="Alpha Source", slug="alpha-source")
+        beta = Source.objects.create(name="Beta Source", slug="beta-source")
+        gamma = Source.objects.create(name="Gamma Source", slug="gamma-source")
+
+        self.ok_feed = Feed.objects.create(
+            source=alpha,
+            name="Alpha Advisory Feed",
+            url="https://example.com/alpha-advisories.xml",
+            feed_type=Feed.FeedType.RSS,
+            section=Feed.Section.ADVISORIES,
+            enabled=True,
+            last_success_at=now,
+            last_error="",
+        )
+        self.error_feed = Feed.objects.create(
+            source=beta,
+            name="Beta EPSS Feed",
+            url="https://example.com/beta-epss.json",
+            feed_type=Feed.FeedType.JSON,
+            adapter_key="epss",
+            section=Feed.Section.ACTIVE,
+            enabled=False,
+            last_success_at=now,
+            last_error="Upstream response failed validation.",
+        )
+        self.never_feed = Feed.objects.create(
+            source=gamma,
+            name="Gamma Research Feed",
+            url="https://example.com/gamma-research.xml",
+            feed_type=Feed.FeedType.RSS,
+            section=Feed.Section.RESEARCH,
+            enabled=True,
+        )
+
+    def test_admin_panel_renders_for_superuser(self):
+        response = self.client.get(self.panel_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Total Feeds")
+        self.assertContains(response, self.ok_feed.name)
+        self.assertContains(response, self.error_feed.name)
+        self.assertContains(response, self.never_feed.name)
+
+    def test_admin_panel_search_filters_feeds(self):
+        response = self.client.get(self.panel_url, {"q": "epss"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.error_feed.name)
+        self.assertNotContains(response, self.ok_feed.name)
+        self.assertNotContains(response, self.never_feed.name)
+
+        response = self.client.get(self.panel_url, {"q": "Alpha Source"})
+
+        self.assertContains(response, self.ok_feed.name)
+        self.assertNotContains(response, self.error_feed.name)
+        self.assertNotContains(response, self.never_feed.name)
+
+        response = self.client.get(self.panel_url, {"q": "Gamma Research Feed"})
+
+        self.assertContains(response, self.never_feed.name)
+        self.assertNotContains(response, self.ok_feed.name)
+        self.assertNotContains(response, self.error_feed.name)
+
+        response = self.client.get(self.panel_url, {"q": "beta-epss.json"})
+
+        self.assertContains(response, self.error_feed.name)
+        self.assertNotContains(response, self.ok_feed.name)
+        self.assertNotContains(response, self.never_feed.name)
+
+    def test_admin_panel_combined_filters_limit_feed_rows(self):
+        response = self.client.get(
+            self.panel_url,
+            {
+                "section": Feed.Section.ACTIVE,
+                "enabled": "disabled",
+                "status": "error",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.error_feed.name)
+        self.assertNotContains(response, self.ok_feed.name)
+        self.assertNotContains(response, self.never_feed.name)
+
+    def test_admin_panel_status_never_filter(self):
+        response = self.client.get(self.panel_url, {"status": "never"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.never_feed.name)
+        self.assertNotContains(response, self.ok_feed.name)
+        self.assertNotContains(response, self.error_feed.name)
