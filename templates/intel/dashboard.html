@@ -4,29 +4,9 @@
 {% block title %}Now | BorealSec Intel{% endblock %}
 
 {% block content %}
-<section class="space-y-3 sm:space-y-5">
-    <!-- ── Stat widgets ─────────────────────────────────────────────── -->
-    <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-4">
-        <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
-            <p class="text-2xl font-bold tabular-nums text-accent sm:text-3xl">{{ items_today_count }}</p>
-            <p class="mt-1 text-[11px] text-slate-400 sm:text-xs">Items today</p>
-        </div>
-        <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
-            <p class="text-2xl font-bold tabular-nums text-accent sm:text-3xl">{{ items_week_count }}</p>
-            <p class="mt-1 text-[11px] text-slate-400 sm:text-xs">This week</p>
-        </div>
-        <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
-            <p class="text-2xl font-bold tabular-nums text-accent sm:text-3xl">{{ active_feeds_count }}</p>
-            <p class="mt-1 text-[11px] text-slate-400 sm:text-xs">Active feeds</p>
-        </div>
-        <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
-            <p class="text-2xl font-bold tabular-nums text-accent sm:text-3xl">{{ dark_hits_30d_count }}</p>
-            <p class="mt-1 text-[11px] text-slate-400 sm:text-xs">Dark hits (30d)</p>
-        </div>
-    </div>
-
-    <div class="sm:hidden">
-        <div class="mb-3 flex items-start justify-between gap-3 px-1 sm:hidden">
+<section class="space-y-4 sm:space-y-5 xl:space-y-7">
+    <div class="space-y-3 md:hidden">
+        <div class="flex items-start justify-between gap-3 px-1">
             <div class="min-w-0">
                 <h1 class="text-sm font-semibold text-white">Now</h1>
                 <p class="mt-0.5 text-[11px] leading-5 text-slate-400">
@@ -41,17 +21,59 @@
                 All advisories
             </a>
         </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow">
+                <p class="text-2xl font-bold tabular-nums text-accent">{{ items_today_count }}</p>
+                <p class="mt-1 text-[11px] text-slate-400">Items today</p>
+            </div>
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow">
+                <p class="text-2xl font-bold tabular-nums text-accent">{{ items_week_count }}</p>
+                <p class="mt-1 text-[11px] text-slate-400">This week</p>
+            </div>
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow">
+                <p class="text-2xl font-bold tabular-nums text-accent">{{ active_feeds_count }}</p>
+                <p class="mt-1 text-[11px] text-slate-400">Active feeds</p>
+            </div>
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow">
+                <p class="text-2xl font-bold tabular-nums text-accent">{{ dark_hits_30d_count }}</p>
+                <p class="mt-1 text-[11px] text-slate-400">Dark hits (30d)</p>
+            </div>
+        </div>
     </div>
 
-    <div class="hidden rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:block sm:p-4">
-        <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-                <h1 class="text-base font-semibold text-white sm:text-lg">Now</h1>
-                <p class="mt-1 text-xs leading-5 text-slate-400 sm:text-sm">
-                    Curated high-signal view. High Signal uses a 7-day window and section blocks are balanced by source.
-                </p>
+    <div class="hidden rounded-2xl border border-line bg-panel/80 p-4 shadow-glow md:block lg:p-5 xl:p-6">
+        <div class="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,1fr)] xl:items-start xl:gap-6">
+            <div class="min-w-0 max-w-3xl">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                        <h1 class="text-xl font-semibold text-white lg:text-2xl xl:text-[1.85rem]">Now</h1>
+                        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300 lg:text-[15px]">
+                            Curated high-signal view. High Signal uses a 7-day window and section blocks are balanced by source.
+                        </p>
+                    </div>
+                    <a href="/advisories" class="shrink-0 rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-slate-800">Browse list</a>
+                </div>
             </div>
-            <a href="/advisories" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-200 hover:bg-slate-800">Browse list</a>
+
+            <div class="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-2 xl:gap-3.5">
+                <div class="rounded-xl border border-line/80 bg-slate-900/55 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                    <p class="text-2xl font-bold tabular-nums text-accent lg:text-3xl">{{ items_today_count }}</p>
+                    <p class="mt-1 text-xs text-slate-400">Items today</p>
+                </div>
+                <div class="rounded-xl border border-line/80 bg-slate-900/55 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                    <p class="text-2xl font-bold tabular-nums text-accent lg:text-3xl">{{ items_week_count }}</p>
+                    <p class="mt-1 text-xs text-slate-400">This week</p>
+                </div>
+                <div class="rounded-xl border border-line/80 bg-slate-900/55 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                    <p class="text-2xl font-bold tabular-nums text-accent lg:text-3xl">{{ active_feeds_count }}</p>
+                    <p class="mt-1 text-xs text-slate-400">Active feeds</p>
+                </div>
+                <div class="rounded-xl border border-line/80 bg-slate-900/55 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                    <p class="text-2xl font-bold tabular-nums text-accent lg:text-3xl">{{ dark_hits_30d_count }}</p>
+                    <p class="mt-1 text-xs text-slate-400">Dark hits (30d)</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -65,11 +87,11 @@
         </div>
     </nav>
 
-    <div class="grid gap-4 lg:grid-cols-12 lg:gap-5">
-        <div id="high-signal" class="space-y-3 rounded-xl border border-line bg-panel/80 p-3 shadow-glow lg:col-span-8 sm:space-y-4 sm:p-4">
+    <div class="grid gap-4 lg:grid-cols-12 lg:items-start lg:gap-5 xl:gap-6">
+        <div id="high-signal" class="space-y-3 rounded-xl border border-line bg-panel/80 p-3 shadow-glow lg:col-span-8 sm:space-y-4 sm:p-4 xl:col-span-9 xl:rounded-2xl xl:p-6">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="space-y-1">
-                    <h2 class="text-sm font-semibold text-white sm:text-base">High Signal (Last 7 days)</h2>
+                    <h2 class="text-sm font-semibold text-white sm:text-base xl:text-lg">High Signal (Last 7 days)</h2>
                     <div class="flex flex-wrap gap-1.5 text-[11px] sm:hidden">
                         <a href="#advisories-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Advisories</a>
                         <a href="#research-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Research</a>
@@ -88,8 +110,8 @@
             </div>
         </div>
 
-        <aside id="trending-block" class="space-y-3 lg:col-span-4 lg:space-y-4">
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+        <aside id="trending-block" class="space-y-3 lg:col-span-4 lg:space-y-4 xl:sticky xl:top-24 xl:col-span-3 xl:space-y-3">
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <h2 class="text-sm font-semibold text-white sm:text-base">Feed Health</h2>
                     <a href="/feed-health" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">Open panel</a>
@@ -122,7 +144,7 @@
                 </p>
             </div>
 
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
                 <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending Sources (48h)</h2>
                 <ul class="space-y-2 text-sm text-slate-300">
                     {% for row in trending_sources %}
@@ -136,7 +158,7 @@
                 </ul>
             </div>
 
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
                 <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending CVEs (7d)</h2>
                 <div class="flex flex-wrap gap-2">
                     {% for cve, count in trending_cves %}
@@ -152,8 +174,8 @@
         </aside>
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-3 lg:gap-5">
-        <div id="advisories-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4">
+    <div class="grid gap-4 lg:grid-cols-12 lg:gap-5 xl:gap-6">
+        <div id="advisories-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4 lg:col-span-7 xl:col-span-5 xl:p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-sm font-semibold text-white sm:text-base">Advisories</h2>
                 <a href="/advisories" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All advisories</a>
@@ -165,7 +187,7 @@
             {% endfor %}
         </div>
 
-        <div id="research-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4">
+        <div id="research-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4 lg:col-span-5 xl:col-span-4 xl:p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-sm font-semibold text-white sm:text-base">Research</h2>
                 <a href="/research" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All research</a>
@@ -177,7 +199,7 @@
             {% endfor %}
         </div>
 
-        <div id="sweden-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4">
+        <div id="sweden-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4 lg:col-span-12 xl:col-span-3 xl:p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-sm font-semibold text-white sm:text-base">Sweden</h2>
                 <a href="/sweden" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All Sweden items</a>
