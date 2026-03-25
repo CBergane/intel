@@ -293,6 +293,48 @@ TIER1_SOURCES = [
         ],
     },
     {
+        "name": "LeakIX",
+        "slug": "leakix",
+        "homepage": "https://leakix.net",
+        "tags": ["threat-intel", "leak", "exposure"],
+        "enabled": True,
+        "feeds": [
+            {
+                "name": "LeakIX Public Feed",
+                "url": "https://leakix.net/rss/scope:public",
+                "feed_type": "rss",
+                "adapter_key": "",
+                "section": "active",
+                "enabled": True,
+                "timeout_seconds": 10,
+                "max_bytes": 1_500_000,
+                "max_age_days": 7,
+                "max_items_per_run": 50,
+            }
+        ],
+    },
+    {
+        "name": "Paste Monitor (psbdmp)",
+        "slug": "psbdmp",
+        "homepage": "https://psbdmp.ws",
+        "tags": ["paste", "credential", "threat-intel"],
+        "enabled": True,
+        "feeds": [
+            {
+                "name": "psbdmp Credential Search",
+                "url": "https://psbdmp.ws/api/v3/search/sweden+credentials",
+                "feed_type": "json",
+                "adapter_key": "psbdmp",
+                "section": "active",
+                "enabled": True,
+                "timeout_seconds": 15,
+                "max_bytes": 2_000_000,
+                "max_age_days": 7,
+                "max_items_per_run": 100,
+            }
+        ],
+    },
+    {
         "name": "Exploit-DB",
         "slug": "exploit-db",
         "homepage": "https://www.exploit-db.com",

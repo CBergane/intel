@@ -1,0 +1,74 @@
+{% load humanize %}
+<!-- Desktop: full item cards (md+) -->
+<div class="hidden space-y-3 sm:space-y-4 md:block">
+    {% for item in page_obj.object_list %}
+        {% include "intel/_item_card.html" with compact=False %}
+    {% empty %}
+        <div class="rounded-xl border border-line bg-panel/80 p-7 text-center text-slate-400">
+            No items matched the current filters.
+        </div>
+    {% endfor %}
+</div>
+
+<!-- Mobile: compact cards (< md) -->
+<div class="space-y-2 md:hidden">
+    {% for item in page_obj.object_list %}
+        <div class="flex min-w-0 items-start gap-3 rounded-xl border border-line/80 bg-slate-900/70 p-3">
+            <div class="min-w-0 flex-1">
+                <p class="line-clamp-2 text-sm font-medium leading-snug text-white">{{ item.title }}</p>
+                <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span class="max-w-[9rem] truncate rounded border border-line/70 bg-slate-800/80 px-1.5 py-0.5 text-[10px] text-slate-300">
+                        {{ item.source.name }}
+                    </span>
+                    {% if item.feed.get_section_display %}
+                        <span class="rounded border border-line/70 bg-slate-800/80 px-1.5 py-0.5 text-[10px] text-slate-300">
+                            {{ item.feed.get_section_display }}
+                        </span>
+                    {% endif %}
+                    <time class="text-[10px] text-slate-500" datetime="{{ item.activity_at|date:'c' }}"
+                          title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
+                        {{ item.activity_at|naturaltime }}
+                    </time>
+                </div>
+            </div>
+            {% if item.url %}
+                <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer"
+                   class="shrink-0 rounded-lg border border-slate-700 p-2 text-slate-400 transition hover:border-accent/40 hover:bg-slate-800 hover:text-accent"
+                   aria-label="Open source">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                    </svg>
+                </a>
+            {% endif %}
+        </div>
+    {% empty %}
+        <div class="rounded-xl border border-line bg-panel/80 p-7 text-center text-slate-400">
+            No items matched the current filters.
+        </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination (shared) -->
+{% if page_obj.paginator.count > 0 %}
+    <div class="flex flex-col gap-3 rounded-xl border border-line bg-panel/80 p-3.5 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+        <span class="break-words">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            <span class="text-slate-500">({{ page_obj.paginator.count }} items)</span>
+        </span>
+        <div class="flex w-full gap-2 sm:w-auto">
+            {% if page_obj.has_previous %}
+                <a class="w-full rounded-lg border border-slate-600 px-3 py-2 text-center transition hover:bg-slate-800 sm:w-auto sm:py-1.5"
+                   href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.previous_page_number }}">
+                    Newer
+                </a>
+            {% endif %}
+            {% if page_obj.has_next %}
+                <a class="w-full rounded-lg border border-slate-600 px-3 py-2 text-center transition hover:bg-slate-800 sm:w-auto sm:py-1.5"
+                   href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.next_page_number }}">
+                    Older
+                </a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}

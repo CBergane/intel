@@ -159,3 +159,8 @@ TOR_SOCKS_PORT = int(os.getenv("TOR_SOCKS_PORT", "9050"))
 TOR_ENABLED = os.getenv("TOR_ENABLED", "true").lower() == "true"
 
 RANSOMWARE_LIVE_NORDICS_ONLY = os.getenv("RANSOMWARE_LIVE_NORDICS_ONLY", "true").lower() == "true"
+
+PSBDMP_QUERIES = os.getenv("PSBDMP_QUERIES", ".se password,.se credentials,sweden leak,nordic breach")
+
+HIBP_API_KEY = os.getenv("HIBP_API_KEY", "")
+HIBP_DOMAINS = env_list("HIBP_DOMAINS", "")

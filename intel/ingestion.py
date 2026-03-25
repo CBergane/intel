@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import feedparser
+import requests
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone as django_timezone
@@ -221,6 +222,8 @@ def parse_json_payload(feed: Feed, payload: bytes, *, fetched_at: datetime) -> l
         return _parse_epss(feed, parsed, fetched_at=fetched_at)
     if adapter_key == "ransomware_live_victims":
         return _parse_ransomware_live_victims(feed, parsed, fetched_at=fetched_at)
+    if adapter_key == "psbdmp":
+        return _parse_psbdmp(feed, parsed, fetched_at=fetched_at)
 
     return _parse_generic_json_entries(feed, parsed, fetched_at=fetched_at)
 
@@ -428,6 +431,81 @@ def _parse_ransomware_live_victims(
         len(results),
         skipped,
     )
+    return results
+
+
+_CREDENTIAL_KEYWORDS = frozenset({"password", "passwd", "credential", "credentials", "apikey", "api_key", "secret"})
+
+
+def _looks_like_credentials(text: str) -> bool:
+    if "@" in text:
+        return True
+    lower = text.lower()
+    return any(kw in lower for kw in _CREDENTIAL_KEYWORDS)
+
+
+def _parse_psbdmp(feed: Feed, payload: Any, *, fetched_at: datetime) -> list[NormalizedEntry]:
+    queries_raw = getattr(settings, "PSBDMP_QUERIES", ".se password,.se credentials,sweden leak")
+    queries = [q.strip() for q in queries_raw.split(",") if q.strip()]
+
+    # Accumulate paste objects; start with the initial payload (from the feed URL fetch)
+    all_pastes: list[dict] = []
+    if isinstance(payload, list):
+        all_pastes.extend(p for p in payload if isinstance(p, dict))
+
+    # Fetch additional queries defined in settings
+    timeout = getattr(settings, "INTEL_FETCH_TIMEOUT", 10)
+    ua = getattr(settings, "INTEL_USER_AGENT", "borealsec-intel-bot/0.1")
+    for query in queries:
+        encoded = query.replace(" ", "+")
+        url = f"https://psbdmp.ws/api/v3/search/{encoded}"
+        try:
+            resp = requests.get(url, timeout=timeout, headers={"User-Agent": ua})
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, list):
+                all_pastes.extend(p for p in data if isinstance(p, dict))
+        except Exception as exc:
+            logger.warning("psbdmp query %r failed: %s", query, exc)
+
+    seen_ids: set[str] = set()
+    results: list[NormalizedEntry] = []
+
+    for paste in all_pastes:
+        paste_id = str(paste.get("id") or "").strip()
+        if not paste_id or paste_id in seen_ids:
+            continue
+        seen_ids.add(paste_id)
+
+        tags = str(paste.get("tags") or "")
+        paste_url = f"https://psbdmp.ws/{paste_id}"
+        canonical_url = canonicalize_url(paste_url)
+
+        tag_display = tags[:120] if tags else "paste"
+        title = normalize_title(f"Paste {paste_id}: {tag_display}")
+
+        time_raw = paste.get("time")
+        if time_raw:
+            try:
+                published_at = datetime.fromtimestamp(int(time_raw), tz=timezone.utc)
+            except (TypeError, ValueError):
+                published_at = fetched_at
+        else:
+            published_at = fetched_at
+
+        results.append(
+            NormalizedEntry(
+                title=title,
+                url=paste_url,
+                canonical_url=canonical_url,
+                published_at=published_at,
+                summary=sanitize_summary(tags[:500]),
+                raw_payload=paste,
+                external_id=paste_id,
+            )
+        )
+
+    logger.info("psbdmp adapter: %d pastes collected across queries.", len(results))
     return results
 
 

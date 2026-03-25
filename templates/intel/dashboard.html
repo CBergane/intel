@@ -5,6 +5,26 @@
 
 {% block content %}
 <section class="space-y-3 sm:space-y-5">
+    <!-- ── Stat widgets ─────────────────────────────────────────────── -->
+    <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-4">
+        <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+            <p class="text-2xl font-bold tabular-nums text-accent sm:text-3xl">{{ items_today_count }}</p>
+            <p class="mt-1 text-[11px] text-slate-400 sm:text-xs">Items today</p>
+        </div>
+        <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+            <p class="text-2xl font-bold tabular-nums text-accent sm:text-3xl">{{ items_week_count }}</p>
+            <p class="mt-1 text-[11px] text-slate-400 sm:text-xs">This week</p>
+        </div>
+        <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+            <p class="text-2xl font-bold tabular-nums text-accent sm:text-3xl">{{ active_feeds_count }}</p>
+            <p class="mt-1 text-[11px] text-slate-400 sm:text-xs">Active feeds</p>
+        </div>
+        <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4">
+            <p class="text-2xl font-bold tabular-nums text-accent sm:text-3xl">{{ dark_hits_30d_count }}</p>
+            <p class="mt-1 text-[11px] text-slate-400 sm:text-xs">Dark hits (30d)</p>
+        </div>
+    </div>
+
     <div class="sm:hidden">
         <div class="mb-3 flex items-start justify-between gap-3 px-1 sm:hidden">
             <div class="min-w-0">

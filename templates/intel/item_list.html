@@ -22,7 +22,13 @@
         <form method="get" class="mt-3 space-y-3">
             <div>
                 <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_q_mobile">Search</label>
-                <input id="id_q_mobile" name="q" value="{{ query }}" placeholder="CVE, vendor, keyword" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none">
+                <input id="id_q_mobile" name="q" value="{{ query }}" placeholder="CVE, vendor, keyword"
+                   class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none"
+                   hx-get="{{ request.path }}"
+                   hx-trigger="keyup changed delay:400ms"
+                   hx-target="#items-list"
+                   hx-swap="innerHTML"
+                   hx-include="closest form">
             </div>
             <div>
                 <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_source_mobile">Source</label>
@@ -51,7 +57,13 @@
     <form method="get" class="hidden gap-3 rounded-xl border border-line bg-panel/80 p-4 shadow-glow md:grid md:grid-cols-4">
         <div class="md:col-span-2">
             <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_q">Search</label>
-            <input id="id_q" name="q" value="{{ query }}" placeholder="CVE, vendor, keyword" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none">
+            <input id="id_q" name="q" value="{{ query }}" placeholder="CVE, vendor, keyword"
+                   class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none"
+                   hx-get="{{ request.path }}"
+                   hx-trigger="keyup changed delay:400ms"
+                   hx-target="#items-list"
+                   hx-swap="innerHTML"
+                   hx-include="closest form">
         </div>
         <div>
             <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_source">Source</label>
@@ -98,28 +110,8 @@
         {% endif %}
     </div>
 
-    <div class="space-y-3 sm:space-y-4">
-        {% for item in page_obj.object_list %}
-            {% include "intel/_item_card.html" with compact=False %}
-        {% empty %}
-            <div class="rounded-xl border border-line bg-panel/80 p-7 text-center text-slate-400">
-                No items matched the current filters.
-            </div>
-        {% endfor %}
+    <div id="items-list">
+        {% include "intel/partials/items_list.html" %}
     </div>
-
-    {% if page_obj.paginator.count > 0 %}
-        <div class="flex flex-col gap-3 rounded-xl border border-line bg-panel/80 p-3.5 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-            <span class="break-words">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} items)</span>
-            <div class="flex w-full gap-2 sm:w-auto">
-                {% if page_obj.has_previous %}
-                    <a class="w-full rounded-lg border border-slate-600 px-3 py-2 text-center hover:bg-slate-800 sm:w-auto sm:py-1.5" href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.previous_page_number }}">Newer</a>
-                {% endif %}
-                {% if page_obj.has_next %}
-                    <a class="w-full rounded-lg border border-slate-600 px-3 py-2 text-center hover:bg-slate-800 sm:w-auto sm:py-1.5" href="?q={{ query|urlencode }}&source={{ selected_source|urlencode }}&time={{ selected_time|urlencode }}&page={{ page_obj.next_page_number }}">Older</a>
-                {% endif %}
-            </div>
-        </div>
-    {% endif %}
 </section>
 {% endblock %}

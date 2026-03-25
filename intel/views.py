@@ -1,3 +1,4 @@
+import json
 import re
 from collections import Counter
 from datetime import timedelta
@@ -295,6 +296,11 @@ def _render_items_page(request, *, title, nav_key, section=None):
             "current_page": nav_key,
         }
     )
+    if request.headers.get("HX-Request"):
+        count = context["filtered_total"]
+        response = render(request, "intel/partials/items_list.html", context)
+        response["HX-Trigger"] = json.dumps({"showToast": f"{count} results"})
+        return response
     return render(request, "intel/item_list.html", context)
 
 
@@ -380,9 +386,22 @@ def now_view(request):
         .first()
     )
 
+    # Dashboard stat widgets
+    today = now.date()
+    week_ago = now - timedelta(days=7)
+    thirty_days_ago = now - timedelta(days=30)
+    items_today_count = Item.objects.filter(published_at__date=today).count()
+    items_week_count = Item.objects.filter(published_at__gte=week_ago).count()
+    active_feeds_count = Feed.objects.filter(enabled=True).count()
+    dark_hits_30d_count = DarkHit.objects.filter(detected_at__gte=thirty_days_ago).count()
+
     context = {
         "page_title": "Now",
         "current_page": "now",
+        "items_today_count": items_today_count,
+        "items_week_count": items_week_count,
+        "active_feeds_count": active_feeds_count,
+        "dark_hits_30d_count": dark_hits_30d_count,
         "high_signal_items": high_signal_items,
         "advisories_items": advisories_items,
         "research_items": research_items,
