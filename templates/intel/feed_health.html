@@ -73,94 +73,113 @@
 
     <div class="hidden overflow-hidden rounded-xl border border-line bg-panel/80 shadow-glow md:block">
         <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
+            <table class="min-w-full table-fixed text-sm">
                 <thead class="bg-slate-900 text-slate-300">
                     <tr>
-                        <th class="px-3 py-2 text-left">Source</th>
-                        <th class="px-3 py-2 text-left">Feed</th>
-                        <th class="px-3 py-2 text-left">Type</th>
-                        <th class="px-3 py-2 text-left">Mode</th>
-                        <th class="px-3 py-2 text-left">Last Success</th>
-                        <th class="px-3 py-2 text-left">Last Run</th>
-                        <th class="px-3 py-2 text-left">Status</th>
-                        <th class="px-3 py-2 text-left">Fetched</th>
-                        <th class="px-3 py-2 text-left">Stored</th>
-                        <th class="px-3 py-2 text-left">Skip Old</th>
-                        <th class="px-3 py-2 text-left">Skip Invalid</th>
-                        <th class="px-3 py-2 text-left">Limited</th>
-                        <th class="px-3 py-2 text-left">Error</th>
+                        <th class="w-[28%] px-3 py-2 text-left">Feed</th>
+                        <th class="w-[20%] px-3 py-2 text-left">Freshness</th>
+                        <th class="w-[12%] px-3 py-2 text-left">Status</th>
+                        <th class="w-[16%] px-3 py-2 text-left">Volume</th>
+                        <th class="w-[14%] px-3 py-2 text-left">Skips</th>
+                        <th class="w-[20%] px-3 py-2 text-left">Error</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for feed in feeds %}
-                        <tr class="border-t border-line/70 text-slate-200">
-                            <td class="px-3 py-2">{{ feed.source.name }}</td>
-                            <td class="px-3 py-2">{{ feed.name }}</td>
-                            <td class="px-3 py-2">{{ feed.feed_type|upper }}</td>
-                            <td class="px-3 py-2">
-                                {% if feed.expanded_collection %}
-                                    <span class="rounded-md bg-amber-500/20 px-2 py-1 text-amber-300">expanded</span>
-                                {% else %}
-                                    <span class="rounded-md bg-slate-700 px-2 py-1 text-slate-300">normal</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-3 py-2">
-                                {% if feed.last_success_at %}
-                                    {{ feed.last_success_at|date:"Y-m-d H:i" }} UTC
-                                {% else %}
-                                    never
-                                {% endif %}
-                            </td>
-                            <td class="px-3 py-2">
-                                {% with latest=latest_by_feed|get_item:feed.id %}
-                                    {% if latest %}
-                                        {{ latest.started_at|date:"Y-m-d H:i" }} UTC
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                {% endwith %}
-                            </td>
-                            <td class="px-3 py-2">
-                                {% with latest=latest_by_feed|get_item:feed.id %}
+                        {% with latest=latest_by_feed|get_item:feed.id %}
+                            <tr class="border-t border-line/70 align-top text-slate-200">
+                                <td class="px-3 py-3">
+                                    <div class="min-w-0">
+                                        <p class="truncate font-medium text-white">{{ feed.name }}</p>
+                                        <p class="mt-1 truncate text-xs text-slate-400">{{ feed.source.name }}</p>
+                                        <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                                            <span class="rounded-md border border-line/80 bg-slate-800/70 px-2 py-1 text-slate-300">{{ feed.feed_type|upper }}</span>
+                                            {% if feed.expanded_collection %}
+                                                <span class="rounded-md border border-amber-500/40 bg-amber-500/15 px-2 py-1 text-amber-200">expanded</span>
+                                            {% else %}
+                                                <span class="rounded-md border border-line/80 bg-slate-800/70 px-2 py-1 text-slate-300">normal</span>
+                                            {% endif %}
+                                        </div>
+                                        <a href="{{ feed.url }}" target="_blank" rel="noopener noreferrer" class="mt-2 inline-flex text-xs font-medium text-sky-300 hover:text-sky-200">
+                                            Open feed URL
+                                        </a>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div class="space-y-2 text-xs text-slate-300">
+                                        <div>
+                                            <p class="uppercase tracking-wide text-slate-500">Last success</p>
+                                            <p class="mt-1 text-sm text-white">
+                                                {% if feed.last_success_at %}
+                                                    {{ feed.last_success_at|date:"Y-m-d H:i" }} UTC
+                                                {% else %}
+                                                    never
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p class="uppercase tracking-wide text-slate-500">Last run</p>
+                                            <p class="mt-1 text-sm text-slate-200">
+                                                {% if latest %}
+                                                    {{ latest.started_at|date:"Y-m-d H:i" }} UTC
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3">
                                     {% if latest and latest.ok %}
-                                        <span class="rounded-md bg-emerald-500/20 px-2 py-1 text-emerald-300">ok</span>
+                                        <span class="rounded-md bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
                                     {% elif latest %}
-                                        <span class="rounded-md bg-rose-500/20 px-2 py-1 text-rose-300">error</span>
+                                        <span class="rounded-md bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
                                     {% else %}
-                                        <span class="rounded-md bg-slate-700 px-2 py-1 text-slate-300">unknown</span>
+                                        <span class="rounded-md bg-slate-700 px-2 py-1 text-xs text-slate-300">unknown</span>
                                     {% endif %}
-                                {% endwith %}
-                            </td>
-                            <td class="px-3 py-2">
-                                {% with latest=latest_by_feed|get_item:feed.id %}
-                                    {{ latest.items_fetched|default:"-" }}
-                                {% endwith %}
-                            </td>
-                            <td class="px-3 py-2">
-                                {% with latest=latest_by_feed|get_item:feed.id %}
-                                    {{ latest.items_stored|default:"-" }}
-                                {% endwith %}
-                            </td>
-                            <td class="px-3 py-2">
-                                {% with latest=latest_by_feed|get_item:feed.id %}
-                                    {{ latest.items_skipped_old|default:"-" }}
-                                {% endwith %}
-                            </td>
-                            <td class="px-3 py-2">
-                                {% with latest=latest_by_feed|get_item:feed.id %}
-                                    {{ latest.items_skipped_invalid|default:"-" }}
-                                {% endwith %}
-                            </td>
-                            <td class="px-3 py-2">
-                                {% with latest=latest_by_feed|get_item:feed.id %}
-                                    {{ latest.items_limited|default:"-" }}
-                                {% endwith %}
-                            </td>
-                            <td class="max-w-xs px-3 py-2 text-xs text-slate-400">{{ feed.last_error|truncatechars:120|default:"-" }}</td>
-                        </tr>
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div class="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-slate-300">
+                                        <div>
+                                            <p class="text-slate-500">Fetched</p>
+                                            <p class="mt-1 font-medium text-white">{{ latest.items_fetched|default:"-" }}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-slate-500">Stored</p>
+                                            <p class="mt-1 font-medium text-white">{{ latest.items_stored|default:"-" }}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3">
+                                    <div class="grid gap-y-2 text-xs text-slate-300">
+                                        <div class="flex items-center justify-between gap-2">
+                                            <span class="text-slate-500">Old</span>
+                                            <span class="font-medium text-white">{{ latest.items_skipped_old|default:"-" }}</span>
+                                        </div>
+                                        <div class="flex items-center justify-between gap-2">
+                                            <span class="text-slate-500">Invalid</span>
+                                            <span class="font-medium text-white">{{ latest.items_skipped_invalid|default:"-" }}</span>
+                                        </div>
+                                        <div class="flex items-center justify-between gap-2">
+                                            <span class="text-slate-500">Limited</span>
+                                            <span class="font-medium text-white">{{ latest.items_limited|default:"-" }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3">
+                                    {% if feed.last_error %}
+                                        <p class="max-w-[16rem] overflow-hidden break-words text-xs leading-5 text-slate-400 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]" title="{{ feed.last_error }}">
+                                            {{ feed.last_error|truncatechars:180 }}
+                                        </p>
+                                    {% else %}
+                                        <span class="text-xs text-slate-500">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endwith %}
                     {% empty %}
                         <tr>
-                            <td colspan="12" class="px-3 py-6 text-center text-slate-400">No feeds configured yet.</td>
+                            <td colspan="6" class="px-3 py-6 text-center text-slate-400">No feeds configured yet.</td>
                         </tr>
                     {% endfor %}
                 </tbody>

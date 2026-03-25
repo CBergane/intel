@@ -55,6 +55,11 @@ urlpatterns = [
         name="dark_source_toggle",
     ),
     path(
+        "admin-panel/dark/<int:source_id>/delete/",
+        views.admin_panel_dark_source_delete,
+        name="dark_source_delete",
+    ),
+    path(
         "admin-panel/dark/<int:source_id>/ingest/",
         views.admin_panel_dark_source_ingest,
         name="dark_source_ingest",

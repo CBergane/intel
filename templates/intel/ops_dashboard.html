@@ -156,86 +156,132 @@
                     {% endfor %}
                 </div>
                 <div class="hidden overflow-x-auto md:block">
-                    <table class="min-w-full text-sm">
+                    <table class="min-w-full table-fixed text-sm">
                         <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
                             <tr>
-                                <th class="px-2 py-2">Source</th>
-                                <th class="px-2 py-2">Feed</th>
-                                <th class="px-2 py-2">Type</th>
-                                <th class="px-2 py-2">Section</th>
-                                <th class="px-2 py-2">Last Success</th>
-                                <th class="px-2 py-2">Last Run</th>
-                                <th class="px-2 py-2">Status</th>
-                                <th class="px-2 py-2">Mode</th>
-                                <th class="px-2 py-2">HTTP</th>
-                                <th class="px-2 py-2">Fetched</th>
-                                <th class="px-2 py-2">New</th>
-                                <th class="px-2 py-2">Updated</th>
-                                <th class="px-2 py-2">Skip Old</th>
-                                <th class="px-2 py-2">Skip Invalid</th>
-                                <th class="px-2 py-2">Limited</th>
-                                <th class="px-2 py-2">Duration</th>
-                                <th class="px-2 py-2">Error</th>
+                                <th class="w-[27%] px-2 py-2">Feed</th>
+                                <th class="w-[18%] px-2 py-2">Freshness</th>
+                                <th class="w-[14%] px-2 py-2">Status</th>
+                                <th class="w-[15%] px-2 py-2">Activity</th>
+                                <th class="w-[12%] px-2 py-2">Skips</th>
+                                <th class="w-[14%] px-2 py-2">Error</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for row in feed_rows %}
                                 <tr class="border-b border-line/60 align-top text-slate-200">
-                                    <td class="px-2 py-2">{{ row.feed.source.name|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ row.feed.name }}</td>
-                                    <td class="px-2 py-2">{{ row.feed.feed_type|upper }}</td>
-                                    <td class="px-2 py-2">{{ row.feed.get_section_display }}</td>
-                                    <td class="px-2 py-2">
-                                        {% if row.feed.last_success_at %}
-                                            <span title="{{ row.feed.last_success_at|date:'Y-m-d H:i' }} UTC">{{ row.feed.last_success_at|naturaltime }}</span>
-                                        {% else %}
-                                            -
-                                        {% endif %}
+                                    <td class="px-2 py-3">
+                                        <div class="min-w-0">
+                                            <p class="truncate font-medium text-white">{{ row.feed.name }}</p>
+                                            <p class="mt-1 truncate text-xs text-slate-400">{{ row.feed.source.name|default:"-" }}</p>
+                                            <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                                                <span class="rounded-md border border-line/80 bg-slate-800/70 px-2 py-1 text-slate-300">{{ row.feed.feed_type|upper }}</span>
+                                                <span class="rounded-md border border-line/80 bg-slate-800/70 px-2 py-1 text-slate-300">{{ row.feed.get_section_display }}</span>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td class="px-2 py-2">
-                                        {% if row.last_run_at %}
-                                            <span title="{{ row.last_run_at|date:'Y-m-d H:i' }} UTC">{{ row.last_run_at|naturaltime }}</span>
-                                        {% else %}
-                                            -
-                                        {% endif %}
+                                    <td class="px-2 py-3">
+                                        <div class="space-y-2 text-xs text-slate-300">
+                                            <div>
+                                                <p class="uppercase tracking-wide text-slate-500">Last success</p>
+                                                <p class="mt-1 text-sm text-white">
+                                                    {% if row.feed.last_success_at %}
+                                                        <span title="{{ row.feed.last_success_at|date:'Y-m-d H:i' }} UTC">{{ row.feed.last_success_at|naturaltime }}</span>
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p class="uppercase tracking-wide text-slate-500">Last run</p>
+                                                <p class="mt-1 text-sm text-slate-200">
+                                                    {% if row.last_run_at %}
+                                                        <span title="{{ row.last_run_at|date:'Y-m-d H:i' }} UTC">{{ row.last_run_at|naturaltime }}</span>
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </p>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td class="px-2 py-2">
-                                        {% if row.status == "ok" %}
-                                            <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
-                                        {% elif row.status == "error" %}
-                                            <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
-                                        {% else %}
-                                            <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">never</span>
-                                        {% endif %}
+                                    <td class="px-2 py-3">
+                                        <div class="space-y-2 text-xs">
+                                            <div>
+                                                {% if row.status == "ok" %}
+                                                    <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
+                                                {% elif row.status == "error" %}
+                                                    <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
+                                                {% else %}
+                                                    <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">never</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="flex flex-wrap gap-1.5 text-[11px]">
+                                                {% if row.collection_mode == "expanded" %}
+                                                    <span class="rounded bg-amber-500/20 px-2 py-1 text-amber-300">expanded</span>
+                                                {% else %}
+                                                    <span class="rounded bg-slate-700 px-2 py-1 text-slate-300">normal</span>
+                                                {% endif %}
+                                                <span class="rounded bg-slate-800 px-2 py-1 text-slate-300">HTTP {{ row.latest_run.http_status|default:"-" }}</span>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td class="px-2 py-2">
-                                        {% if row.collection_mode == "expanded" %}
-                                            <span class="rounded bg-amber-500/20 px-2 py-1 text-xs text-amber-300">expanded</span>
-                                        {% else %}
-                                            <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">normal</span>
-                                        {% endif %}
+                                    <td class="px-2 py-3">
+                                        <div class="grid gap-y-2 text-xs text-slate-300">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Fetched</span>
+                                                <span class="font-medium text-white">{{ row.latest_run.items_fetched|default:"-" }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">New</span>
+                                                <span class="font-medium text-white">{{ row.latest_run.items_new|default:"-" }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Updated</span>
+                                                <span class="font-medium text-white">{{ row.latest_run.items_updated|default:"-" }}</span>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td class="px-2 py-2">{{ row.latest_run.http_status|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ row.latest_run.items_fetched|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ row.latest_run.items_new|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ row.latest_run.items_updated|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ row.latest_run.items_skipped_old|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ row.latest_run.items_skipped_invalid|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ row.latest_run.items_limited|default:"-" }}</td>
-                                    <td class="px-2 py-2">
-                                        {% if row.latest_run and row.latest_run.duration_ms %}
-                                            {{ row.latest_run.duration_ms }}ms
-                                        {% else %}
-                                            -
-                                        {% endif %}
+                                    <td class="px-2 py-3">
+                                        <div class="grid gap-y-2 text-xs text-slate-300">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Old</span>
+                                                <span class="font-medium text-white">{{ row.latest_run.items_skipped_old|default:"-" }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Invalid</span>
+                                                <span class="font-medium text-white">{{ row.latest_run.items_skipped_invalid|default:"-" }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Limited</span>
+                                                <span class="font-medium text-white">{{ row.latest_run.items_limited|default:"-" }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Duration</span>
+                                                <span class="font-medium text-white">
+                                                    {% if row.latest_run and row.latest_run.duration_ms %}
+                                                        {{ row.latest_run.duration_ms }}ms
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td class="max-w-xs px-2 py-2 text-xs text-slate-400 break-words">
-                                        {{ row.latest_run.error|default:row.feed.last_error|truncatechars:200|default:"-" }}
+                                    <td class="px-2 py-3">
+                                        {% with row_error=row.latest_run.error|default:row.feed.last_error %}
+                                            {% if row_error %}
+                                                <p class="max-w-[15rem] overflow-hidden break-words text-xs leading-5 text-slate-400 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]" title="{{ row_error }}">
+                                                    {{ row_error|truncatechars:180 }}
+                                                </p>
+                                            {% else %}
+                                                <span class="text-xs text-slate-500">-</span>
+                                            {% endif %}
+                                        {% endwith %}
                                     </td>
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="17" class="px-2 py-6 text-center text-slate-400">No enabled feeds.</td>
+                                    <td colspan="6" class="px-2 py-6 text-center text-slate-400">No enabled feeds.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -282,20 +328,15 @@
                     {% endfor %}
                 </div>
                 <div class="hidden overflow-x-auto md:block">
-                    <table class="min-w-full text-sm">
+                    <table class="min-w-full table-fixed text-sm">
                         <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
                             <tr>
-                                <th class="px-2 py-2">When</th>
-                                <th class="px-2 py-2">Feed</th>
-                                <th class="px-2 py-2">OK</th>
-                                <th class="px-2 py-2">HTTP</th>
-                                <th class="px-2 py-2">Fetched</th>
-                                <th class="px-2 py-2">New</th>
-                                <th class="px-2 py-2">Updated</th>
-                                <th class="px-2 py-2">Skip Old</th>
-                                <th class="px-2 py-2">Skip Invalid</th>
-                                <th class="px-2 py-2">Duration</th>
-                                <th class="px-2 py-2">Error</th>
+                                <th class="w-[18%] px-2 py-2">When</th>
+                                <th class="w-[24%] px-2 py-2">Feed</th>
+                                <th class="w-[16%] px-2 py-2">Result</th>
+                                <th class="w-[18%] px-2 py-2">Volume</th>
+                                <th class="w-[12%] px-2 py-2">Skips</th>
+                                <th class="w-[12%] px-2 py-2">Error</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -308,36 +349,73 @@
                                     </td>
                                     <td class="px-2 py-2">
                                         {% if feed_list_url %}
-                                            <a href="{{ feed_list_url }}" class="text-sky-300 hover:text-sky-200">{{ run.feed.name }}</a>
+                                            <a href="{{ feed_list_url }}" class="block truncate text-sky-300 hover:text-sky-200">{{ run.feed.name }}</a>
                                         {% else %}
-                                            {{ run.feed.name }}
+                                            <span class="block truncate">{{ run.feed.name }}</span>
                                         {% endif %}
                                     </td>
                                     <td class="px-2 py-2">
-                                        {% if run.ok %}
-                                            <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
-                                        {% else %}
-                                            <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
-                                        {% endif %}
+                                        <div class="space-y-2 text-xs">
+                                            <div>
+                                                {% if run.ok %}
+                                                    <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
+                                                {% else %}
+                                                    <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="flex flex-wrap gap-1.5 text-[11px]">
+                                                <span class="rounded bg-slate-800 px-2 py-1 text-slate-300">HTTP {{ run.http_status|default:"-" }}</span>
+                                                <span class="rounded bg-slate-800 px-2 py-1 text-slate-300">
+                                                    {% if run.duration_ms %}
+                                                        {{ run.duration_ms }}ms
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td class="px-2 py-2">{{ run.http_status|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ run.items_fetched|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ run.items_new }}</td>
-                                    <td class="px-2 py-2">{{ run.items_updated }}</td>
-                                    <td class="px-2 py-2">{{ run.items_skipped_old|default:"-" }}</td>
-                                    <td class="px-2 py-2">{{ run.items_skipped_invalid|default:"-" }}</td>
                                     <td class="px-2 py-2">
-                                        {% if run.duration_ms %}
-                                            {{ run.duration_ms }}ms
+                                        <div class="grid gap-y-2 text-xs text-slate-300">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Fetched</span>
+                                                <span class="font-medium text-white">{{ run.items_fetched|default:"-" }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">New</span>
+                                                <span class="font-medium text-white">{{ run.items_new }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Updated</span>
+                                                <span class="font-medium text-white">{{ run.items_updated }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-2 py-2">
+                                        <div class="grid gap-y-2 text-xs text-slate-300">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Old</span>
+                                                <span class="font-medium text-white">{{ run.items_skipped_old|default:"-" }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-2">
+                                                <span class="text-slate-500">Invalid</span>
+                                                <span class="font-medium text-white">{{ run.items_skipped_invalid|default:"-" }}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-2 py-2">
+                                        {% if run.error %}
+                                            <p class="max-w-[12rem] overflow-hidden break-words text-xs leading-5 text-slate-400 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]" title="{{ run.error }}">
+                                                {{ run.error|truncatechars:180 }}
+                                            </p>
                                         {% else %}
-                                            -
+                                            <span class="text-xs text-slate-500">-</span>
                                         {% endif %}
                                     </td>
-                                    <td class="max-w-xs px-2 py-2 text-xs text-slate-400 break-words">{{ run.error|truncatechars:200|default:"-" }}</td>
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="11" class="px-2 py-6 text-center text-slate-400">No runs yet.</td>
+                                    <td colspan="6" class="px-2 py-6 text-center text-slate-400">No runs yet.</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -346,7 +424,7 @@
             </div>
         </div>
 
-        <aside class="order-1 hidden space-y-4 lg:order-2 lg:col-span-4 lg:block">
+        <aside class="order-1 hidden space-y-4 lg:order-2 lg:col-span-4 lg:block lg:self-start lg:sticky lg:top-28 xl:top-32">
             <div class="rounded-xl border border-line bg-panel/80 p-4 shadow-glow">
                 <h2 class="mb-3 text-base font-semibold text-white">Actions</h2>
                 <p class="mb-3 text-xs text-slate-400">
@@ -477,7 +555,7 @@
                 </table>
             </div>
         </div>
-        <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow lg:col-span-4 sm:p-4">
+        <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow lg:col-span-4 lg:self-start lg:sticky lg:top-28 sm:p-4 xl:top-32">
             <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Job Output</h2>
             {% if selected_job %}
                 <div class="space-y-3 text-xs">

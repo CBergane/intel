@@ -77,125 +77,223 @@
         {% endif %}
     {% endif %}
 
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Total Dark Sources</p>
+            <p class="mt-2 text-2xl font-semibold text-white">{{ total_dark_sources_count }}</p>
+        </div>
+        <div class="rounded-2xl border border-emerald-500/20 bg-panel/80 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Enabled</p>
+            <p class="mt-2 text-2xl font-semibold text-emerald-200">{{ enabled_dark_sources_count }}</p>
+        </div>
+        <div class="rounded-2xl border border-slate-700 bg-panel/80 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Disabled</p>
+            <p class="mt-2 text-2xl font-semibold text-slate-200">{{ disabled_dark_sources_count }}</p>
+        </div>
+        <div class="rounded-2xl border border-cyan-500/20 bg-panel/80 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Tor-enabled</p>
+            <p class="mt-2 text-2xl font-semibold text-cyan-200">{{ tor_enabled_sources_count }}</p>
+        </div>
+        <div class="rounded-2xl border border-amber-500/20 bg-panel/80 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Keyword Watches</p>
+            <p class="mt-2 text-2xl font-semibold text-amber-200">{{ keyword_watch_sources_count }}</p>
+        </div>
+    </div>
+
     <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-        <div class="mb-3 flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
             <span class="text-xs uppercase tracking-wide text-slate-400">Safe presets:</span>
             <a href="{% url 'intel_admin:dark_source_create' %}?preset=cisa-alerts-index" class="rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">CISA index</a>
             <a href="{% url 'intel_admin:dark_source_create' %}?preset=krebs-feed" class="rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Krebs feed</a>
             <a href="{% url 'intel_admin:dark_source_create' %}?preset=single-page-watch" class="rounded-lg border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Single page</a>
         </div>
-        <div class="overflow-x-auto">
-            <table class="min-w-full text-sm">
-                <thead class="border-b border-line text-left text-xs uppercase tracking-wide text-slate-400">
-                    <tr>
-                        <th class="px-2 py-2">Name</th>
-                        <th class="px-2 py-2">URL</th>
-                        <th class="px-2 py-2">Type</th>
-                        <th class="px-2 py-2">Enabled</th>
-                        <th class="px-2 py-2">Tor</th>
-                        <th class="px-2 py-2">Documents</th>
-                        <th class="px-2 py-2">Hits</th>
-                        <th class="px-2 py-2">Last Hit Count</th>
-                        <th class="px-2 py-2">Last Hit</th>
-                        <th class="px-2 py-2">Last Run</th>
-                        <th class="px-2 py-2">Status</th>
-                        <th class="px-2 py-2">Last Error</th>
-                        <th class="px-2 py-2">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in source_rows %}
-                        <tr class="border-b border-line/60 align-top text-slate-200">
-                            <td class="px-2 py-2">
-                                <div class="font-medium text-white">{{ row.source.name }}</div>
-                                <div class="text-xs text-slate-400">{{ row.source.slug }}</div>
-                            </td>
-                            <td class="max-w-xs min-w-0 px-2 py-2">
-                                <a href="{{ row.source.url }}" target="_blank" rel="noopener noreferrer" class="block max-w-full truncate overflow-hidden text-sky-300 hover:text-sky-200" title="{{ row.source.url }}">{{ row.source.url }}</a>
-                                {% if row.suitability_warning %}
-                                    <p class="mt-1 break-words text-xs text-amber-300">{{ row.suitability_warning }}</p>
-                                {% endif %}
-                            </td>
-                            <td class="px-2 py-2">{{ row.source.get_source_type_display }}</td>
-                            <td class="px-2 py-2">
-                                {% if row.source.enabled %}
-                                    <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">enabled</span>
-                                {% else %}
-                                    <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">disabled</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-2 py-2">
-                                {% if row.source.use_tor %}
-                                    <span class="rounded bg-cyan-500/20 px-2 py-1 text-xs text-cyan-300">tor</span>
-                                {% else %}
-                                    <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">direct</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-2 py-2">{{ row.source.document_count }}</td>
-                            <td class="px-2 py-2">{{ row.source.hit_count }}</td>
-                            <td class="px-2 py-2">{{ row.latest_hit_count }}</td>
-                            <td class="px-2 py-2">
-                                {% if row.source.last_hit_at %}
-                                    <span title="{{ row.source.last_hit_at|date:'Y-m-d H:i' }} UTC">{{ row.source.last_hit_at|naturaltime }}</span>
-                                {% else %}
-                                    <span class="text-slate-400">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-2 py-2">
-                                {% if row.last_run_at %}
-                                    <span title="{{ row.last_run_at|date:'Y-m-d H:i' }} UTC">{{ row.last_run_at|naturaltime }}</span>
-                                {% else %}
-                                    <span class="text-slate-400">never</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-2 py-2">
-                                {% if row.status == "ok" %}
-                                    <span class="rounded bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300">ok</span>
-                                {% elif row.partial_success %}
-                                    <span class="rounded bg-amber-500/20 px-2 py-1 text-xs text-amber-300">partial</span>
-                                {% elif row.status == "error" %}
-                                    <span class="rounded bg-rose-500/20 px-2 py-1 text-xs text-rose-300">error</span>
-                                {% else %}
-                                    <span class="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300">never</span>
-                                {% endif %}
-                            </td>
-                            <td class="max-w-xs px-2 py-2 text-xs text-slate-400 break-words">{{ row.last_error|truncatechars:180|default:"-" }}</td>
-                            <td class="px-2 py-2">
-                                <div class="flex flex-wrap gap-2">
-                                    <a href="{{ row.open_url }}" class="rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Open</a>
-                                    <a href="{% url 'intel_admin:dark_source_edit' row.source.id %}" class="rounded border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Edit</a>
-                                    <form method="post" action="{% url 'intel_admin:dark_source_test' row.source.id %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
-                                        <button type="submit" class="rounded border border-cyan-500/50 px-2 py-1 text-xs text-cyan-200 hover:bg-cyan-500/15">Test</button>
-                                    </form>
-                                    <form method="post" action="{% url 'intel_admin:dark_source_ingest' row.source.id %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
-                                        <button type="submit" class="rounded border border-sky-500/50 px-2 py-1 text-xs text-sky-200 hover:bg-sky-500/15">Run ingest</button>
-                                    </form>
-                                    <form method="post" action="{% url 'intel_admin:dark_source_duplicate' row.source.id %}">
-                                        {% csrf_token %}
-                                        <button type="submit" class="rounded border border-slate-500/60 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Duplicate</button>
-                                    </form>
-                                    <form method="post" action="{% url 'intel_admin:dark_source_toggle' row.source.id %}">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
-                                        <button type="submit" class="rounded border {% if row.source.enabled %}border-rose-500/50 text-rose-200 hover:bg-rose-500/15{% else %}border-emerald-500/50 text-emerald-200 hover:bg-emerald-500/15{% endif %} px-2 py-1 text-xs">
-                                            {% if row.source.enabled %}Disable{% else %}Enable{% endif %}
-                                        </button>
-                                    </form>
+    </div>
+
+    <div class="space-y-3">
+        {% for row in source_rows %}
+            <article class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <div class="grid gap-4 xl:grid-cols-12 xl:items-start">
+                    <div class="min-w-0 space-y-3 xl:col-span-9">
+                        <div class="flex flex-wrap items-start gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h2 class="text-base font-semibold text-white">{{ row.source.name }}</h2>
+                                    {% if row.status == "ok" %}
+                                        <span class="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-emerald-200">ok</span>
+                                    {% elif row.partial_success %}
+                                        <span class="rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-amber-200">partial</span>
+                                    {% elif row.status == "error" %}
+                                        <span class="rounded-full border border-rose-500/30 bg-rose-500/15 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-rose-200">error</span>
+                                    {% else %}
+                                        <span class="rounded-full border border-slate-700 bg-slate-900/70 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-300">never</span>
+                                    {% endif %}
+                                    {% if row.source.enabled %}
+                                        <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-200">enabled</span>
+                                    {% else %}
+                                        <span class="rounded-full border border-slate-700 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">disabled</span>
+                                    {% endif %}
                                 </div>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="13" class="px-2 py-6 text-center text-slate-400">No dark sources configured yet.</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                                <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                    <span class="rounded-full border border-line/80 bg-slate-950/40 px-2.5 py-1">{{ row.source.get_source_type_display }}</span>
+                                    {% if row.source.use_tor %}
+                                        <span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">tor</span>
+                                    {% else %}
+                                        <span class="rounded-full border border-slate-700 bg-slate-900/70 px-2.5 py-1 text-slate-300">clearnet</span>
+                                    {% endif %}
+                                    {% if row.has_keyword_watch %}
+                                        <span class="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-amber-200">keywords {{ row.keyword_watch_count }}</span>
+                                    {% endif %}
+                                    {% if row.has_regex_watch %}
+                                        <span class="rounded-full border border-fuchsia-500/20 bg-fuchsia-500/10 px-2.5 py-1 text-fuchsia-200">regex {{ row.regex_watch_count }}</span>
+                                    {% endif %}
+                                    {% if not row.has_keyword_watch and not row.has_regex_watch %}
+                                        <span class="rounded-full border border-slate-700 bg-slate-900/70 px-2.5 py-1 text-slate-300">no watches</span>
+                                    {% endif %}
+                                    <span class="text-slate-500">{{ row.source.slug }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                            <div class="rounded-xl border border-line/80 bg-slate-950/30 p-3">
+                                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Documents</p>
+                                <p class="mt-2 text-lg font-semibold text-white">{{ row.source.document_count }}</p>
+                            </div>
+                            <div class="rounded-xl border border-line/80 bg-slate-950/30 p-3">
+                                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Hits</p>
+                                <p class="mt-2 text-lg font-semibold text-white">{{ row.source.hit_count }}</p>
+                            </div>
+                            <div class="rounded-xl border border-line/80 bg-slate-950/30 p-3">
+                                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Latest Run Hits</p>
+                                <p class="mt-2 text-lg font-semibold text-white">{{ row.latest_hit_count }}</p>
+                            </div>
+                            <div class="rounded-xl border border-line/80 bg-slate-950/30 p-3">
+                                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Recent Activity</p>
+                                <div class="mt-2 space-y-1 text-xs text-slate-300">
+                                    <p>
+                                        <span class="text-slate-500">Last hit:</span>
+                                        {% if row.source.last_hit_at %}
+                                            <span title="{{ row.source.last_hit_at|date:'Y-m-d H:i' }} UTC">{{ row.source.last_hit_at|naturaltime }}</span>
+                                        {% else %}
+                                            <span class="text-slate-400">never</span>
+                                        {% endif %}
+                                    </p>
+                                    <p>
+                                        <span class="text-slate-500">Last run:</span>
+                                        {% if row.last_run_at %}
+                                            <span title="{{ row.last_run_at|date:'Y-m-d H:i' }} UTC">{{ row.last_run_at|naturaltime }}</span>
+                                        {% else %}
+                                            <span class="text-slate-400">never</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if row.last_error or row.suitability_warning %}
+                            <div class="grid gap-3 lg:grid-cols-2">
+                                {% if row.last_error %}
+                                    <div class="rounded-xl border border-rose-500/20 bg-rose-950/10 p-3">
+                                        <p class="text-[11px] uppercase tracking-[0.2em] text-rose-300">Latest Error</p>
+                                        <p class="mt-2 max-w-3xl break-words text-sm text-rose-100">{{ row.last_error|truncatechars:180 }}</p>
+                                    </div>
+                                {% endif %}
+                                {% if row.suitability_warning %}
+                                    <div class="rounded-xl border border-amber-500/20 bg-amber-950/10 p-3">
+                                        <p class="text-[11px] uppercase tracking-[0.2em] text-amber-300">Collection Note</p>
+                                        <p class="mt-2 max-w-3xl break-words text-sm text-amber-100">{{ row.suitability_warning }}</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        <details class="rounded-xl border border-line/80 bg-slate-950/25">
+                            <summary class="cursor-pointer px-3 py-2 text-sm font-medium text-slate-300">Advanced details</summary>
+                            <div class="grid gap-3 border-t border-line/80 p-3 text-xs text-slate-300 md:grid-cols-2">
+                                <div class="space-y-1 md:col-span-2">
+                                    <p class="uppercase tracking-wide text-slate-500">URL</p>
+                                    <a href="{{ row.source.url }}" target="_blank" rel="noopener noreferrer" class="block break-all text-sky-300 hover:text-sky-200">{{ row.source.url }}</a>
+                                </div>
+                                {% if row.source.homepage %}
+                                    <div class="space-y-1">
+                                        <p class="uppercase tracking-wide text-slate-500">Homepage</p>
+                                        <a href="{{ row.source.homepage }}" target="_blank" rel="noopener noreferrer" class="block break-all text-sky-300 hover:text-sky-200">{{ row.source.homepage }}</a>
+                                    </div>
+                                {% endif %}
+                                <div class="space-y-1">
+                                    <p class="uppercase tracking-wide text-slate-500">Dashboard</p>
+                                    <a href="{{ row.open_url }}" class="text-sky-300 hover:text-sky-200">Open filtered dark dashboard</a>
+                                </div>
+                                {% if row.has_keyword_watch %}
+                                    <div class="space-y-1">
+                                        <p class="uppercase tracking-wide text-slate-500">Keyword Watches</p>
+                                        <div class="whitespace-pre-wrap break-words rounded-lg border border-amber-500/20 bg-amber-950/10 p-2 text-amber-100">{{ row.source.watch_keywords }}</div>
+                                    </div>
+                                {% endif %}
+                                {% if row.has_regex_watch %}
+                                    <div class="space-y-1">
+                                        <p class="uppercase tracking-wide text-slate-500">Regex Watches</p>
+                                        <div class="whitespace-pre-wrap break-words rounded-lg border border-fuchsia-500/20 bg-fuchsia-950/10 p-2 text-fuchsia-100">{{ row.source.watch_regex }}</div>
+                                    </div>
+                                {% endif %}
+                                {% if row.suitability_warning %}
+                                    <div class="space-y-1 md:col-span-2">
+                                        <p class="uppercase tracking-wide text-slate-500">Suitability Note</p>
+                                        <div class="rounded-lg border border-amber-500/20 bg-amber-950/10 p-2 text-amber-100">{{ row.suitability_warning }}</div>
+                                    </div>
+                                {% endif %}
+                                {% if row.last_error %}
+                                    <div class="space-y-1 md:col-span-2">
+                                        <p class="uppercase tracking-wide text-slate-500">Full Error</p>
+                                        <div class="whitespace-pre-wrap break-words rounded-lg border border-rose-500/20 bg-rose-950/10 p-2 text-rose-100">{{ row.last_error }}</div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </details>
+                    </div>
+
+                    <div class="xl:col-span-3 xl:justify-self-end">
+                        <div class="rounded-2xl border border-slate-700/80 bg-slate-950/35 p-3">
+                            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Actions</p>
+                            <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-2">
+                                <a href="{{ row.open_url }}" class="inline-flex items-center justify-center rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Open</a>
+                                <a href="{% url 'intel_admin:dark_source_edit' row.source.id %}" class="inline-flex items-center justify-center rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Edit</a>
+                                <form method="post" action="{% url 'intel_admin:dark_source_test' row.source.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
+                                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg border border-cyan-500/50 px-3 py-2 text-xs text-cyan-200 hover:bg-cyan-500/15">Test</button>
+                                </form>
+                                <form method="post" action="{% url 'intel_admin:dark_source_ingest' row.source.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
+                                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg border border-sky-500/50 px-3 py-2 text-xs text-sky-200 hover:bg-sky-500/15">Run ingest</button>
+                                </form>
+                                <form method="post" action="{% url 'intel_admin:dark_source_duplicate' row.source.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg border border-slate-500/60 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Duplicate</button>
+                                </form>
+                                <form method="post" action="{% url 'intel_admin:dark_source_toggle' row.source.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
+                                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg border {% if row.source.enabled %}border-rose-500/50 text-rose-200 hover:bg-rose-500/15{% else %}border-emerald-500/50 text-emerald-200 hover:bg-emerald-500/15{% endif %} px-3 py-2 text-xs">
+                                        {% if row.source.enabled %}Disable{% else %}Enable{% endif %}
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'intel_admin:dark_source_delete' row.source.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{% url 'intel_admin:dark_sources' %}">
+                                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg border border-rose-500/50 px-3 py-2 text-xs text-rose-200 hover:bg-rose-500/15">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </article>
+        {% empty %}
+            <div class="rounded-2xl border border-line bg-panel/80 px-4 py-6 text-center text-sm text-slate-400 shadow-glow">
+                No dark sources configured yet.
+            </div>
+        {% endfor %}
     </div>
 </section>
 {% endblock %}
