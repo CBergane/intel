@@ -4,6 +4,7 @@ from collections import Counter
 from datetime import timedelta
 
 import feedparser
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
@@ -116,6 +117,29 @@ DARK_SOURCE_PRESETS = (
             "use_tor": False,
             "enabled": True,
         },
+    },
+)
+
+DARK_SOURCE_FORM_SECTIONS = (
+    {
+        "title": "Basic",
+        "description": "Core identity and the primary fetch target for this source.",
+        "fields": ("name", "slug", "url", "source_type"),
+    },
+    {
+        "title": "Fetch Config",
+        "description": "Operational controls for enablement, network path, limits, and retries.",
+        "fields": ("enabled", "use_tor", "timeout_seconds", "max_bytes", "fetch_retries"),
+    },
+    {
+        "title": "Matching / Watches",
+        "description": "Passive matching rules applied to discovered content.",
+        "fields": ("watch_keywords", "watch_regex"),
+    },
+    {
+        "title": "Notes / Tags / Suitability",
+        "description": "Operator context, grouping tags, and collection guidance.",
+        "fields": ("homepage", "tags"),
     },
 )
 
@@ -1024,6 +1048,12 @@ def _dark_source_rows():
             last_run_at = latest_run.finished_at or latest_run.started_at
             last_error = (latest_run.error or "").strip()
             latest_hit_count = int(latest_run.hits_new or 0) + int(latest_run.hits_updated or 0)
+        keyword_watch_count = len(
+            [value for value in re.split(r"[\n,]+", source.watch_keywords or "") if value.strip()]
+        )
+        regex_watch_count = len(
+            [value for value in (source.watch_regex or "").splitlines() if value.strip()]
+        )
         partial_success = (
             status == "error"
             and latest_run is not None
@@ -1041,6 +1071,10 @@ def _dark_source_rows():
                 "last_error": last_error,
                 "latest_hit_count": latest_hit_count,
                 "partial_success": partial_success,
+                "has_keyword_watch": keyword_watch_count > 0,
+                "has_regex_watch": regex_watch_count > 0,
+                "keyword_watch_count": keyword_watch_count,
+                "regex_watch_count": regex_watch_count,
                 "suitability_warning": dark_source_suitability_warning(
                     source.url, source.source_type
                 ),
@@ -1176,10 +1210,123 @@ def _dark_preview_failure_info(exc: Exception) -> dict:
     return {"reason": reason, "detail": detail[:500]}
 
 
+def _prepare_dark_source_form(form):
+    field_overrides = {
+        "name": {
+            "label": "Source Name",
+            "help_text": "Operator-facing name shown in the dark admin and dark dashboard.",
+            "placeholder": "Acme leak monitor",
+        },
+        "slug": {
+            "label": "Slug",
+            "help_text": "Stable identifier used in routes and filtered dashboard links.",
+            "placeholder": "acme-leak-monitor",
+            "spellcheck": "false",
+        },
+        "homepage": {
+            "label": "Homepage / Context URL",
+            "help_text": "Optional operator reference page for context or documentation.",
+            "placeholder": "https://example.com/advisories/",
+            "spellcheck": "false",
+        },
+        "url": {
+            "label": "Fetch URL",
+            "help_text": "Primary allowlisted fetch target. Prefer a direct RSS/Atom endpoint when using feed mode.",
+            "placeholder": "https://example.com/feed.xml",
+            "spellcheck": "false",
+        },
+        "source_type": {
+            "label": "Source Type",
+            "help_text": "Choose feed for RSS/Atom, index_page for same-host discovery, or single_page for one URL only.",
+        },
+        "enabled": {
+            "label": "Enabled",
+            "help_text": "Turn off to keep the source configured without including it in ingest jobs.",
+        },
+        "use_tor": {
+            "label": "Route Through Tor",
+            "help_text": "Onion URLs always use Tor. Enable this to force Tor for clearnet targets.",
+        },
+        "timeout_seconds": {
+            "label": "Timeout Seconds",
+            "help_text": "Per-source timeout override. Leave blank to use the global DARK_FETCH_TIMEOUT value.",
+            "placeholder": "15",
+        },
+        "max_bytes": {
+            "label": "Max Response Bytes",
+            "help_text": "Hard response size cap. Leave blank to use the global DARK_MAX_BYTES value.",
+            "placeholder": "1048576",
+        },
+        "fetch_retries": {
+            "label": "Retry Attempts",
+            "help_text": "Retry count for transient failures. Leave blank to use the global DARK_FETCH_RETRIES value.",
+            "placeholder": "2",
+        },
+        "tags": {
+            "label": "Tags",
+            "help_text": "Comma-separated internal tags for grouping and triage.",
+            "placeholder": "vendor, sweden, ransomware",
+        },
+        "watch_keywords": {
+            "label": "Keyword Watches",
+            "help_text": "Comma-separated passive match terms. Saved in lowercase on submit.",
+            "placeholder": "breach, leak, initial access",
+            "textarea_rows": 4,
+            "spellcheck": "false",
+        },
+        "watch_regex": {
+            "label": "Regex Watches",
+            "help_text": "One regex per line. Use only for patterns keywords cannot express cleanly.",
+            "placeholder": r"CVE-\d{4}-\d+" + "\n" + r"ransomware",
+            "textarea_rows": 6,
+            "spellcheck": "false",
+        },
+    }
+    for name, overrides in field_overrides.items():
+        field = form.fields[name]
+        base_class = field.widget.attrs.get("class", "")
+        field.label = overrides["label"]
+        field.help_text = overrides["help_text"]
+        if "textarea_rows" in overrides and not isinstance(field.widget, forms.Textarea):
+            field.widget = forms.Textarea()
+            if base_class:
+                field.widget.attrs["class"] = base_class
+        if "placeholder" in overrides:
+            field.widget.attrs["placeholder"] = overrides["placeholder"]
+        if "spellcheck" in overrides:
+            field.widget.attrs["spellcheck"] = overrides["spellcheck"]
+        if "textarea_rows" in overrides:
+            field.widget.attrs["rows"] = overrides["textarea_rows"]
+            field.widget.attrs["class"] = (
+                f"{field.widget.attrs.get('class', '')} min-h-28 whitespace-pre-wrap".strip()
+            )
+        if name in {"slug", "homepage", "url", "watch_regex"}:
+            field.widget.attrs["class"] = (
+                f"{field.widget.attrs.get('class', '')} font-mono text-sm".strip()
+            )
+        if name in {"timeout_seconds", "max_bytes", "fetch_retries"}:
+            field.widget.attrs["inputmode"] = "numeric"
+        if form.errors.get(name):
+            field.widget.attrs["aria-invalid"] = "true"
+    return [
+        {
+            "title": section["title"],
+            "description": section["description"],
+            "fields": [form[name] for name in section["fields"]],
+        }
+        for section in DARK_SOURCE_FORM_SECTIONS
+    ]
+
+
 @superuser_required
 def admin_panel_dark_sources_list(request):
     source_rows = _dark_source_rows()
     test_preview = request.session.pop("dark_source_test_preview", None)
+    total_dark_sources_count = len(source_rows)
+    enabled_dark_sources_count = sum(1 for row in source_rows if row["source"].enabled)
+    disabled_dark_sources_count = total_dark_sources_count - enabled_dark_sources_count
+    tor_enabled_sources_count = sum(1 for row in source_rows if row["source"].use_tor)
+    keyword_watch_sources_count = sum(1 for row in source_rows if row["has_keyword_watch"])
 
     return render(
         request,
@@ -1188,6 +1335,11 @@ def admin_panel_dark_sources_list(request):
             "page_title": "Dark Admin",
             "current_page": "admin",
             "source_rows": source_rows,
+            "total_dark_sources_count": total_dark_sources_count,
+            "enabled_dark_sources_count": enabled_dark_sources_count,
+            "disabled_dark_sources_count": disabled_dark_sources_count,
+            "tor_enabled_sources_count": tor_enabled_sources_count,
+            "keyword_watch_sources_count": keyword_watch_sources_count,
             "feeds_url": reverse("intel_admin:panel"),
             "sources_url": reverse("intel_admin:sources"),
             "django_admin_url": reverse("admin:index"),
@@ -1210,6 +1362,7 @@ def admin_panel_dark_source_create(request):
         source = form.save()
         messages.success(request, f"Dark source '{source.name}' created.")
         return redirect("intel_admin:dark_sources")
+    form_sections = _prepare_dark_source_form(form)
     return render(
         request,
         "intel/admin_panel/dark_source_form.html",
@@ -1217,6 +1370,7 @@ def admin_panel_dark_source_create(request):
             "page_title": "Create Dark Source",
             "current_page": "admin",
             "form": form,
+            "form_sections": form_sections,
             "mode": "create",
             "cancel_url": reverse("intel_admin:dark_sources"),
             "presets": DARK_SOURCE_PRESETS,
@@ -1233,6 +1387,7 @@ def admin_panel_dark_source_edit(request, source_id: int):
         form.save()
         messages.success(request, f"Dark source '{source.name}' updated.")
         return redirect("intel_admin:dark_sources")
+    form_sections = _prepare_dark_source_form(form)
     return render(
         request,
         "intel/admin_panel/dark_source_form.html",
@@ -1240,6 +1395,7 @@ def admin_panel_dark_source_edit(request, source_id: int):
             "page_title": "Edit Dark Source",
             "current_page": "admin",
             "form": form,
+            "form_sections": form_sections,
             "mode": "edit",
             "source": source,
             "cancel_url": reverse("intel_admin:dark_sources"),
@@ -1256,6 +1412,18 @@ def admin_panel_dark_source_toggle(request, source_id: int):
     source.save(update_fields=["enabled", "updated_at"])
     state = "enabled" if source.enabled else "disabled"
     messages.success(request, f"Dark source '{source.name}' {state}.")
+    return redirect(
+        _validated_redirect_target(request, reverse("intel_admin:dark_sources"))
+    )
+
+
+@superuser_required
+@require_POST
+def admin_panel_dark_source_delete(request, source_id: int):
+    source = get_object_or_404(DarkSource, id=source_id)
+    source_name = source.name
+    source.delete()
+    messages.success(request, f"Dark source '{source_name}' deleted.")
     return redirect(
         _validated_redirect_target(request, reverse("intel_admin:dark_sources"))
     )

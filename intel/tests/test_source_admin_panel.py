@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from intel.models import Source
+from intel.models import DarkSource, Source
 
 
 class SourceAdminSecurityTests(TestCase):
@@ -161,3 +161,181 @@ class SourceAdminCrudTests(TestCase):
         client.force_login(self.superuser)
         response = client.post(self.toggle_url, {"next": self.list_url})
         self.assertEqual(response.status_code, 403)
+
+
+class DarkSourceAdminPanelTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.superuser = user_model.objects.create_superuser(
+            username="dark-admin",
+            password="dark-admin-pass-123",
+        )
+        self.list_url = reverse("intel_admin:dark_sources")
+        self.primary = DarkSource.objects.create(
+            name="Alpha Leak Watch",
+            slug="alpha-leak-watch",
+            url="https://alpha.example.com/feed.xml",
+            source_type=DarkSource.SourceType.FEED,
+            enabled=True,
+            use_tor=True,
+            watch_keywords="breach, leak",
+            watch_regex=r"CVE-\d{4}-\d+",
+        )
+        self.secondary = DarkSource.objects.create(
+            name="Beta Onion Mirror",
+            slug="beta-onion-mirror",
+            url="http://betaexampleonion.onion/index",
+            source_type=DarkSource.SourceType.INDEX_PAGE,
+            enabled=False,
+            use_tor=True,
+            watch_keywords="",
+            watch_regex="",
+        )
+
+    def test_superuser_can_view_dark_sources_list_with_summary_and_actions(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Dark Admin")
+        self.assertContains(response, "Total Dark Sources")
+        self.assertContains(response, "Keyword Watches")
+        self.assertContains(response, "Alpha Leak Watch")
+        self.assertContains(response, "Beta Onion Mirror")
+        self.assertContains(response, "Advanced details")
+        self.assertContains(response, "Delete")
+        self.assertContains(
+            response, reverse("intel_admin:dark_source_edit", kwargs={"source_id": self.primary.id})
+        )
+        self.assertContains(
+            response,
+            reverse("intel_admin:dark_source_delete", kwargs={"source_id": self.primary.id}),
+        )
+        self.assertEqual(response.context["total_dark_sources_count"], 2)
+        self.assertEqual(response.context["enabled_dark_sources_count"], 1)
+        self.assertEqual(response.context["disabled_dark_sources_count"], 1)
+        self.assertEqual(response.context["tor_enabled_sources_count"], 2)
+        self.assertEqual(response.context["keyword_watch_sources_count"], 1)
+
+    def test_dark_sources_list_surfaces_watch_and_network_badges(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "keywords 2")
+        self.assertContains(response, "regex 1")
+        self.assertContains(response, "tor")
+        self.assertContains(response, "disabled")
+        self.assertContains(response, "no watches")
+
+    def test_superuser_can_delete_dark_source_with_csrf(self):
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.superuser)
+
+        list_response = client.get(self.list_url)
+        self.assertEqual(list_response.status_code, 200)
+        token = client.cookies["csrftoken"].value
+
+        delete_response = client.post(
+            reverse("intel_admin:dark_source_delete", kwargs={"source_id": self.primary.id}),
+            {
+                "csrfmiddlewaretoken": token,
+                "next": self.list_url,
+            },
+        )
+
+        self.assertEqual(delete_response.status_code, 302)
+        self.assertEqual(delete_response.url, self.list_url)
+        self.assertFalse(DarkSource.objects.filter(id=self.primary.id).exists())
+
+
+class DarkSourceAdminFormTests(TestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.superuser = user_model.objects.create_superuser(
+            username="dark-form-admin",
+            password="dark-form-admin-pass-123",
+        )
+        self.create_url = reverse("intel_admin:dark_source_create")
+        self.source = DarkSource.objects.create(
+            name="Gamma Intel Watch",
+            slug="gamma-intel-watch",
+            url="https://gamma.example.com/feed.xml",
+            source_type=DarkSource.SourceType.FEED,
+            enabled=True,
+            use_tor=False,
+            watch_keywords="breach, leak",
+            watch_regex=r"CVE-\d{4}-\d+",
+        )
+        self.edit_url = reverse("intel_admin:dark_source_edit", kwargs={"source_id": self.source.id})
+
+    def test_create_form_groups_fields_and_configures_operational_help(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(self.create_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Basic")
+        self.assertContains(response, "Fetch Config")
+        self.assertContains(response, "Matching / Watches")
+        self.assertContains(response, "Notes / Tags / Suitability")
+        self.assertContains(response, "Source Type Quick Guide")
+        self.assertEqual(
+            [section["title"] for section in response.context["form_sections"]],
+            ["Basic", "Fetch Config", "Matching / Watches", "Notes / Tags / Suitability"],
+        )
+
+        form = response.context["form"]
+        self.assertEqual(form.fields["url"].label, "Fetch URL")
+        self.assertEqual(form.fields["use_tor"].label, "Route Through Tor")
+        self.assertEqual(
+            form.fields["enabled"].help_text,
+            "Turn off to keep the source configured without including it in ingest jobs.",
+        )
+        self.assertEqual(
+            form.fields["watch_keywords"].widget.attrs["placeholder"],
+            "breach, leak, initial access",
+        )
+        self.assertEqual(form.fields["watch_keywords"].widget.attrs["rows"], 4)
+        self.assertEqual(form.fields["watch_regex"].widget.attrs["rows"], 6)
+
+    def test_edit_form_shows_consistent_footer_actions(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(self.edit_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Save Changes")
+        self.assertContains(response, "Cancel")
+        self.assertContains(response, "Delete")
+        self.assertContains(
+            response,
+            reverse("intel_admin:dark_source_delete", kwargs={"source_id": self.source.id}),
+        )
+        self.assertContains(
+            response,
+            reverse("intel_admin:dark_source_test", kwargs={"source_id": self.source.id}),
+        )
+        self.assertContains(
+            response,
+            reverse("intel_admin:dark_source_ingest", kwargs={"source_id": self.source.id}),
+        )
+
+    def test_invalid_dark_source_form_shows_error_summary(self):
+        self.client.force_login(self.superuser)
+        response = self.client.post(
+            self.create_url,
+            {
+                "name": "Delta Watch",
+                "slug": "delta-watch",
+                "url": "https://delta.example.com/feed.xml",
+                "source_type": DarkSource.SourceType.FEED,
+                "timeout_seconds": "0",
+                "max_bytes": "100",
+                "fetch_retries": "0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Check the highlighted fields.")
+        self.assertContains(response, "Timeout must be between 1 and 120 seconds.")
+        self.assertContains(response, "Max bytes must be between 1024 and 25000000.")
+        self.assertContains(response, "Retries must be between 1 and 10.")
