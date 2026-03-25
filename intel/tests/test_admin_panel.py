@@ -3,6 +3,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from intel.forms import FeedCreateForm
 from intel.models import Feed, Source
 
 
@@ -256,3 +257,54 @@ class AdminPanelFeedListTests(TestCase):
         self.assertContains(response, self.never_feed.name)
         self.assertNotContains(response, self.ok_feed.name)
         self.assertNotContains(response, self.error_feed.name)
+
+
+class AdminPanelFeedFormValidationTests(TestCase):
+    def setUp(self):
+        self.source = Source.objects.create(name="Adapter Source", slug="adapter-source")
+
+    def _base_form_data(self, **overrides):
+        data = {
+            "source": str(self.source.id),
+            "name": "Adapter Feed",
+            "url": "https://example.com/adapter.json",
+            "feed_type": Feed.FeedType.JSON,
+            "adapter_key": "generic_json",
+            "section": Feed.Section.ACTIVE,
+            "priority": "100",
+            "enabled": "on",
+            "timeout_seconds": "10",
+            "max_bytes": "1500000",
+            "max_age_days": "120",
+            "max_items_per_run": "150",
+            "expanded_max_age_days": "",
+            "expanded_max_items_per_run": "",
+        }
+        data.update(overrides)
+        return data
+
+    def test_json_feed_accepts_supported_ingestion_adapter_keys(self):
+        for adapter_key in (
+            "cisa_kev",
+            "generic_json",
+            "epss",
+            "ransomware_live_victims",
+            "psbdmp",
+        ):
+            form = FeedCreateForm(data=self._base_form_data(adapter_key=adapter_key))
+
+            self.assertTrue(form.is_valid(), msg=f"{adapter_key} should be accepted: {form.errors}")
+            self.assertEqual(form.cleaned_data["adapter_key"], adapter_key)
+
+    def test_ransomware_live_victims_rejected_for_rss_feed(self):
+        form = FeedCreateForm(
+            data=self._base_form_data(
+                url="https://example.com/feed.xml",
+                feed_type=Feed.FeedType.RSS,
+                adapter_key="ransomware_live_victims",
+            )
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("adapter_key", form.errors)
+        self.assertIn("Adapter key should be empty for RSS/Atom feeds.", form.errors["adapter_key"])

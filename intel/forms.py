@@ -13,7 +13,14 @@ _CHECKBOX_CLASS = "h-4 w-4 rounded border-slate-700 bg-slate-950 text-sky-400 fo
 
 
 class _BaseFeedForm(forms.ModelForm):
-    ALLOWED_ADAPTER_KEYS = {"", "cisa_kev", "generic_json"}
+    ALLOWED_ADAPTER_KEYS = {
+        "",
+        "cisa_kev",
+        "generic_json",
+        "epss",
+        "ransomware_live_victims",
+        "psbdmp",
+    }
 
     def clean_adapter_key(self):
         normalized = (self.cleaned_data.get("adapter_key") or "").strip().lower()
