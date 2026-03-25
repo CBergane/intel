@@ -13,7 +13,7 @@ from intel.ingestion import (
     upsert_normalized_item,
 )
 from intel.models import Feed, FetchRun
-from intel.notifications import send_high_epss_alert
+from intel.notifications import send_high_epss_alert, send_ransomware_victim_alert
 
 
 class Command(BaseCommand):
@@ -106,6 +106,8 @@ class Command(BaseCommand):
                         items_new += 1
                         if feed.adapter_key == "epss":
                             send_high_epss_alert(item)
+                        elif feed.adapter_key == "ransomware_live_victims":
+                            send_ransomware_victim_alert(item)
                     else:
                         items_updated += 1
 

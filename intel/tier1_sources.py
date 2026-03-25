@@ -188,6 +188,27 @@ TIER1_SOURCES = [
         ],
     },
     {
+        "name": "Ransomware.live Victims",
+        "slug": "ransomware-live",
+        "homepage": "https://www.ransomware.live",
+        "tags": ["ransomware", "threat-intel", "victims", "priority"],
+        "enabled": True,
+        "feeds": [
+            {
+                "name": "Ransomware.live Recent Victims",
+                "url": "https://api.ransomware.live/v2/recentvictims",
+                "feed_type": "json",
+                "adapter_key": "ransomware_live_victims",
+                "section": "active",
+                "enabled": True,
+                "timeout_seconds": 15,
+                "max_bytes": 2_000_000,
+                "max_age_days": 7,
+                "max_items_per_run": 200,
+            }
+        ],
+    },
+    {
         "name": "Bleeping Computer",
         "slug": "bleeping-computer",
         "homepage": "https://www.bleepingcomputer.com",

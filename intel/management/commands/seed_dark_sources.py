@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 
 from intel.models import DarkSource
 
-RANSOMWATCH_API = "https://ransomwatch.telemetry.ltd/api/v1/groups"
+RANSOMWARE_LIVE_API = "https://api.ransomware.live/v2/groups"
 RANSOMWATCH_MAX_BYTES = 2_000_000
 RANSOMWATCH_TIMEOUT = 15
 
@@ -66,9 +66,9 @@ def _pick_available_page(pages: list) -> dict | None:
 
 
 def _fetch_ransomwatch() -> list:
-    """Fetch and return the ransomwatch groups list. Raises on error."""
+    """Fetch and return the ransomware.live groups list. Raises on error."""
     response = requests.get(
-        RANSOMWATCH_API,
+        RANSOMWARE_LIVE_API,
         timeout=RANSOMWATCH_TIMEOUT,
         stream=True,
         headers={"User-Agent": "borealsec-intel-bot/0.1"},
@@ -93,7 +93,7 @@ def _fetch_ransomwatch() -> list:
 
 class Command(BaseCommand):
     help = (
-        "Seed DarkSource entries from ransomwatch community API. "
+        "Seed DarkSource entries from ransomware.live community API. "
         "Creates or updates onion addresses for known ransomware leak sites."
     )
 
@@ -107,18 +107,18 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = bool(options.get("dry_run"))
 
-        self.stdout.write("Fetching ransomwatch API...")
+        self.stdout.write("Fetching ransomware.live API...")
         try:
             groups_list = _fetch_ransomwatch()
         except Exception as exc:
-            self.stderr.write(f"Failed to fetch ransomwatch API: {exc}")
+            self.stderr.write(f"Failed to fetch ransomware.live API: {exc}")
             sys.exit(1)
 
         if not isinstance(groups_list, list):
-            self.stderr.write("Unexpected ransomwatch API response format (not a list).")
+            self.stderr.write("Unexpected ransomware.live API response format (not a list).")
             sys.exit(1)
 
-        self.stdout.write(f"Found {len(groups_list)} groups in ransomwatch.")
+        self.stdout.write(f"Found {len(groups_list)} groups in ransomware.live.")
 
         # Build lookup: slug → group dict
         api_by_slug = {
@@ -140,7 +140,7 @@ class Command(BaseCommand):
                 skipped_count += 1
                 continue
 
-            page = _pick_available_page(group.get("pages") or [])
+            page = _pick_available_page(group.get("locations") or [])
             if page is None:
                 self.stdout.write(f"  \u2717 {slug} \u2014 no available page (skipped)")
                 skipped_count += 1

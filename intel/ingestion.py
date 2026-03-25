@@ -219,6 +219,8 @@ def parse_json_payload(feed: Feed, payload: bytes, *, fetched_at: datetime) -> l
         return _parse_cisa_kev(feed, parsed, fetched_at=fetched_at)
     if adapter_key == "epss":
         return _parse_epss(feed, parsed, fetched_at=fetched_at)
+    if adapter_key == "ransomware_live_victims":
+        return _parse_ransomware_live_victims(feed, parsed, fetched_at=fetched_at)
 
     return _parse_generic_json_entries(feed, parsed, fetched_at=fetched_at)
 
@@ -347,6 +349,84 @@ def _parse_epss(feed: Feed, payload: Any, *, fetched_at: datetime) -> list[Norma
         len(results),
         skipped,
         min_score,
+    )
+    return results
+
+
+_NORDIC_COUNTRIES = {"Sweden", "Norway", "Denmark", "Finland", "Iceland"}
+_NORDIC_TLDS = {".se", ".no", ".dk", ".fi", ".is"}
+
+
+def _is_nordic_victim(offer: dict) -> bool:
+    country = str(offer.get("country") or "")
+    if country in _NORDIC_COUNTRIES:
+        return True
+    victim = str(offer.get("victim") or "").lower()
+    return any(victim.endswith(tld) for tld in _NORDIC_TLDS)
+
+
+def _parse_ransomware_live_victims(
+    feed: Feed, payload: Any, *, fetched_at: datetime
+) -> list[NormalizedEntry]:
+    if not isinstance(payload, list):
+        raise ValueError("ransomware.live victims payload must be a list.")
+
+    nordics_only = getattr(settings, "RANSOMWARE_LIVE_NORDICS_ONLY", True)
+    results: list[NormalizedEntry] = []
+    skipped = 0
+
+    for offer in payload:
+        if not isinstance(offer, dict):
+            continue
+
+        if nordics_only and not _is_nordic_victim(offer):
+            skipped += 1
+            continue
+
+        victim = str(offer.get("victim") or "").strip()
+        group = str(offer.get("group") or "").strip()
+        if not victim or not group:
+            continue
+
+        title = f"{group.title()}: {victim}"
+        url = f"https://www.ransomware.live/victim/{victim}"
+        canonical_url = canonicalize_url(url)
+        external_id = f"{group}:{victim}"
+        summary = sanitize_summary(str(offer.get("description") or "")[:500])
+
+        discovered = offer.get("discovered")
+        if discovered:
+            try:
+                published_at = datetime.fromisoformat(str(discovered))
+                if django_timezone.is_naive(published_at):
+                    published_at = django_timezone.make_aware(published_at, timezone.utc)
+            except (TypeError, ValueError):
+                published_at = fetched_at
+        else:
+            published_at = fetched_at
+
+        results.append(
+            NormalizedEntry(
+                title=title,
+                url=url,
+                canonical_url=canonical_url,
+                published_at=published_at,
+                summary=summary,
+                raw_payload={
+                    "victim": victim,
+                    "group": group,
+                    "country": offer.get("country"),
+                    "discovered": discovered,
+                    "description": offer.get("description"),
+                },
+                external_id=external_id,
+            )
+        )
+
+    logger.info(
+        "ransomware.live adapter: %d nordic victims parsed, %d non-nordic filtered out.",
+        len(results),
+        skipped,
     )
     return results
 

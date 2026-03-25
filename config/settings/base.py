@@ -157,3 +157,5 @@ EPSS_ALERT_THRESHOLD = float(os.getenv("EPSS_ALERT_THRESHOLD", "0.7"))
 TOR_SOCKS_HOST = os.getenv("TOR_SOCKS_HOST", "127.0.0.1")
 TOR_SOCKS_PORT = int(os.getenv("TOR_SOCKS_PORT", "9050"))
 TOR_ENABLED = os.getenv("TOR_ENABLED", "true").lower() == "true"
+
+RANSOMWARE_LIVE_NORDICS_ONLY = os.getenv("RANSOMWARE_LIVE_NORDICS_ONLY", "true").lower() == "true"
