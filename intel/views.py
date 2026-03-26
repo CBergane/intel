@@ -611,27 +611,30 @@ def sources_view(request):
     )
 
 
-DARK_DAY_OPTIONS = [("7", "7d"), ("30", "30d"), ("90", "90d")]
+DARK_WINDOW_RANGES = {
+    "24h": timedelta(hours=24),
+    "7d": timedelta(days=7),
+    "30d": timedelta(days=30),
+}
+DARK_WINDOW_OPTIONS = [("24h", "24h"), ("7d", "7d"), ("30d", "30d")]
 
 
 def _dark_filtered_hits_queryset(request):
     query = (request.GET.get("q") or "").strip()
     selected_source = (request.GET.get("source") or "").strip()
+    legacy_window_map = {"7": "7d", "30": "30d", "90": "30d"}
+    window = (request.GET.get("window") or "").strip()
+    if not window:
+        window = legacy_window_map.get((request.GET.get("days") or "").strip(), "7d")
+    if window not in DARK_WINDOW_RANGES:
+        window = "7d"
+    since = timezone.now() - DARK_WINDOW_RANGES[window]
 
-    _valid_days = {"7", "30", "90"}
-    days_param = request.GET.get("days", "30")
-    if days_param not in _valid_days:
-        days_param = "30"
-    since = timezone.now() - timedelta(days=int(days_param))
-
-    hits = (
-        DarkHit.objects.select_related("dark_source", "dark_document")
-        .filter(detected_at__gte=since)
-    )
+    base_hits = DarkHit.objects.select_related("dark_source", "dark_document")
     if selected_source:
-        hits = hits.filter(dark_source__slug=selected_source)
+        base_hits = base_hits.filter(dark_source__slug=selected_source)
     if query:
-        hits = hits.filter(
+        base_hits = base_hits.filter(
             Q(group_name__icontains=query)
             | Q(victim_name__icontains=query)
             | Q(country__icontains=query)
@@ -646,10 +649,11 @@ def _dark_filtered_hits_queryset(request):
             | Q(matched_keywords__icontains=query)
             | Q(matched_regex__icontains=query)
         )
-    return hits.order_by("-detected_at", "-id"), {
+    selected_hits = base_hits.filter(detected_at__gte=since).order_by("-detected_at", "-id")
+    return base_hits, selected_hits, {
         "query": query,
         "selected_source": selected_source,
-        "days": days_param,
+        "window": window,
         "since": since,
     }
 
@@ -767,15 +771,42 @@ def _active_group_rows(hits):
     return rows
 
 
+def _dark_dashboard_summary(base_hits, selected_hits):
+    hits_24h = base_hits.filter(detected_at__gte=timezone.now() - DARK_WINDOW_RANGES["24h"])
+    hits_7d = base_hits.filter(detected_at__gte=timezone.now() - DARK_WINDOW_RANGES["7d"])
+    selected_hits_list = list(selected_hits)
+    countries = {
+        (hit.country or "").strip()
+        for hit in selected_hits_list
+        if (hit.country or "").strip()
+    }
+    source_ids = {hit.dark_source_id for hit in selected_hits_list}
+
+    return {
+        "active_groups_24h": len(_active_group_rows(hits_24h)),
+        "active_groups_7d": len(_active_group_rows(hits_7d)),
+        "incident_count_24h": hits_24h.filter(record_type="incident").count(),
+        "incident_count_7d": hits_7d.filter(record_type="incident").count(),
+        "affected_country_count": len(countries),
+        "source_hit_count": len(source_ids),
+    }
+
+
+def _live_incident_hits(hits):
+    return [hit for hit in hits if hit.record_type == "incident"][:6]
+
+
 @superuser_required
 def dark_dashboard_view(request):
-    hits, filter_context = _dark_filtered_hits_queryset(request)
-    active_groups = _active_group_rows(hits)
+    base_hits, hits, filter_context = _dark_filtered_hits_queryset(request)
+    selected_hits = list(hits)
+    active_groups = _active_group_rows(selected_hits)
     grouped_incident_count = sum(row["incident_count"] for row in active_groups)
     groups_paginator = Paginator(active_groups, 40)
     groups_page = groups_paginator.get_page(request.GET.get("page"))
     health_context = _dark_source_health_context()
-    raw_recent_preview = list(hits[:5])
+    summary_metrics = _dark_dashboard_summary(base_hits, selected_hits)
+    live_incidents = _live_incident_hits(selected_hits)
 
     return render(
         request,
@@ -787,9 +818,10 @@ def dark_dashboard_view(request):
             "page_obj": groups_page,
             "active_group_count": len(active_groups),
             "incident_count": grouped_incident_count,
-            "raw_recent_preview": raw_recent_preview,
+            "summary_metrics": summary_metrics,
+            "live_incidents": live_incidents,
             "recent_hits_url": reverse("dark-recent-hits"),
-            "day_options": DARK_DAY_OPTIONS,
+            "window_options": DARK_WINDOW_OPTIONS,
             **health_context,
             **filter_context,
         },
@@ -798,7 +830,7 @@ def dark_dashboard_view(request):
 
 @superuser_required
 def dark_recent_hits_view(request):
-    hits, filter_context = _dark_filtered_hits_queryset(request)
+    _, hits, filter_context = _dark_filtered_hits_queryset(request)
     paginator = Paginator(hits, 50)
     page_obj = paginator.get_page(request.GET.get("page"))
     health_context = _dark_source_health_context()
@@ -812,7 +844,7 @@ def dark_recent_hits_view(request):
             "hits": page_obj,
             "page_obj": page_obj,
             "groups_url": reverse("dark-dashboard"),
-            "day_options": DARK_DAY_OPTIONS,
+            "window_options": DARK_WINDOW_OPTIONS,
             **health_context,
             **filter_context,
         },

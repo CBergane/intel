@@ -30,6 +30,7 @@ def _make_hit(
     country: str = "",
     record_type: str = "incident",
     detected_offset_days: int = 0,
+    detected_offset_hours: int = 0,
 ):
     unique_hash = hashlib.md5(f"{source.slug}{title}{group_name}".encode()).hexdigest()
     hit = DarkHit.objects.create(
@@ -42,8 +43,11 @@ def _make_hit(
         country=country,
         record_type=record_type,
     )
-    if detected_offset_days:
-        activity_at = timezone.now() - timedelta(days=detected_offset_days)
+    if detected_offset_days or detected_offset_hours:
+        activity_at = timezone.now() - timedelta(
+            days=detected_offset_days,
+            hours=detected_offset_hours,
+        )
         DarkHit.objects.filter(pk=hit.pk).update(
             detected_at=activity_at,
             last_seen_at=activity_at,
@@ -95,6 +99,7 @@ class ActiveGroupsViewTests(TestCase):
         self.source_a = _make_source(slug="akira-a", name="Akira Source A")
         self.source_b = _make_source(slug="akira-b", name="Akira Source B")
         self.source_c = _make_source(slug="play-a", name="Play Source")
+        self.source_d = _make_source(slug="lockbit-a", name="LockBit Source")
 
         _make_hit(
             self.source_a,
@@ -110,6 +115,7 @@ class ActiveGroupsViewTests(TestCase):
             group_name="Akira",
             victim_name="Beta Retail",
             country="Norway",
+            detected_offset_hours=8,
         )
         _make_hit(
             self.source_c,
@@ -117,7 +123,15 @@ class ActiveGroupsViewTests(TestCase):
             group_name="Play",
             victim_name="Gamma Health",
             country="Denmark",
-            detected_offset_days=1,
+            detected_offset_hours=2,
+        )
+        _make_hit(
+            self.source_d,
+            title="Legacy Victim",
+            group_name="LockBit",
+            victim_name="Legacy Victim",
+            country="Finland",
+            detected_offset_days=10,
         )
 
     def test_active_groups_view_aggregates_by_group_name(self):
@@ -131,19 +145,46 @@ class ActiveGroupsViewTests(TestCase):
         self.assertEqual(response.context["incident_count"], 3)
 
         rows = list(response.context["group_rows"].object_list)
+        self.assertEqual(rows[0]["group_name"], "Play")
         akira_row = next(row for row in rows if row["group_name"] == "Akira")
         self.assertEqual(akira_row["incident_count"], 2)
         self.assertEqual(akira_row["latest_victim_name"], "Beta Retail")
         self.assertEqual(akira_row["latest_country"], "Norway")
         self.assertEqual(akira_row["source_count"], 2)
 
-    def test_active_groups_view_renders_secondary_recent_hits_link(self):
+    def test_active_groups_view_renders_summary_metrics(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_GROUPS_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Affected Countries")
+        self.assertContains(response, "Sources Producing Hits")
+        summary = response.context["summary_metrics"]
+        self.assertEqual(summary["active_groups_24h"], 2)
+        self.assertEqual(summary["active_groups_7d"], 2)
+        self.assertEqual(summary["incident_count_24h"], 2)
+        self.assertEqual(summary["incident_count_7d"], 3)
+        self.assertEqual(summary["affected_country_count"], 3)
+        self.assertEqual(summary["source_hit_count"], 3)
+
+    def test_active_groups_view_renders_live_incidents_section(self):
+        _make_hit(
+            self.source_a,
+            title="Black Basta Profile",
+            group_name="Black Basta",
+            record_type="group",
+            detected_offset_hours=1,
+        )
         self.client.force_login(self.superuser)
         response = self.client.get(DARK_GROUPS_URL)
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("dark-recent-hits"))
-        self.assertContains(response, "Recent Signals")
+        self.assertContains(response, "Live Incidents")
+        live_incidents = response.context["live_incidents"]
+        self.assertTrue(live_incidents)
+        self.assertTrue(all(hit.record_type == "incident" for hit in live_incidents))
+        self.assertFalse(any(hit.title == "Black Basta Profile" for hit in live_incidents))
 
     def test_group_cards_without_stored_group_name_still_appear_via_title_fallback(self):
         _make_hit(
@@ -202,6 +243,17 @@ class ActiveGroupsViewTests(TestCase):
         self.assertEqual(response.context["active_group_count"], 2)
         rows = list(response.context["group_rows"].object_list)
         self.assertFalse(any(row["group_name"] == "Ungrouped Incident" for row in rows))
+
+    def test_dark_dashboard_window_filters_change_group_scope(self):
+        self.client.force_login(self.superuser)
+
+        response_24h = self.client.get(DARK_GROUPS_URL, {"window": "24h"})
+        response_30d = self.client.get(DARK_GROUPS_URL, {"window": "30d"})
+
+        self.assertEqual(response_24h.context["active_group_count"], 2)
+        self.assertEqual(response_24h.context["summary_metrics"]["affected_country_count"], 2)
+        self.assertEqual(response_30d.context["active_group_count"], 3)
+        self.assertEqual(response_30d.context["summary_metrics"]["affected_country_count"], 4)
 
     def test_recent_hits_view_keeps_raw_hits_available(self):
         self.client.force_login(self.superuser)

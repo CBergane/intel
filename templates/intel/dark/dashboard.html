@@ -11,13 +11,12 @@
                 <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Dark Intel</p>
                 <h1 class="mt-1 text-xl font-semibold text-white sm:text-2xl">Active Groups</h1>
                 <p class="mt-2 max-w-3xl text-sm text-slate-400">
-                    Structured dark monitoring grouped into active ransomware and extortion actors.
-                    Recent raw hits remain available as a secondary analyst/debug view.
+                    Operational view of grouped actor activity with a compact live-incident lane. Raw recent hits remain available as the secondary analyst/debug view.
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ recent_hits_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Recent Hits</a>
-                {% if query or selected_source or days != "30" %}
+                {% if query or selected_source or window != "7d" %}
                     <a href="{% url 'dark-dashboard' %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Reset</a>
                 {% endif %}
             </div>
@@ -25,24 +24,44 @@
         <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
                 <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Active Groups</p>
-                <p class="mt-2 text-2xl font-semibold text-white">{{ active_group_count }}</p>
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                    <div>
+                        <p class="text-[11px] uppercase tracking-wide text-slate-500">24h</p>
+                        <p class="mt-1 text-2xl font-semibold text-white">{{ summary_metrics.active_groups_24h }}</p>
+                    </div>
+                    <div>
+                        <p class="text-[11px] uppercase tracking-wide text-slate-500">7d</p>
+                        <p class="mt-1 text-2xl font-semibold text-white">{{ summary_metrics.active_groups_7d }}</p>
+                    </div>
+                </div>
             </div>
             <div class="rounded-xl border border-rose-500/20 bg-slate-950/35 p-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Incidents In Window</p>
-                <p class="mt-2 text-2xl font-semibold text-rose-200">{{ incident_count }}</p>
-            </div>
-            <div class="rounded-xl border border-sky-500/20 bg-slate-950/35 p-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Enabled Sources</p>
-                <p class="mt-2 text-2xl font-semibold text-sky-200">{{ source_rows|length }}</p>
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Live Incidents</p>
+                <div class="mt-3 grid grid-cols-2 gap-3">
+                    <div>
+                        <p class="text-[11px] uppercase tracking-wide text-slate-500">24h</p>
+                        <p class="mt-1 text-2xl font-semibold text-rose-200">{{ summary_metrics.incident_count_24h }}</p>
+                    </div>
+                    <div>
+                        <p class="text-[11px] uppercase tracking-wide text-slate-500">7d</p>
+                        <p class="mt-1 text-2xl font-semibold text-rose-200">{{ summary_metrics.incident_count_7d }}</p>
+                    </div>
+                </div>
             </div>
             <div class="rounded-xl border border-emerald-500/20 bg-slate-950/35 p-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Window</p>
-                <p class="mt-2 text-2xl font-semibold text-emerald-200">{{ days }}d</p>
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Affected Countries</p>
+                <p class="mt-3 text-2xl font-semibold text-emerald-200">{{ summary_metrics.affected_country_count }}</p>
+                <p class="mt-1 text-[11px] text-slate-500">Within selected {{ window }} window</p>
+            </div>
+            <div class="rounded-xl border border-sky-500/20 bg-slate-950/35 p-3">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Sources Producing Hits</p>
+                <p class="mt-3 text-2xl font-semibold text-sky-200">{{ summary_metrics.source_hit_count }}</p>
+                <p class="mt-1 text-[11px] text-slate-500">Filtered operational dataset</p>
             </div>
         </div>
     </div>
 
-    <form method="get" class="grid gap-3 rounded-2xl border border-line bg-panel/75 p-3 shadow-glow lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_10rem_auto]">
+    <form method="get" class="grid gap-3 rounded-2xl border border-line bg-panel/75 p-3 shadow-glow lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_10rem_auto]">
         <div>
             <label for="id_source" class="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Source</label>
             <select id="id_source" name="source" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none">
@@ -57,10 +76,10 @@
             <input id="id_q" name="q" value="{{ query }}" placeholder="group, victim, country, industry" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none">
         </div>
         <div>
-            <label for="id_days" class="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Window</label>
-            <select id="id_days" name="days" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none">
-                {% for value, label in day_options %}
-                    <option value="{{ value }}" {% if days == value %}selected{% endif %}>{{ label }}</option>
+            <label for="id_window" class="mb-1 block text-[11px] uppercase tracking-wide text-slate-400">Window</label>
+            <select id="id_window" name="window" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none">
+                {% for value, label in window_options %}
+                    <option value="{{ value }}" {% if window == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -76,7 +95,7 @@
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h2 class="text-base font-semibold text-white sm:text-lg">Group Activity</h2>
-                        <p class="mt-1 text-xs text-slate-500">Sorted by latest activity first, then by incident count.</p>
+                        <p class="mt-1 text-xs text-slate-500">Ranked by latest seen first, then by total grouped records.</p>
                     </div>
                     <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ page_obj.paginator.count }} groups</span>
                 </div>
@@ -86,19 +105,21 @@
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
+                                        <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] font-medium text-slate-300">#{{ forloop.counter }}</span>
                                         <h3 class="text-lg font-semibold text-white">{{ group.group_name }}</h3>
-                                        <span class="rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-medium text-rose-200">{{ group.incident_count }} incident{% if group.incident_count != 1 %}s{% endif %}</span>
-                                        <span class="rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ group.source_count }} source{% if group.source_count != 1 %}s{% endif %}</span>
                                     </div>
-                                    <div class="mt-2 flex flex-wrap gap-1.5">
-                                        {% for source_name in group.source_names|slice:":4" %}
-                                            <span class="rounded-md border border-line/80 bg-slate-950/60 px-2 py-1 text-[11px] text-slate-300">{{ source_name }}</span>
-                                        {% endfor %}
+                                    <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                                        <span class="rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-rose-200">{{ group.incident_count }} records</span>
+                                        <span class="rounded-full border border-slate-700 bg-slate-950/70 px-2.5 py-1 text-slate-300">{{ group.source_count }} source{% if group.source_count != 1 %}s{% endif %}</span>
+                                        {% if group.latest_country %}
+                                            <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">{{ group.latest_country }}</span>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <div class="text-right text-[11px] text-slate-500">
-                                    <p>Latest activity</p>
-                                    <p class="mt-1 text-slate-300" title="{{ group.latest_activity_at|date:'Y-m-d H:i' }} UTC">{{ group.latest_activity_at|naturaltime }}</p>
+                                    <p class="uppercase tracking-wide">Latest Seen</p>
+                                    <p class="mt-1 text-sm text-slate-200" title="{{ group.latest_activity_at|date:'Y-m-d H:i' }} UTC">{{ group.latest_activity_at|naturaltime }}</p>
+                                    <p class="mt-1">{{ group.latest_detected_at|date:"Y-m-d H:i" }} UTC</p>
                                 </div>
                             </div>
                             <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -115,15 +136,22 @@
                                     <p class="mt-2 text-sm text-slate-100">{% if group.victim_count or group.victim_count == 0 %}{{ group.victim_count }}{% else %}-{% endif %}</p>
                                 </div>
                                 <div class="rounded-xl border border-line/80 bg-slate-950/30 p-3">
-                                    <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Latest Seen</p>
-                                    <p class="mt-2 text-sm text-slate-100">{{ group.latest_detected_at|naturaltime }}</p>
+                                    <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Sources</p>
+                                    <div class="mt-2 flex flex-wrap gap-1.5">
+                                        {% for source_name in group.source_names|slice:":3" %}
+                                            <span class="rounded-md border border-line/80 bg-slate-950/60 px-2 py-1 text-[11px] text-slate-300">{{ source_name }}</span>
+                                        {% endfor %}
+                                        {% if group.source_count > 3 %}
+                                            <span class="rounded-md border border-line/80 bg-slate-950/60 px-2 py-1 text-[11px] text-slate-400">+{{ group.source_count|add:"-3" }} more</span>
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                             {% if group.latest_activity_text %}
                                 <p class="mt-3 text-sm leading-6 text-slate-300">{{ group.latest_activity_text }}</p>
                             {% endif %}
                             <div class="mt-4 flex flex-wrap items-center gap-2">
-                                <a href="{{ recent_hits_url }}?q={{ group.group_name|urlencode }}&days={{ days }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Open Raw Hits</a>
+                                <a href="{{ recent_hits_url }}?q={{ group.group_name|urlencode }}&window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Open Raw Hits</a>
                             </div>
                         </article>
                     {% empty %}
@@ -134,36 +162,50 @@
                     {% endfor %}
                 </div>
             </div>
-        </div>
 
-        <aside class="space-y-4">
-            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-                <div class="flex items-center justify-between gap-2">
-                    <h2 class="text-sm font-semibold text-white sm:text-base">Recent Signals</h2>
-                    <a href="{{ recent_hits_url }}" class="text-[11px] text-sky-300 hover:text-sky-200">Full raw list</a>
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-base font-semibold text-white sm:text-lg">Live Incidents</h2>
+                        <p class="mt-1 text-xs text-slate-500">Recent incident-style records only. Use Recent Hits for full raw analyst detail.</p>
+                    </div>
+                    <a href="{{ recent_hits_url }}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if query %}&q={{ query|urlencode }}{% endif %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Open Raw View</a>
                 </div>
-                <div class="mt-3 space-y-3">
-                    {% for hit in raw_recent_preview %}
-                        <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
-                            <div class="flex items-center justify-between gap-2">
-                                <p class="truncate text-sm font-medium text-white">{{ hit.title }}</p>
-                                <span class="text-[11px] text-slate-500">{{ hit.detected_at|naturaltime }}</span>
+                <div class="space-y-3">
+                    {% for hit in live_incidents %}
+                        <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                        <span class="max-w-[12rem] truncate rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ hit.dark_source.name }}</span>
+                                        {% if hit.group_name %}
+                                            <span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">{{ hit.group_name }}</span>
+                                        {% endif %}
+                                        {% if hit.country %}
+                                            <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ hit.country }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <h3 class="mt-2 text-base font-medium leading-tight text-white">{{ hit.victim_name|default:hit.title }}</h3>
+                                    {% if hit.excerpt %}
+                                        <p class="mt-2 overflow-hidden break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{{ hit.excerpt }}</p>
+                                    {% endif %}
+                                </div>
+                                <div class="text-right text-[11px] text-slate-500">
+                                    <p class="text-slate-300" title="{{ hit.last_seen_at|date:'Y-m-d H:i' }} UTC">{{ hit.last_seen_at|naturaltime }}</p>
+                                    <a href="{{ recent_hits_url }}?q={{ hit.title|urlencode }}&window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}" class="mt-2 inline-flex rounded-md border border-slate-700 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-900/70">Raw</a>
+                                </div>
                             </div>
-                            <div class="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-                                {% if hit.group_name %}
-                                    <span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">{{ hit.group_name }}</span>
-                                {% endif %}
-                                {% if hit.victim_name %}
-                                    <span class="rounded-md border border-slate-700 bg-slate-900/70 px-2 py-1 text-slate-300">{{ hit.victim_name }}</span>
-                                {% endif %}
-                            </div>
-                        </div>
+                        </article>
                     {% empty %}
-                        <p class="text-sm text-slate-400">No recent dark hits in the selected window.</p>
+                        <div class="rounded-xl border border-line bg-panel/80 p-5 text-sm text-slate-400">
+                            No incident-style records matched the current filters.
+                        </div>
                     {% endfor %}
                 </div>
             </div>
+        </div>
 
+        <aside class="space-y-4">
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <div class="mb-3 flex items-center justify-between gap-2">
                     <h2 class="text-sm font-semibold text-white sm:text-base">Source Health</h2>
