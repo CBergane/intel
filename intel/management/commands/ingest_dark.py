@@ -14,6 +14,7 @@ from intel.dark_utils import (
     extract_links,
     matched_keywords,
     matched_regex,
+    resolve_group_name,
     summarize_profile_content,
 )
 from intel.models import DarkDocument, DarkFetchRun, DarkHit, DarkSnapshot, DarkSource
@@ -232,6 +233,12 @@ class Command(BaseCommand):
                 regex_matches = matched_regex(match_text, source.watch_regex)
                 if not keyword_matches and not regex_matches:
                     continue
+                normalized_group_name = resolve_group_name(
+                    record_type=record.record_type,
+                    group_name=record.group_name,
+                    title=record.title,
+                    victim_name=record.victim_name,
+                )
 
                 hit_hash = build_content_hash(
                     url=record.url or final_url or doc_url,
@@ -246,7 +253,7 @@ class Command(BaseCommand):
                         "matched_keywords": keyword_matches,
                         "matched_regex": regex_matches,
                         "record_type": record.record_type,
-                        "group_name": record.group_name,
+                        "group_name": normalized_group_name,
                         "victim_name": record.victim_name,
                         "country": record.country,
                         "industry": record.industry,
@@ -268,7 +275,7 @@ class Command(BaseCommand):
                 hit.matched_keywords = keyword_matches
                 hit.matched_regex = regex_matches
                 hit.record_type = record.record_type
-                hit.group_name = record.group_name
+                hit.group_name = normalized_group_name
                 hit.victim_name = record.victim_name
                 hit.country = record.country
                 hit.industry = record.industry

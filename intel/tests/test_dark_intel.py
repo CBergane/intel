@@ -496,7 +496,7 @@ class DarkIngestionTests(TestCase):
             <section class="hero">Landing page for monitoring updates and general notices.</section>
             <div class="incident-card">
                 <h2>AlphaCorp</h2>
-                <p>Group: Akira</p>
+                <p>Threat Group:   Akira   </p>
                 <p>Country: Sweden</p>
                 <p>Industry: Manufacturing</p>
                 <p>Company Website: <a href="https://alphacorp.example">alphacorp.example</a></p>
@@ -693,3 +693,38 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(hits[0].victim_count, 41)
         self.assertEqual(hits[0].country, "Sweden")
         self.assertEqual(hits[0].last_activity_text, "2026-03-24")
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_table_rows_with_name_header_populate_group_name_for_grouped_dashboard(self):
+        self.source.watch_keywords = "akira"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.TABLE_ROWS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Group Summary</title><body>
+            <table>
+                <thead><tr><th>Name</th><th>Victims</th><th>Country</th><th>Notes</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td>Akira</td>
+                        <td>41</td>
+                        <td>Sweden</td>
+                        <td>Recent disclosures</td>
+                    </tr>
+                    <tr>
+                        <td>Play</td>
+                        <td>18</td>
+                        <td>Denmark</td>
+                        <td>Older disclosures</td>
+                    </tr>
+                </tbody>
+            </table>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hit = DarkHit.objects.get(dark_source=self.source, title="Akira")
+        self.assertEqual(hit.group_name, "Akira")
+        self.assertEqual(hit.record_type, "group")

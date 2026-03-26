@@ -95,10 +95,12 @@ STRUCTURED_CONTENT_HINT_RE = re.compile(
 GROUP_NAME_LABELS = (
     "group name",
     "ransomware group",
+    "threat group",
     "threat actor",
     "actor",
     "group",
     "gang",
+    "operator",
 )
 VICTIM_NAME_LABELS = ("victim name", "victim", "company", "organization")
 COUNTRY_LABELS = ("country", "location")
@@ -301,6 +303,25 @@ def _clean_structured_text(value: str, *, max_length: int = 255) -> str:
     return cleaned[:max_length].strip()
 
 
+def resolve_group_name(
+    *,
+    record_type: str = "",
+    group_name: str = "",
+    title: str = "",
+    victim_name: str = "",
+) -> str:
+    normalized_group_name = _clean_structured_text(group_name)
+    if normalized_group_name:
+        return normalized_group_name
+
+    normalized_title = _clean_structured_text(title)
+    if record_type == "group" and normalized_title:
+        return normalized_title
+    if record_type == "table_row" and normalized_title and not normalize_text(victim_name):
+        return normalized_title
+    return ""
+
+
 def _absolute_http_url(value: str, *, base_url: str = "") -> str:
     candidate = (value or "").strip()
     if not candidate:
@@ -438,16 +459,19 @@ def _structured_metadata_for_profile(
     if profile == "incident_cards":
         metadata["record_type"] = "incident"
         metadata["victim_name"] = _clean_structured_text(title)
-        metadata["group_name"] = _extract_labeled_line_value(
-            lines, GROUP_NAME_LABELS, max_length=255
+        metadata["group_name"] = resolve_group_name(
+            record_type="incident",
+            group_name=_extract_labeled_line_value(lines, GROUP_NAME_LABELS, max_length=255),
         )
         return metadata
 
     if profile == "group_cards":
         metadata["record_type"] = "group"
-        metadata["group_name"] = _extract_labeled_line_value(
-            lines, GROUP_NAME_LABELS, max_length=255
-        ) or _clean_structured_text(title)
+        metadata["group_name"] = resolve_group_name(
+            record_type="group",
+            group_name=_extract_labeled_line_value(lines, GROUP_NAME_LABELS, max_length=255),
+            title=title,
+        )
         metadata["victim_count"] = _extract_integer(
             _extract_labeled_line_value(lines, VICTIM_COUNT_LABELS)
         )
@@ -622,7 +646,7 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
             }
             for index, cell in enumerate(cells):
                 header = headers[index] if index < len(headers) else ""
-                if any(token in header for token in ("group", "actor", "gang")):
+                if any(token in header for token in ("group", "actor", "gang")) or header == "name":
                     metadata["group_name"] = _clean_structured_text(cell)
                     metadata["record_type"] = "group"
                 elif any(token in header for token in ("victim count", "victims")):
@@ -638,6 +662,12 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
                 elif any(token in header for token in ("activity", "updated", "last")):
                     metadata["last_activity_text"] = _clean_structured_text(cell)
 
+            metadata["group_name"] = resolve_group_name(
+                record_type=metadata["record_type"],
+                group_name=metadata["group_name"],
+                title=cells[0],
+                victim_name=metadata["victim_name"],
+            )
             title = metadata["group_name"] or metadata["victim_name"] or cells[0]
             detail_parts = []
             for cell in cells[1:]:

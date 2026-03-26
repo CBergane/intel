@@ -23,6 +23,7 @@ from django.views.decorators.http import require_POST
 from .dark_utils import (
     dark_source_suitability_warning,
     extract_links,
+    resolve_group_name,
     summarize_profile_content,
 )
 from .forms import (
@@ -694,10 +695,27 @@ def _dark_source_health_context():
     return {"sources": sources, "source_rows": source_rows}
 
 
+def _preferred_group_display(current_name: str, candidate_name: str) -> str:
+    if not candidate_name:
+        return current_name
+    if not current_name:
+        return candidate_name
+    if current_name == current_name.lower() and candidate_name != candidate_name.lower():
+        return candidate_name
+    if current_name == current_name.upper() and candidate_name != candidate_name.upper():
+        return candidate_name
+    return current_name
+
+
 def _active_group_rows(hits):
     grouped = {}
     for hit in hits:
-        group_name = (hit.group_name or "").strip()
+        group_name = resolve_group_name(
+            record_type=hit.record_type,
+            group_name=hit.group_name,
+            title=hit.title,
+            victim_name=hit.victim_name,
+        )
         if not group_name:
             continue
         group_key = group_name.lower()
@@ -719,6 +737,7 @@ def _active_group_rows(hits):
             grouped[group_key] = row
 
         row["incident_count"] += 1
+        row["group_name"] = _preferred_group_display(row["group_name"], group_name)
         if hit.dark_source_id not in row["source_ids"]:
             row["source_ids"].add(hit.dark_source_id)
             row["source_names"].append(hit.dark_source.name)

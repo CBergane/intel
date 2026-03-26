@@ -145,6 +145,64 @@ class ActiveGroupsViewTests(TestCase):
         self.assertContains(response, reverse("dark-recent-hits"))
         self.assertContains(response, "Recent Signals")
 
+    def test_group_cards_without_stored_group_name_still_appear_via_title_fallback(self):
+        _make_hit(
+            self.source_a,
+            title="Black Basta",
+            group_name="   ",
+            record_type="group",
+        )
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_GROUPS_URL)
+
+        rows = list(response.context["group_rows"].object_list)
+        black_basta_row = next(row for row in rows if row["group_name"] == "Black Basta")
+        self.assertEqual(black_basta_row["incident_count"], 1)
+
+    def test_table_rows_without_explicit_group_name_still_appear_when_title_is_group(self):
+        _make_hit(
+            self.source_b,
+            title="LockBit",
+            group_name="",
+            record_type="table_row",
+        )
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_GROUPS_URL)
+
+        rows = list(response.context["group_rows"].object_list)
+        lockbit_row = next(row for row in rows if row["group_name"] == "LockBit")
+        self.assertEqual(lockbit_row["incident_count"], 1)
+
+    def test_group_identity_is_normalized_for_grouping(self):
+        _make_hit(
+            self.source_a,
+            title="Akira Follow-Up",
+            group_name="  akira   ",
+            victim_name="Delta Logistics",
+        )
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_GROUPS_URL)
+
+        self.assertEqual(response.context["active_group_count"], 2)
+        rows = list(response.context["group_rows"].object_list)
+        akira_row = next(row for row in rows if row["group_name"] == "Akira")
+        self.assertEqual(akira_row["incident_count"], 3)
+
+    def test_blank_group_name_does_not_create_fake_group(self):
+        _make_hit(
+            self.source_a,
+            title="Ungrouped Incident",
+            group_name="   ",
+            victim_name="Omega Corp",
+            record_type="incident",
+        )
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_GROUPS_URL)
+
+        self.assertEqual(response.context["active_group_count"], 2)
+        rows = list(response.context["group_rows"].object_list)
+        self.assertFalse(any(row["group_name"] == "Ungrouped Incident" for row in rows))
+
     def test_recent_hits_view_keeps_raw_hits_available(self):
         self.client.force_login(self.superuser)
         response = self.client.get(DARK_RECENT_URL)
