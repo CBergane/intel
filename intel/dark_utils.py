@@ -78,6 +78,15 @@ GROUP_BLOCK_HINTS = (
     "actor",
 )
 MAX_STRUCTURED_RECORD_TEXT = 2800
+STRUCTURED_CONTENT_HINT_RE = re.compile(
+    r"(?i)\b("
+    r"attack|attacks|actor|actors|activity|active|breach|breached|breaching|campaign|claim|claimed|"
+    r"compromise|compromised|details|disclosure|disclosures|disclosed|disclosing|discussion|entry|entries|"
+    r"extortion|group|groups|incident|indicators|initial access|leak|leaked|leaking|malware|"
+    r"negotiation|operator|operators|posted|posting|published|publishing|ransomware|report|"
+    r"reported|target|targeting|targets|timeline|update|updates|victim|victims"
+    r")\b"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,7 +261,36 @@ def _fragment_url(fragment: str, base_url: str) -> str:
         if parts.scheme not in {"http", "https"}:
             continue
         return absolute
-    return base_url or ""
+    return ""
+
+
+def _strip_title_from_text(text: str, title: str) -> str:
+    cleaned = normalize_text(text)
+    normalized_title = normalize_text(title)
+    if not cleaned or not normalized_title:
+        return cleaned
+    pattern = re.compile(
+        r"^" + re.escape(normalized_title) + r"(?:[\s:|\-/,.]+)?",
+        re.IGNORECASE,
+    )
+    stripped = pattern.sub("", cleaned, count=1).strip()
+    return stripped or cleaned
+
+
+def _looks_fragment_only(text: str) -> bool:
+    cleaned = normalize_text(text)
+    if not cleaned:
+        return True
+    words = cleaned.split()
+    if len(words) <= 2:
+        return True
+    if len(cleaned) < 24 and len(words) <= 4:
+        return True
+    if STRUCTURED_CONTENT_HINT_RE.search(cleaned):
+        return False
+    if len(words) <= 6 and not any(mark in cleaned for mark in ".!?"):
+        return True
+    return False
 
 
 def _build_record(fragment: str, *, base_url: str) -> ExtractedRecord | None:
@@ -260,10 +298,14 @@ def _build_record(fragment: str, *, base_url: str) -> ExtractedRecord | None:
     if len(text) < 24 or len(text) > MAX_STRUCTURED_RECORD_TEXT:
         return None
     title = _fragment_title(fragment, text)
+    detail_text = _strip_title_from_text(text, title)
+    if _looks_fragment_only(detail_text):
+        return None
+    match_text = normalize_text("\n".join(part for part in (title, detail_text) if part))
     return ExtractedRecord(
         title=title,
-        text=text,
-        excerpt=build_excerpt(text, limit=240),
+        text=match_text,
+        excerpt=build_excerpt(detail_text, limit=240),
         url=_fragment_url(fragment, base_url),
         raw=(fragment or "")[:4000],
     )
@@ -290,15 +332,47 @@ def _extract_balanced_block(markup: str, start_match) -> str:
 
 
 def _dedupe_records(records: list[ExtractedRecord]) -> list[ExtractedRecord]:
-    deduped = []
+    indexed_records = []
     seen = set()
-    for record in records:
-        key = (record.title.lower(), normalize_text(record.text).lower())
+    for index, record in enumerate(records):
+        key = (record.title.lower(), normalize_text(record.text).lower(), record.url or "")
         if key in seen:
             continue
         seen.add(key)
-        deduped.append(record)
-    return deduped
+        indexed_records.append((index, record))
+
+    kept = []
+    for index, record in sorted(
+        indexed_records,
+        key=lambda pair: len(normalize_text(pair[1].text)),
+        reverse=True,
+    ):
+        candidate_text = normalize_text(record.text).lower()
+        candidate_title = normalize_text(record.title).lower()
+        shadowed = False
+        for _, existing in kept:
+            existing_text = normalize_text(existing.text).lower()
+            existing_title = normalize_text(existing.title).lower()
+            if candidate_text == existing_text:
+                shadowed = True
+                break
+            if (
+                len(candidate_text) < len(existing_text)
+                and candidate_text
+                and candidate_text in existing_text
+                and (
+                    candidate_title == existing_title
+                    or not record.url
+                    or record.url == existing.url
+                )
+            ):
+                shadowed = True
+                break
+        if shadowed:
+            continue
+        kept.append((index, record))
+
+    return [record for _, record in sorted(kept, key=lambda pair: pair[0])]
 
 
 def _extract_card_records(markup: str, *, base_url: str, hints: tuple[str, ...]) -> list[ExtractedRecord]:
@@ -319,20 +393,7 @@ def _extract_card_records(markup: str, *, base_url: str, hints: tuple[str, ...])
         if record is None:
             continue
         records.append(record)
-    records = _dedupe_records(records)
-    if len(records) >= 2:
-        return records
-
-    fallback_records = []
-    repeated_tag_re = re.compile(r"<(?P<tag>article|li)\b(?P<attrs>[^>]*)>", re.IGNORECASE)
-    for match in repeated_tag_re.finditer(cleaned):
-        fragment = _extract_balanced_block(cleaned, match)
-        record = _build_record(fragment, base_url=base_url)
-        if record is None:
-            continue
-        fallback_records.append(record)
-    fallback_records = _dedupe_records(fallback_records)
-    return fallback_records if len(fallback_records) >= 2 else records
+    return _dedupe_records(records)
 
 
 def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecord]:
@@ -352,14 +413,16 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
             cells = [cell for cell in cells if cell]
             if len(cells) < 2:
                 continue
-            row_text = " | ".join(cells)
-            if len(row_text) < 16:
+            title = cells[0]
+            detail_text = " | ".join(cells[1:])
+            row_text = normalize_text("\n".join(part for part in (title, detail_text) if part))
+            if len(row_text) < 16 or _looks_fragment_only(detail_text):
                 continue
             table_rows.append(
                 ExtractedRecord(
-                    title=cells[0],
+                    title=title,
                     text=row_text,
-                    excerpt=build_excerpt(row_text, limit=240),
+                    excerpt=build_excerpt(detail_text, limit=240),
                     url=_fragment_url(row_markup, base_url),
                     raw=row_markup[:4000],
                 )

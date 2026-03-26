@@ -485,8 +485,8 @@ class DarkIngestionTests(TestCase):
         self.assertNotIn("privacy policy", hit.excerpt.lower())
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
-    def test_incident_cards_match_card_records_and_ignore_landing_page_text(self):
-        self.source.watch_keywords = "landing, alphacorp"
+    def test_incident_card_with_multiple_keyword_matches_creates_one_hit(self):
+        self.source.watch_keywords = "alphacorp, breach, negotiation, leak"
         self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
         self.source.save(
             update_fields=["watch_keywords", "extractor_profile", "updated_at"]
@@ -496,7 +496,7 @@ class DarkIngestionTests(TestCase):
             <section class="hero">Landing page for monitoring updates and general notices.</section>
             <div class="incident-card">
                 <h2>AlphaCorp</h2>
-                <p>Negotiation leak posted with fresh victim details.</p>
+                <p>Breach negotiation leak posted with fresh victim details.</p>
                 <a href="/live/alphacorp">Alpha entry</a>
             </div>
             <div class="incident-card">
@@ -508,16 +508,49 @@ class DarkIngestionTests(TestCase):
 
         self._ingest_markup(markup)
 
-        hit = DarkHit.objects.get(dark_source=self.source)
+        hits = list(DarkHit.objects.filter(dark_source=self.source))
         run = DarkFetchRun.objects.get(dark_source=self.source)
         self.assertEqual(run.hits_new, 1)
+        self.assertEqual(len(hits), 1)
+        hit = hits[0]
         self.assertEqual(hit.title, "AlphaCorp")
-        self.assertEqual(hit.matched_keywords, ["alphacorp"])
+        self.assertEqual(
+            hit.matched_keywords,
+            ["alphacorp", "breach", "negotiation", "leak"],
+        )
         self.assertEqual(hit.url, "https://gamma.example.com/live/alphacorp")
         self.assertNotIn("landing page", hit.raw.lower())
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
-    def test_group_cards_extract_repeated_group_records(self):
+    def test_fragment_only_card_blocks_are_ignored(self):
+        self.source.watch_keywords = "alphacorp, sweden, manufacturing, breach"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Victim Updates</title><body>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <div class="country-card">Sweden</div>
+                <div class="industry-card">Manufacturing</div>
+                <p>Breach disclosure posted with negotiation notes and response timeline.</p>
+            </div>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hits = list(DarkHit.objects.filter(dark_source=self.source))
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].title, "AlphaCorp")
+        self.assertEqual(
+            hits[0].matched_keywords,
+            ["alphacorp", "sweden", "manufacturing", "breach"],
+        )
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_structured_record_without_link_falls_back_to_source_page_url(self):
         self.source.watch_keywords = "black basta"
         self.source.extractor_profile = DarkSource.ExtractorProfile.GROUP_CARDS
         self.source.save(
@@ -543,6 +576,34 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(hit.title, "Black Basta")
         self.assertEqual(hit.matched_keywords, ["black basta"])
         self.assertIn("extortion operations", hit.excerpt)
+        self.assertEqual(hit.url, self.source.url)
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_partial_duplicate_card_records_are_pruned_in_favor_of_fuller_record(self):
+        self.source.watch_keywords = "alphacorp, leak, timeline"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Incident Stream</title><body>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <div class="incident-item">
+                    <h3>AlphaCorp</h3>
+                    <p>Leak posted.</p>
+                </div>
+                <p>Leak posted with negotiation transcript and timeline for the response activity.</p>
+            </div>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hits = list(DarkHit.objects.filter(dark_source=self.source))
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].title, "AlphaCorp")
+        self.assertIn("timeline", hits[0].excerpt.lower())
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_table_rows_extract_multiple_structured_hits_from_one_page(self):
