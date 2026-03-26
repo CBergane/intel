@@ -9,12 +9,24 @@ class DarkSource(models.Model):
         INDEX_PAGE = "index_page", "Index Page"
         FEED = "feed", "RSS/Atom Feed"
 
+    class ExtractorProfile(models.TextChoices):
+        GENERIC_PAGE = "generic_page", "Generic Page"
+        INCIDENT_CARDS = "incident_cards", "Incident Cards"
+        GROUP_CARDS = "group_cards", "Group Cards"
+        TABLE_ROWS = "table_rows", "Table Rows"
+
     name = models.CharField(max_length=120, unique=True)
     slug = models.SlugField(max_length=120, unique=True)
     homepage = models.URLField(blank=True)
     url = models.URLField(max_length=1500)
     source_type = models.CharField(
         max_length=20, choices=SourceType.choices, default=SourceType.SINGLE_PAGE
+    )
+    extractor_profile = models.CharField(
+        max_length=20,
+        choices=ExtractorProfile.choices,
+        default=ExtractorProfile.GENERIC_PAGE,
+        help_text="How fetched pages should be turned into matchable records.",
     )
     enabled = models.BooleanField(default=True)
     use_tor = models.BooleanField(

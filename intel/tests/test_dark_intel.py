@@ -26,6 +26,20 @@ class DummyResponse:
             yield chunk
 
 
+class DarkSourceModelTests(TestCase):
+    def test_dark_source_defaults_to_generic_extractor_profile(self):
+        source = DarkSource.objects.create(
+            name="Profile Default",
+            slug="profile-default",
+            url="https://example.test/default",
+        )
+
+        self.assertEqual(
+            source.extractor_profile,
+            DarkSource.ExtractorProfile.GENERIC_PAGE,
+        )
+
+
 class DarkAdminSecurityTests(TestCase):
     def setUp(self):
         user_model = get_user_model()
@@ -141,6 +155,7 @@ class DarkAdminCrudTests(TestCase):
                 "homepage": "https://beta.example.com/home",
                 "url": "https://beta.example.com/index",
                 "source_type": DarkSource.SourceType.INDEX_PAGE,
+                "extractor_profile": DarkSource.ExtractorProfile.INCIDENT_CARDS,
                 "enabled": "on",
                 "tags": "leaks, sweden",
                 "watch_keywords": "Breach, Initial Access",
@@ -158,6 +173,10 @@ class DarkAdminCrudTests(TestCase):
         self.assertEqual(created.tags, ["leaks", "sweden"])
         self.assertEqual(created.watch_keywords, "breach, initial access")
         self.assertEqual(created.source_type, DarkSource.SourceType.INDEX_PAGE)
+        self.assertEqual(
+            created.extractor_profile,
+            DarkSource.ExtractorProfile.INCIDENT_CARDS,
+        )
         self.assertTrue(created.use_tor)
         self.assertEqual(created.timeout_seconds, 12)
         self.assertEqual(created.max_bytes, 650000)
@@ -175,6 +194,7 @@ class DarkAdminCrudTests(TestCase):
                 "homepage": "https://alpha.example.com/reports",
                 "url": "https://alpha.example.com/reports",
                 "source_type": DarkSource.SourceType.FEED,
+                "extractor_profile": DarkSource.ExtractorProfile.TABLE_ROWS,
                 "tags": "onion, market",
                 "watch_keywords": "Leak, Broker",
                 "watch_regex": r"ransomware",
@@ -192,6 +212,10 @@ class DarkAdminCrudTests(TestCase):
         self.assertEqual(self.source.tags, ["onion", "market"])
         self.assertEqual(self.source.watch_keywords, "leak, broker")
         self.assertEqual(self.source.source_type, DarkSource.SourceType.FEED)
+        self.assertEqual(
+            self.source.extractor_profile,
+            DarkSource.ExtractorProfile.TABLE_ROWS,
+        )
         self.assertEqual(self.source.timeout_seconds, 9)
         self.assertEqual(self.source.max_bytes, 720000)
         self.assertEqual(self.source.fetch_retries, 4)
@@ -242,6 +266,7 @@ class DarkAdminCrudTests(TestCase):
         duplicated = DarkSource.objects.filter(slug__contains="copy").latest("id")
         self.assertFalse(duplicated.enabled)
         self.assertIn("copy", duplicated.slug)
+        self.assertEqual(duplicated.extractor_profile, self.source.extractor_profile)
 
         token = client.cookies["csrftoken"].value
         with patch("intel.views._build_dark_source_preview") as mocked_preview:
@@ -329,6 +354,14 @@ class DarkIngestionTests(TestCase):
             watch_keywords="breach, market",
         )
 
+    def _ingest_markup(self, markup: str):
+        response = DummyResponse([markup.encode("utf-8")], url=self.source.url)
+        with patch(
+            "intel.management.commands.ingest_dark.requests.get",
+            return_value=response,
+        ):
+            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+
     @override_settings(DARK_MAX_BYTES=10, DARK_FETCH_RETRIES=1)
     def test_ingestion_respects_dark_max_bytes_and_records_error_run(self):
         response = DummyResponse([b"12345678", b"12345678"], url=self.source.url)
@@ -351,15 +384,10 @@ class DarkIngestionTests(TestCase):
         html = (
             "<html><title>Breach market update</title>"
             "<body>New breach listing posted on the market today.</body></html>"
-        ).encode("utf-8")
-        response = DummyResponse([html], url=self.source.url)
+        )
 
-        with patch(
-            "intel.management.commands.ingest_dark.requests.get",
-            return_value=response,
-        ):
-            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
-            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+        self._ingest_markup(html)
+        self._ingest_markup(html)
 
         self.assertEqual(DarkFetchRun.objects.filter(dark_source=self.source).count(), 2)
         self.assertEqual(DarkDocument.objects.filter(dark_source=self.source).count(), 1)
@@ -447,16 +475,109 @@ class DarkIngestionTests(TestCase):
             "<p>Breach details for operators were published with indicators and timeline.</p>"
             "<p>Analysts confirmed the disclosure and scoped affected systems.</p>"
             "</article></body></html>"
-        ).encode("utf-8")
-        response = DummyResponse([noisy_html], url=self.source.url)
+        )
 
-        with patch(
-            "intel.management.commands.ingest_dark.requests.get",
-            return_value=response,
-        ):
-            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+        self._ingest_markup(noisy_html)
 
         hit = DarkHit.objects.get(dark_source=self.source)
         self.assertIn("Breach details for operators", hit.excerpt)
         self.assertNotIn("font-family", hit.excerpt.lower())
         self.assertNotIn("privacy policy", hit.excerpt.lower())
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_incident_cards_match_card_records_and_ignore_landing_page_text(self):
+        self.source.watch_keywords = "landing, alphacorp"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Live Updates</title><body>
+            <section class="hero">Landing page for monitoring updates and general notices.</section>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <p>Negotiation leak posted with fresh victim details.</p>
+                <a href="/live/alphacorp">Alpha entry</a>
+            </div>
+            <div class="incident-card">
+                <h2>Beta Retail</h2>
+                <p>Discussion thread without watched terms.</p>
+            </div>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hit = DarkHit.objects.get(dark_source=self.source)
+        run = DarkFetchRun.objects.get(dark_source=self.source)
+        self.assertEqual(run.hits_new, 1)
+        self.assertEqual(hit.title, "AlphaCorp")
+        self.assertEqual(hit.matched_keywords, ["alphacorp"])
+        self.assertEqual(hit.url, "https://gamma.example.com/live/alphacorp")
+        self.assertNotIn("landing page", hit.raw.lower())
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_group_cards_extract_repeated_group_records(self):
+        self.source.watch_keywords = "black basta"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.GROUP_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Threat Groups</title><body>
+            <div class="intro">Trusted-source overview page.</div>
+            <article class="group-card">
+                <h2>Black Basta</h2>
+                <p>Windows-focused extortion operations with recent disclosures.</p>
+            </article>
+            <article class="group-card">
+                <h2>Akira</h2>
+                <p>Linux and VMware targeting noted this week.</p>
+            </article>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hit = DarkHit.objects.get(dark_source=self.source)
+        self.assertEqual(hit.title, "Black Basta")
+        self.assertEqual(hit.matched_keywords, ["black basta"])
+        self.assertIn("extortion operations", hit.excerpt)
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_table_rows_extract_multiple_structured_hits_from_one_page(self):
+        self.source.watch_keywords = "akira, play"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.TABLE_ROWS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Group Summary</title><body>
+            <section class="hero">Landing page with totals and charts.</section>
+            <table>
+                <thead><tr><th>Group</th><th>Victims</th><th>Notes</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><a href="/groups/akira">Akira</a></td>
+                        <td>41</td>
+                        <td>Double extortion activity</td>
+                    </tr>
+                    <tr>
+                        <td><a href="/groups/play">Play</a></td>
+                        <td>18</td>
+                        <td>Recent surge in disclosures</td>
+                    </tr>
+                </tbody>
+            </table>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        run = DarkFetchRun.objects.get(dark_source=self.source)
+        hits = list(DarkHit.objects.filter(dark_source=self.source).order_by("title"))
+        self.assertEqual(DarkDocument.objects.filter(dark_source=self.source).count(), 1)
+        self.assertEqual(run.hits_new, 2)
+        self.assertEqual(len(hits), 2)
+        self.assertEqual([hit.title for hit in hits], ["Akira", "Play"])
+        self.assertEqual(hits[0].url, "https://gamma.example.com/groups/akira")

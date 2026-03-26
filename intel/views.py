@@ -21,11 +21,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .dark_utils import (
-    build_excerpt,
     dark_source_suitability_warning,
     extract_links,
-    extract_title,
-    strip_tags,
+    summarize_profile_content,
 )
 from .forms import (
     DarkSourceCreateForm,
@@ -82,6 +80,7 @@ DARK_SOURCE_PRESETS = (
             "slug": "cisa-alerts-index",
             "url": "https://www.cisa.gov/news-events/cybersecurity-advisories",
             "source_type": DarkSource.SourceType.INDEX_PAGE,
+            "extractor_profile": DarkSource.ExtractorProfile.GENERIC_PAGE,
             "watch_keywords": "actively exploited, zero-day, cve",
             "watch_regex": r"CVE-\d{4}-\d+",
             "use_tor": False,
@@ -97,6 +96,7 @@ DARK_SOURCE_PRESETS = (
             "slug": "krebs-feed",
             "url": "https://krebsonsecurity.com/feed/",
             "source_type": DarkSource.SourceType.FEED,
+            "extractor_profile": DarkSource.ExtractorProfile.GENERIC_PAGE,
             "watch_keywords": "ransomware, exploit, breach",
             "watch_regex": r"CVE-\d{4}-\d+",
             "use_tor": False,
@@ -112,6 +112,7 @@ DARK_SOURCE_PRESETS = (
             "slug": "example-single-page",
             "url": "https://www.cisa.gov/news-events/alerts",
             "source_type": DarkSource.SourceType.SINGLE_PAGE,
+            "extractor_profile": DarkSource.ExtractorProfile.GENERIC_PAGE,
             "watch_keywords": "alert, vulnerability",
             "watch_regex": r"CVE-\d{4}-\d+",
             "use_tor": False,
@@ -123,8 +124,8 @@ DARK_SOURCE_PRESETS = (
 DARK_SOURCE_FORM_SECTIONS = (
     {
         "title": "Basic",
-        "description": "Core identity and the primary fetch target for this source.",
-        "fields": ("name", "slug", "url", "source_type"),
+        "description": "Core identity, fetch target, and how discovered pages should be extracted.",
+        "fields": ("name", "slug", "url", "source_type", "extractor_profile"),
     },
     {
         "title": "Fetch Config",
@@ -1077,6 +1078,7 @@ def _dark_source_rows():
                 "has_regex_watch": regex_watch_count > 0,
                 "keyword_watch_count": keyword_watch_count,
                 "regex_watch_count": regex_watch_count,
+                "extractor_profile_display": source.get_extractor_profile_display(),
                 "suitability_warning": dark_source_suitability_warning(
                     source.url, source.source_type
                 ),
@@ -1142,9 +1144,14 @@ def _build_dark_source_preview(source: DarkSource):
     markup, http_status, final_url, bytes_received = command._fetch_with_retries(
         source.url, source
     )
-    title = extract_title(markup)
-    extracted_text = strip_tags(markup)
-    excerpt = build_excerpt(extracted_text, limit=220)
+    summary = summarize_profile_content(
+        markup,
+        profile=source.extractor_profile,
+        base_url=final_url or source.url,
+    )
+    title = summary["title"]
+    extracted_text = summary["text"]
+    excerpt = summary["excerpt"][:220] if len(summary["excerpt"]) > 220 else summary["excerpt"]
     if len(excerpt) < 40:
         raise ValueError("No useful content extracted from response.")
 
@@ -1182,11 +1189,13 @@ def _build_dark_source_preview(source: DarkSource):
         "source_name": source.name,
         "source_id": source.id,
         "source_type": source.source_type,
+        "extractor_profile": source.extractor_profile,
         "http_status": http_status,
         "final_url": final_url or source.url,
         "title": title,
         "excerpt": excerpt,
         "text_length": len(extracted_text),
+        "record_count": len(summary["records"]),
         "link_count": link_count,
         "candidate_links": candidate_links,
         "bytes_received": bytes_received,
@@ -1241,6 +1250,10 @@ def _prepare_dark_source_form(form):
             "label": "Source Type",
             "help_text": "Choose feed for RSS/Atom, index_page for same-host discovery, or single_page for one URL only.",
         },
+        "extractor_profile": {
+            "label": "Extractor Profile",
+            "help_text": "Use generic_page for one cleaned page, incident_cards/group_cards for repeated cards, or table_rows for structured summary tables.",
+        },
         "enabled": {
             "label": "Enabled",
             "help_text": "Turn off to keep the source configured without including it in ingest jobs.",
@@ -1271,14 +1284,14 @@ def _prepare_dark_source_form(form):
         },
         "watch_keywords": {
             "label": "Keyword Watches",
-            "help_text": "Comma-separated passive match terms. Saved in lowercase on submit.",
+            "help_text": "Comma-separated passive match terms applied to extracted records. Saved in lowercase on submit.",
             "placeholder": "breach, leak, initial access",
             "textarea_rows": 4,
             "spellcheck": "false",
         },
         "watch_regex": {
             "label": "Regex Watches",
-            "help_text": "One regex per line. Use only for patterns keywords cannot express cleanly.",
+            "help_text": "One regex per line. Structured profiles test these against each extracted record instead of the whole page.",
             "placeholder": r"CVE-\d{4}-\d+" + "\n" + r"ransomware",
             "textarea_rows": 6,
             "spellcheck": "false",
@@ -1473,6 +1486,7 @@ def admin_panel_dark_source_duplicate(request, source_id: int):
         homepage=source.homepage,
         url=source.url,
         source_type=source.source_type,
+        extractor_profile=source.extractor_profile,
         enabled=False,
         use_tor=source.use_tor,
         timeout_seconds=source.timeout_seconds,

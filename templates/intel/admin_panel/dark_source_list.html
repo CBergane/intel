@@ -44,6 +44,12 @@
                     <p><span class="text-cyan-300">HTTP:</span> {{ test_preview.http_status }}</p>
                     <p><span class="text-cyan-300">Bytes:</span> {{ test_preview.bytes_received }}</p>
                     <p><span class="text-cyan-300">Candidate links:</span> {{ test_preview.link_count }}</p>
+                    {% if test_preview.extractor_profile %}
+                        <p><span class="text-cyan-300">Profile:</span> {{ test_preview.extractor_profile }}</p>
+                    {% endif %}
+                    {% if test_preview.record_count is not None %}
+                        <p><span class="text-cyan-300">Extracted records:</span> {{ test_preview.record_count }}</p>
+                    {% endif %}
                     <p><span class="text-cyan-300">Extracted chars:</span> {{ test_preview.text_length }}</p>
                 </div>
                 <p class="mt-2 break-all text-xs text-cyan-200">Final URL: {{ test_preview.final_url }}</p>
@@ -135,6 +141,7 @@
                                 </div>
                                 <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                                     <span class="rounded-full border border-line/80 bg-slate-950/40 px-2.5 py-1">{{ row.source.get_source_type_display }}</span>
+                                    <span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-200">{{ row.extractor_profile_display }}</span>
                                     {% if row.source.use_tor %}
                                         <span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">tor</span>
                                     {% else %}
@@ -220,6 +227,10 @@
                                         <a href="{{ row.source.homepage }}" target="_blank" rel="noopener noreferrer" class="block break-all text-sky-300 hover:text-sky-200">{{ row.source.homepage }}</a>
                                     </div>
                                 {% endif %}
+                                <div class="space-y-1">
+                                    <p class="uppercase tracking-wide text-slate-500">Extractor Profile</p>
+                                    <div class="rounded-lg border border-sky-500/20 bg-sky-950/10 px-2 py-1.5 text-sky-100">{{ row.extractor_profile_display }}</div>
+                                </div>
                                 <div class="space-y-1">
                                     <p class="uppercase tracking-wide text-slate-500">Dashboard</p>
                                     <a href="{{ row.open_url }}" class="text-sky-300 hover:text-sky-200">Open filtered dark dashboard</a>

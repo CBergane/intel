@@ -176,6 +176,7 @@ class DarkSourceAdminPanelTests(TestCase):
             slug="alpha-leak-watch",
             url="https://alpha.example.com/feed.xml",
             source_type=DarkSource.SourceType.FEED,
+            extractor_profile=DarkSource.ExtractorProfile.GROUP_CARDS,
             enabled=True,
             use_tor=True,
             watch_keywords="breach, leak",
@@ -186,6 +187,7 @@ class DarkSourceAdminPanelTests(TestCase):
             slug="beta-onion-mirror",
             url="http://betaexampleonion.onion/index",
             source_type=DarkSource.SourceType.INDEX_PAGE,
+            extractor_profile=DarkSource.ExtractorProfile.TABLE_ROWS,
             enabled=False,
             use_tor=True,
             watch_keywords="",
@@ -227,6 +229,8 @@ class DarkSourceAdminPanelTests(TestCase):
         self.assertContains(response, "tor")
         self.assertContains(response, "disabled")
         self.assertContains(response, "no watches")
+        self.assertContains(response, "Group Cards")
+        self.assertContains(response, "Table Rows")
 
     def test_superuser_can_delete_dark_source_with_csrf(self):
         client = Client(enforce_csrf_checks=True)
@@ -262,6 +266,7 @@ class DarkSourceAdminFormTests(TestCase):
             slug="gamma-intel-watch",
             url="https://gamma.example.com/feed.xml",
             source_type=DarkSource.SourceType.FEED,
+            extractor_profile=DarkSource.ExtractorProfile.INCIDENT_CARDS,
             enabled=True,
             use_tor=False,
             watch_keywords="breach, leak",
@@ -278,7 +283,7 @@ class DarkSourceAdminFormTests(TestCase):
         self.assertContains(response, "Fetch Config")
         self.assertContains(response, "Matching / Watches")
         self.assertContains(response, "Notes / Tags / Suitability")
-        self.assertContains(response, "Source Type Quick Guide")
+        self.assertContains(response, "Collection Quick Guide")
         self.assertEqual(
             [section["title"] for section in response.context["form_sections"]],
             ["Basic", "Fetch Config", "Matching / Watches", "Notes / Tags / Suitability"],
@@ -287,16 +292,22 @@ class DarkSourceAdminFormTests(TestCase):
         form = response.context["form"]
         self.assertEqual(form.fields["url"].label, "Fetch URL")
         self.assertEqual(form.fields["use_tor"].label, "Route Through Tor")
+        self.assertEqual(form.fields["extractor_profile"].label, "Extractor Profile")
         self.assertEqual(
             form.fields["enabled"].help_text,
             "Turn off to keep the source configured without including it in ingest jobs.",
         )
+        self.assertIn("incident_cards/group_cards", form.fields["extractor_profile"].help_text)
         self.assertEqual(
             form.fields["watch_keywords"].widget.attrs["placeholder"],
             "breach, leak, initial access",
         )
         self.assertEqual(form.fields["watch_keywords"].widget.attrs["rows"], 4)
         self.assertEqual(form.fields["watch_regex"].widget.attrs["rows"], 6)
+        self.assertEqual(
+            form.initial["extractor_profile"],
+            DarkSource.ExtractorProfile.GENERIC_PAGE,
+        )
 
     def test_edit_form_shows_consistent_footer_actions(self):
         self.client.force_login(self.superuser)
@@ -328,6 +339,7 @@ class DarkSourceAdminFormTests(TestCase):
                 "slug": "delta-watch",
                 "url": "https://delta.example.com/feed.xml",
                 "source_type": DarkSource.SourceType.FEED,
+                "extractor_profile": DarkSource.ExtractorProfile.TABLE_ROWS,
                 "timeout_seconds": "0",
                 "max_bytes": "100",
                 "fetch_retries": "0",
@@ -339,3 +351,13 @@ class DarkSourceAdminFormTests(TestCase):
         self.assertContains(response, "Timeout must be between 1 and 120 seconds.")
         self.assertContains(response, "Max bytes must be between 1024 and 25000000.")
         self.assertContains(response, "Retries must be between 1 and 10.")
+
+    def test_edit_form_preserves_selected_extractor_profile(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(self.edit_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context["form"].initial["extractor_profile"],
+            DarkSource.ExtractorProfile.INCIDENT_CARDS,
+        )

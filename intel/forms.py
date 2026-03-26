@@ -199,8 +199,16 @@ class _BaseDarkSourceForm(forms.ModelForm):
             self.fields["tags"].initial = ", ".join(self.instance.tags or [])
             self.fields["watch_keywords"].initial = self.instance.watch_keywords
             self.fields["watch_regex"].initial = self.instance.watch_regex
+        else:
+            self.initial.setdefault(
+                "extractor_profile", DarkSource.ExtractorProfile.GENERIC_PAGE
+            )
         self.fields["source_type"].help_text = (
             "single_page = one page, index_page = same-host discovery, feed = RSS/Atom links."
+        )
+        self.fields["extractor_profile"].help_text = (
+            "generic_page = one cleaned page, incident_cards/group_cards = repeated cards, "
+            "table_rows = structured summary rows."
         )
         self.fields["url"].help_text = (
             "Use dark allowlisted endpoints. Normal public news/research/advisory feeds should usually use standard intel feeds."
@@ -307,6 +315,7 @@ class DarkSourceCreateForm(_BaseDarkSourceForm):
             "homepage",
             "url",
             "source_type",
+            "extractor_profile",
             "enabled",
             "use_tor",
             "timeout_seconds",
@@ -327,6 +336,7 @@ class DarkSourceEditForm(_BaseDarkSourceForm):
             "homepage",
             "url",
             "source_type",
+            "extractor_profile",
             "enabled",
             "use_tor",
             "timeout_seconds",

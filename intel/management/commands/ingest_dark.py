@@ -11,12 +11,10 @@ from django.utils import timezone
 
 from intel.dark_utils import (
     build_content_hash,
-    build_excerpt,
     extract_links,
-    extract_title,
     matched_keywords,
     matched_regex,
-    strip_tags,
+    summarize_profile_content,
 )
 from intel.models import DarkDocument, DarkFetchRun, DarkHit, DarkSnapshot, DarkSource
 from intel.notifications import send_dark_hit_alert
@@ -76,17 +74,15 @@ class Command(BaseCommand):
                     markup, status, final_url, doc_bytes = self._fetch_with_retries(doc_url, source)
                     bytes_received_total += doc_bytes
                     docs_fetched += 1
-                    hit_created, hit_updated = self._upsert_document_and_hits(
+                    created_count, updated_count = self._upsert_document_and_hits(
                         source=source,
                         doc_url=doc_url,
                         final_url=final_url,
                         status=status,
                         markup=markup,
                     )
-                    if hit_created:
-                        hits_new += 1
-                    if hit_updated:
-                        hits_updated += 1
+                    hits_new += created_count
+                    hits_updated += updated_count
                 except Exception as exc:
                     errors.append(f"{doc_url}: {exc}")
 
@@ -169,9 +165,15 @@ class Command(BaseCommand):
         raise ValueError(f"Unsupported dark source type: {source_type}")
 
     def _upsert_document_and_hits(self, *, source, doc_url, final_url, status, markup):
-        title = extract_title(markup)
-        text = strip_tags(markup)
-        excerpt = sanitize_summary(build_excerpt(text))
+        summary = summarize_profile_content(
+            markup,
+            profile=source.extractor_profile,
+            base_url=final_url or doc_url,
+        )
+        title = summary["title"]
+        text = summary["text"]
+        excerpt = sanitize_summary(summary["excerpt"])
+        records = summary["records"]
         content_hash = build_content_hash(url=final_url or doc_url, title=title, text=text)
         canonical_url = canonicalize_url(final_url or doc_url)
 
@@ -222,39 +224,49 @@ class Command(BaseCommand):
                     raw=markup[:4000],
                 )
 
-            match_text = f"{title}\n{text}"
-            keyword_matches = matched_keywords(match_text, source.watch_keywords)
-            regex_matches = matched_regex(match_text, source.watch_regex)
-            if not keyword_matches and not regex_matches:
-                return False, False
+            hits_new = 0
+            hits_updated = 0
+            for record in records:
+                match_text = f"{record.title}\n{record.text}"
+                keyword_matches = matched_keywords(match_text, source.watch_keywords)
+                regex_matches = matched_regex(match_text, source.watch_regex)
+                if not keyword_matches and not regex_matches:
+                    continue
 
-            hit, hit_created = DarkHit.objects.select_for_update().get_or_create(
-                dark_source=source,
-                dark_document=document,
-                content_hash=content_hash,
-                defaults={
-                    "matched_keywords": keyword_matches,
-                    "matched_regex": regex_matches,
-                    "title": title,
-                    "excerpt": excerpt,
-                    "url": final_url or doc_url,
-                    "raw": markup[:4000],
-                    "last_seen_at": now,
-                },
-            )
-            if hit_created:
-                send_dark_hit_alert(hit)
-                return True, False
+                hit_hash = build_content_hash(
+                    url=record.url or final_url or doc_url,
+                    title=record.title,
+                    text=record.text,
+                )
+                hit, hit_created = DarkHit.objects.select_for_update().get_or_create(
+                    dark_source=source,
+                    dark_document=document,
+                    content_hash=hit_hash,
+                    defaults={
+                        "matched_keywords": keyword_matches,
+                        "matched_regex": regex_matches,
+                        "title": record.title,
+                        "excerpt": sanitize_summary(record.excerpt),
+                        "url": record.url or final_url or doc_url,
+                        "raw": record.raw,
+                        "last_seen_at": now,
+                    },
+                )
+                if hit_created:
+                    send_dark_hit_alert(hit)
+                    hits_new += 1
+                    continue
 
-            hit.matched_keywords = keyword_matches
-            hit.matched_regex = regex_matches
-            hit.title = title
-            hit.excerpt = excerpt
-            hit.url = final_url or doc_url
-            hit.raw = markup[:4000]
-            hit.last_seen_at = now
-            hit.save()
-            return False, True
+                hit.matched_keywords = keyword_matches
+                hit.matched_regex = regex_matches
+                hit.title = record.title
+                hit.excerpt = sanitize_summary(record.excerpt)
+                hit.url = record.url or final_url or doc_url
+                hit.raw = record.raw
+                hit.last_seen_at = now
+                hit.save()
+                hits_updated += 1
+            return hits_new, hits_updated
 
     def _fetch_with_retries(self, url: str, source: DarkSource):
         retries = max(source.effective_fetch_retries(), 1)
@@ -295,9 +307,7 @@ class Command(BaseCommand):
             "stream": True,
         }
         if self._should_use_tor(url, source) and settings.TOR_ENABLED:
-            socks_url = (
-                f"socks5h://{settings.TOR_SOCKS_HOST}:{settings.TOR_SOCKS_PORT}"
-            )
+            socks_url = settings.DARK_TOR_SOCKS_URL
             kwargs["proxies"] = {
                 "http": socks_url,
                 "https": socks_url,

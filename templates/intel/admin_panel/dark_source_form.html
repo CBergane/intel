@@ -85,11 +85,12 @@
                 {% if section.title == "Notes / Tags / Suitability" %}
                     <div class="mb-4 grid gap-3 lg:grid-cols-2">
                         <div class="rounded-xl border border-line/80 bg-slate-950/30 p-3 text-xs text-slate-300">
-                            <p class="font-medium text-white">Source Type Quick Guide</p>
+                            <p class="font-medium text-white">Collection Quick Guide</p>
                             <ul class="mt-2 space-y-1">
-                                <li><span class="text-slate-100">feed:</span> structured RSS/Atom endpoint.</li>
-                                <li><span class="text-slate-100">index_page:</span> same-host discovery from one page.</li>
-                                <li><span class="text-slate-100">single_page:</span> monitor one specific URL only.</li>
+                                <li><span class="text-slate-100">feed / index_page / single_page:</span> choose how documents are discovered.</li>
+                                <li><span class="text-slate-100">generic_page:</span> match against one cleaned page-level record.</li>
+                                <li><span class="text-slate-100">incident_cards / group_cards:</span> match repeated card-style records, not the whole landing page.</li>
+                                <li><span class="text-slate-100">table_rows:</span> match structured summary rows from tables.</li>
                             </ul>
                         </div>
                         <div class="rounded-xl border {% if form.suitability_hint %}border-amber-500/40 bg-amber-900/20{% else %}border-emerald-500/30 bg-emerald-900/10{% endif %} p-3 text-xs {% if form.suitability_hint %}text-amber-100{% else %}text-emerald-100{% endif %}">
