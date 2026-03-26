@@ -245,6 +245,14 @@ class Command(BaseCommand):
                     defaults={
                         "matched_keywords": keyword_matches,
                         "matched_regex": regex_matches,
+                        "record_type": record.record_type,
+                        "group_name": record.group_name,
+                        "victim_name": record.victim_name,
+                        "country": record.country,
+                        "industry": record.industry,
+                        "website_url": record.website_url,
+                        "victim_count": record.victim_count,
+                        "last_activity_text": record.last_activity_text,
                         "title": record.title,
                         "excerpt": sanitize_summary(record.excerpt),
                         "url": record.url or final_url or doc_url,
@@ -259,6 +267,14 @@ class Command(BaseCommand):
 
                 hit.matched_keywords = keyword_matches
                 hit.matched_regex = regex_matches
+                hit.record_type = record.record_type
+                hit.group_name = record.group_name
+                hit.victim_name = record.victim_name
+                hit.country = record.country
+                hit.industry = record.industry
+                hit.website_url = record.website_url
+                hit.victim_count = record.victim_count
+                hit.last_activity_text = record.last_activity_text
                 hit.title = record.title
                 hit.excerpt = sanitize_summary(record.excerpt)
                 hit.url = record.url or final_url or doc_url

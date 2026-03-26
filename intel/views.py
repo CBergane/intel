@@ -610,8 +610,10 @@ def sources_view(request):
     )
 
 
-@superuser_required
-def dark_dashboard_view(request):
+DARK_DAY_OPTIONS = [("7", "7d"), ("30", "30d"), ("90", "90d")]
+
+
+def _dark_filtered_hits_queryset(request):
     query = (request.GET.get("q") or "").strip()
     selected_source = (request.GET.get("source") or "").strip()
 
@@ -624,23 +626,34 @@ def dark_dashboard_view(request):
     hits = (
         DarkHit.objects.select_related("dark_source", "dark_document")
         .filter(detected_at__gte=since)
-        .order_by("-detected_at", "-id")
     )
     if selected_source:
         hits = hits.filter(dark_source__slug=selected_source)
     if query:
         hits = hits.filter(
-            Q(title__icontains=query)
+            Q(group_name__icontains=query)
+            | Q(victim_name__icontains=query)
+            | Q(country__icontains=query)
+            | Q(industry__icontains=query)
+            | Q(website_url__icontains=query)
+            | Q(last_activity_text__icontains=query)
+            | Q(record_type__icontains=query)
+            | Q(title__icontains=query)
             | Q(excerpt__icontains=query)
             | Q(url__icontains=query)
             | Q(raw__icontains=query)
             | Q(matched_keywords__icontains=query)
             | Q(matched_regex__icontains=query)
         )
+    return hits.order_by("-detected_at", "-id"), {
+        "query": query,
+        "selected_source": selected_source,
+        "days": days_param,
+        "since": since,
+    }
 
-    paginator = Paginator(hits, 50)
-    page_obj = paginator.get_page(request.GET.get("page"))
 
+def _dark_source_health_context():
     sources = list(
         DarkSource.objects.filter(enabled=True)
         .annotate(
@@ -678,6 +691,72 @@ def dark_dashboard_view(request):
                 "last_run_at": last_run_at,
             }
         )
+    return {"sources": sources, "source_rows": source_rows}
+
+
+def _active_group_rows(hits):
+    grouped = {}
+    for hit in hits:
+        group_name = (hit.group_name or "").strip()
+        if not group_name:
+            continue
+        group_key = group_name.lower()
+        activity_at = hit.last_seen_at or hit.detected_at
+        row = grouped.get(group_key)
+        if row is None:
+            row = {
+                "group_name": group_name,
+                "incident_count": 0,
+                "latest_activity_at": activity_at,
+                "latest_detected_at": hit.detected_at,
+                "latest_victim_name": "",
+                "latest_country": "",
+                "latest_activity_text": "",
+                "victim_count": None,
+                "source_names": [],
+                "source_ids": set(),
+            }
+            grouped[group_key] = row
+
+        row["incident_count"] += 1
+        if hit.dark_source_id not in row["source_ids"]:
+            row["source_ids"].add(hit.dark_source_id)
+            row["source_names"].append(hit.dark_source.name)
+        if row["victim_count"] is None and hit.victim_count is not None:
+            row["victim_count"] = hit.victim_count
+
+        if activity_at >= row["latest_activity_at"]:
+            row["latest_activity_at"] = activity_at
+            row["latest_detected_at"] = hit.detected_at
+            row["latest_victim_name"] = hit.victim_name or row["latest_victim_name"]
+            row["latest_country"] = hit.country or row["latest_country"]
+            row["latest_activity_text"] = hit.last_activity_text or row["latest_activity_text"]
+
+    rows = []
+    for row in grouped.values():
+        row["source_count"] = len(row["source_ids"])
+        del row["source_ids"]
+        rows.append(row)
+    rows.sort(
+        key=lambda row: (
+            row["latest_activity_at"],
+            row["incident_count"],
+            row["group_name"].lower(),
+        ),
+        reverse=True,
+    )
+    return rows
+
+
+@superuser_required
+def dark_dashboard_view(request):
+    hits, filter_context = _dark_filtered_hits_queryset(request)
+    active_groups = _active_group_rows(hits)
+    grouped_incident_count = sum(row["incident_count"] for row in active_groups)
+    groups_paginator = Paginator(active_groups, 40)
+    groups_page = groups_paginator.get_page(request.GET.get("page"))
+    health_context = _dark_source_health_context()
+    raw_recent_preview = list(hits[:5])
 
     return render(
         request,
@@ -685,13 +764,38 @@ def dark_dashboard_view(request):
         {
             "page_title": "Dark Intel",
             "current_page": "dark",
+            "group_rows": groups_page,
+            "page_obj": groups_page,
+            "active_group_count": len(active_groups),
+            "incident_count": grouped_incident_count,
+            "raw_recent_preview": raw_recent_preview,
+            "recent_hits_url": reverse("dark-recent-hits"),
+            "day_options": DARK_DAY_OPTIONS,
+            **health_context,
+            **filter_context,
+        },
+    )
+
+
+@superuser_required
+def dark_recent_hits_view(request):
+    hits, filter_context = _dark_filtered_hits_queryset(request)
+    paginator = Paginator(hits, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    health_context = _dark_source_health_context()
+
+    return render(
+        request,
+        "intel/dark/recent_hits.html",
+        {
+            "page_title": "Dark Intel",
+            "current_page": "dark",
             "hits": page_obj,
             "page_obj": page_obj,
-            "source_rows": source_rows,
-            "sources": sources,
-            "query": query,
-            "selected_source": selected_source,
-            "days": days_param,
+            "groups_url": reverse("dark-dashboard"),
+            "day_options": DARK_DAY_OPTIONS,
+            **health_context,
+            **filter_context,
         },
     )
 

@@ -18,6 +18,9 @@ NAV_BLOCK_RE = re.compile(
 )
 BODY_RE = re.compile(r"<body[^>]*>(.*?)</body>", re.IGNORECASE | re.DOTALL)
 MAIN_RE = re.compile(r"<(article|main)[^>]*>(.*?)</\1>", re.IGNORECASE | re.DOTALL)
+STRUCTURED_LINE_BREAK_RE = re.compile(
+    r"(?i)<br\s*/?>|</(?:p|div|li|td|th|tr|h1|h2|h3|h4|section|article|ul|ol)>"
+)
 CONTENT_CONTAINER_RE = re.compile(
     r'<(section|div)[^>]*(?:id|class)\s*=\s*["\'][^"\']*(?:content|article|post|entry|story|main|body|text|markdown)[^"\']*["\'][^>]*>(.*?)</\1>',
     re.IGNORECASE | re.DOTALL,
@@ -40,6 +43,8 @@ ROW_RE = re.compile(r"<tr[^>]*>.*?</tr>", re.IGNORECASE | re.DOTALL)
 CELL_RE = re.compile(r"<(td|th)[^>]*>(.*?)</\1>", re.IGNORECASE | re.DOTALL)
 WHITESPACE_RE = re.compile(r"\s+")
 CVE_RE = re.compile(r"\bCVE-\d{4}-\d+\b", re.IGNORECASE)
+URL_TEXT_RE = re.compile(r"https?://[^\s<>\"]+", re.IGNORECASE)
+INTEGER_RE = re.compile(r"\b\d[\d,]*\b")
 CSS_JUNK_RE = re.compile(
     r"(?i)(font-family|display\s*:|margin\s*:|padding\s*:|background\s*:|var\(|@media|{[^}]{1,200}})"
 )
@@ -87,6 +92,19 @@ STRUCTURED_CONTENT_HINT_RE = re.compile(
     r"reported|target|targeting|targets|timeline|update|updates|victim|victims"
     r")\b"
 )
+GROUP_NAME_LABELS = (
+    "group name",
+    "ransomware group",
+    "threat actor",
+    "actor",
+    "group",
+    "gang",
+)
+VICTIM_NAME_LABELS = ("victim name", "victim", "company", "organization")
+COUNTRY_LABELS = ("country", "location")
+INDUSTRY_LABELS = ("industry", "sector")
+VICTIM_COUNT_LABELS = ("victim count", "victims", "listed victims")
+LAST_ACTIVITY_LABELS = ("last activity", "last seen", "last update", "updated", "activity")
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +114,14 @@ class ExtractedRecord:
     excerpt: str
     url: str
     raw: str
+    record_type: str = ""
+    group_name: str = ""
+    victim_name: str = ""
+    country: str = ""
+    industry: str = ""
+    website_url: str = ""
+    victim_count: int | None = None
+    last_activity_text: str = ""
 
 
 def _strip_markup_noise(markup: str) -> str:
@@ -253,6 +279,10 @@ def _fragment_url(fragment: str, base_url: str) -> str:
         href = (match.group("href") or "").strip()
         if not href:
             continue
+        context = fragment[max(0, match.start() - 160) : match.start()]
+        context_text = normalize_text(html.unescape(TAG_RE.sub(" ", context))).lower()
+        if any(label in context_text for label in ("company website", "website", "site")):
+            continue
         absolute = urljoin(base_url, href)
         try:
             parts = urlsplit(absolute)
@@ -262,6 +292,97 @@ def _fragment_url(fragment: str, base_url: str) -> str:
             continue
         return absolute
     return ""
+
+
+def _clean_structured_text(value: str, *, max_length: int = 255) -> str:
+    cleaned = normalize_text(value)
+    if not cleaned:
+        return ""
+    return cleaned[:max_length].strip()
+
+
+def _absolute_http_url(value: str, *, base_url: str = "") -> str:
+    candidate = (value or "").strip()
+    if not candidate:
+        return ""
+    absolute = urljoin(base_url, candidate)
+    try:
+        parts = urlsplit(absolute)
+    except ValueError:
+        return ""
+    if parts.scheme not in {"http", "https"}:
+        return ""
+    return absolute
+
+
+def _fragment_lines(fragment: str) -> list[str]:
+    marked = STRUCTURED_LINE_BREAK_RE.sub("\n", fragment or "")
+    marked = COMMENT_RE.sub(" ", marked)
+    marked = NOISE_BLOCK_RE.sub(" ", marked)
+    lines = []
+    for part in marked.splitlines():
+        cleaned = _clean_structured_text(html.unescape(TAG_RE.sub(" ", part)))
+        if not cleaned:
+            continue
+        if not lines or lines[-1] != cleaned:
+            lines.append(cleaned)
+    return lines
+
+
+def _extract_labeled_line_value(lines: list[str], labels: tuple[str, ...], *, max_length: int = 255) -> str:
+    label_pattern = "|".join(re.escape(label) for label in sorted(labels, key=len, reverse=True))
+    with_separator = re.compile(
+        rf"^(?:{label_pattern})\s*(?::|-|\|)\s*(.+)$",
+        re.IGNORECASE,
+    )
+    without_separator = re.compile(
+        rf"^(?:{label_pattern})\s+(.+)$",
+        re.IGNORECASE,
+    )
+    for line in lines:
+        match = with_separator.match(line) or without_separator.match(line)
+        if not match:
+            continue
+        value = _clean_structured_text(match.group(1), max_length=max_length)
+        if value:
+            return value
+    return ""
+
+
+def _extract_anchor_after_label(fragment: str, labels: tuple[str, ...], *, base_url: str) -> str:
+    for match in HREF_RE.finditer(fragment or ""):
+        context = fragment[max(0, match.start() - 160) : match.start()]
+        context_text = normalize_text(html.unescape(TAG_RE.sub(" ", context))).lower()
+        if not any(label.lower() in context_text for label in labels):
+            continue
+        url = _absolute_http_url(match.group("href") or "", base_url=base_url)
+        if url:
+            return url
+    return ""
+
+
+def _extract_website_url(fragment: str, lines: list[str], *, base_url: str) -> str:
+    label_candidates = ("company website", "website", "site")
+    labeled_anchor = _extract_anchor_after_label(fragment, label_candidates, base_url=base_url)
+    if labeled_anchor:
+        return labeled_anchor
+    labeled_text = _extract_labeled_line_value(lines, label_candidates, max_length=1500)
+    if labeled_text:
+        url_match = URL_TEXT_RE.search(labeled_text)
+        if url_match:
+            return _absolute_http_url(url_match.group(0), base_url=base_url)
+        return _absolute_http_url(labeled_text, base_url=base_url)
+    return ""
+
+
+def _extract_integer(value: str) -> int | None:
+    match = INTEGER_RE.search(value or "")
+    if not match:
+        return None
+    try:
+        return int(match.group(0).replace(",", ""))
+    except ValueError:
+        return None
 
 
 def _strip_title_from_text(text: str, title: str) -> str:
@@ -293,7 +414,49 @@ def _looks_fragment_only(text: str) -> bool:
     return False
 
 
-def _build_record(fragment: str, *, base_url: str) -> ExtractedRecord | None:
+def _structured_metadata_for_profile(
+    *,
+    fragment: str,
+    lines: list[str],
+    title: str,
+    profile: str,
+    base_url: str,
+) -> dict:
+    metadata = {
+        "record_type": "",
+        "group_name": "",
+        "victim_name": "",
+        "country": _extract_labeled_line_value(lines, COUNTRY_LABELS, max_length=120),
+        "industry": _extract_labeled_line_value(lines, INDUSTRY_LABELS, max_length=120),
+        "website_url": _extract_website_url(fragment, lines, base_url=base_url),
+        "victim_count": None,
+        "last_activity_text": _extract_labeled_line_value(
+            lines, LAST_ACTIVITY_LABELS, max_length=255
+        ),
+    }
+
+    if profile == "incident_cards":
+        metadata["record_type"] = "incident"
+        metadata["victim_name"] = _clean_structured_text(title)
+        metadata["group_name"] = _extract_labeled_line_value(
+            lines, GROUP_NAME_LABELS, max_length=255
+        )
+        return metadata
+
+    if profile == "group_cards":
+        metadata["record_type"] = "group"
+        metadata["group_name"] = _extract_labeled_line_value(
+            lines, GROUP_NAME_LABELS, max_length=255
+        ) or _clean_structured_text(title)
+        metadata["victim_count"] = _extract_integer(
+            _extract_labeled_line_value(lines, VICTIM_COUNT_LABELS)
+        )
+        return metadata
+
+    return metadata
+
+
+def _build_record(fragment: str, *, base_url: str, profile: str = "") -> ExtractedRecord | None:
     text = _fragment_text(fragment)
     if len(text) < 24 or len(text) > MAX_STRUCTURED_RECORD_TEXT:
         return None
@@ -302,12 +465,28 @@ def _build_record(fragment: str, *, base_url: str) -> ExtractedRecord | None:
     if _looks_fragment_only(detail_text):
         return None
     match_text = normalize_text("\n".join(part for part in (title, detail_text) if part))
+    lines = _fragment_lines(fragment)
+    metadata = _structured_metadata_for_profile(
+        fragment=fragment,
+        lines=lines,
+        title=title,
+        profile=profile,
+        base_url=base_url,
+    )
     return ExtractedRecord(
         title=title,
         text=match_text,
         excerpt=build_excerpt(detail_text, limit=240),
         url=_fragment_url(fragment, base_url),
         raw=(fragment or "")[:4000],
+        record_type=metadata["record_type"],
+        group_name=metadata["group_name"],
+        victim_name=metadata["victim_name"],
+        country=metadata["country"],
+        industry=metadata["industry"],
+        website_url=metadata["website_url"],
+        victim_count=metadata["victim_count"],
+        last_activity_text=metadata["last_activity_text"],
     )
 
 
@@ -375,7 +554,13 @@ def _dedupe_records(records: list[ExtractedRecord]) -> list[ExtractedRecord]:
     return [record for _, record in sorted(kept, key=lambda pair: pair[0])]
 
 
-def _extract_card_records(markup: str, *, base_url: str, hints: tuple[str, ...]) -> list[ExtractedRecord]:
+def _extract_card_records(
+    markup: str,
+    *,
+    base_url: str,
+    hints: tuple[str, ...],
+    profile: str,
+) -> list[ExtractedRecord]:
     cleaned = _strip_markup_noise(markup or "")
     hint_pattern = re.compile(
         r"(?:"
@@ -389,7 +574,7 @@ def _extract_card_records(markup: str, *, base_url: str, hints: tuple[str, ...])
         if not hint_pattern.search(attrs):
             continue
         fragment = _extract_balanced_block(cleaned, match)
-        record = _build_record(fragment, base_url=base_url)
+        record = _build_record(fragment, base_url=base_url, profile=profile)
         if record is None:
             continue
         records.append(record)
@@ -401,30 +586,83 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
     records = []
     for table_match in TABLE_RE.finditer(cleaned):
         table_markup = table_match.group(0)
+        headers = []
         table_rows = []
         for row_match in ROW_RE.finditer(table_markup):
             row_markup = row_match.group(0)
+            if "<th" in row_markup.lower() and "<td" not in row_markup.lower():
+                headers = [
+                    _clean_structured_text(
+                        html.unescape(TAG_RE.sub(" ", cell_match.group(2)))
+                    ).lower()
+                    for cell_match in CELL_RE.finditer(row_markup)
+                ]
+                continue
             if "<td" not in row_markup.lower():
                 continue
             cells = [
-                normalize_text(html.unescape(TAG_RE.sub(" ", cell_match.group(2))))
+                _clean_structured_text(
+                    html.unescape(TAG_RE.sub(" ", cell_match.group(2))),
+                    max_length=255,
+                )
                 for cell_match in CELL_RE.finditer(row_markup)
             ]
             cells = [cell for cell in cells if cell]
             if len(cells) < 2:
                 continue
-            title = cells[0]
-            detail_text = " | ".join(cells[1:])
+            metadata = {
+                "record_type": "table_row",
+                "group_name": "",
+                "victim_name": "",
+                "country": "",
+                "industry": "",
+                "website_url": "",
+                "victim_count": None,
+                "last_activity_text": "",
+            }
+            for index, cell in enumerate(cells):
+                header = headers[index] if index < len(headers) else ""
+                if any(token in header for token in ("group", "actor", "gang")):
+                    metadata["group_name"] = _clean_structured_text(cell)
+                    metadata["record_type"] = "group"
+                elif any(token in header for token in ("victim count", "victims")):
+                    metadata["victim_count"] = _extract_integer(cell)
+                elif any(token in header for token in ("victim", "company", "organization")):
+                    metadata["victim_name"] = _clean_structured_text(cell)
+                elif any(token in header for token in ("country", "location")):
+                    metadata["country"] = _clean_structured_text(cell, max_length=120)
+                elif any(token in header for token in ("industry", "sector")):
+                    metadata["industry"] = _clean_structured_text(cell, max_length=120)
+                elif "website" in header or "domain" in header:
+                    metadata["website_url"] = _absolute_http_url(cell, base_url=base_url)
+                elif any(token in header for token in ("activity", "updated", "last")):
+                    metadata["last_activity_text"] = _clean_structured_text(cell)
+
+            title = metadata["group_name"] or metadata["victim_name"] or cells[0]
+            detail_parts = []
+            for cell in cells[1:]:
+                if cell != title:
+                    detail_parts.append(cell)
+            detail_text = " | ".join(detail_parts)
             row_text = normalize_text("\n".join(part for part in (title, detail_text) if part))
             if len(row_text) < 16 or _looks_fragment_only(detail_text):
                 continue
+            row_url = _fragment_url(row_markup, base_url)
             table_rows.append(
                 ExtractedRecord(
                     title=title,
                     text=row_text,
                     excerpt=build_excerpt(detail_text, limit=240),
-                    url=_fragment_url(row_markup, base_url),
+                    url=row_url,
                     raw=row_markup[:4000],
+                    record_type=metadata["record_type"],
+                    group_name=metadata["group_name"],
+                    victim_name=metadata["victim_name"],
+                    country=metadata["country"],
+                    industry=metadata["industry"],
+                    website_url=metadata["website_url"],
+                    victim_count=metadata["victim_count"],
+                    last_activity_text=metadata["last_activity_text"],
                 )
             )
         if len(table_rows) >= 2:
@@ -434,9 +672,19 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
 
 def extract_profile_records(markup: str, *, profile: str, base_url: str = "") -> list[ExtractedRecord]:
     if profile == "incident_cards":
-        return _extract_card_records(markup, base_url=base_url, hints=INCIDENT_BLOCK_HINTS)
+        return _extract_card_records(
+            markup,
+            base_url=base_url,
+            hints=INCIDENT_BLOCK_HINTS,
+            profile=profile,
+        )
     if profile == "group_cards":
-        return _extract_card_records(markup, base_url=base_url, hints=GROUP_BLOCK_HINTS)
+        return _extract_card_records(
+            markup,
+            base_url=base_url,
+            hints=GROUP_BLOCK_HINTS,
+            profile=profile,
+        )
     if profile == "table_rows":
         return _extract_table_records(markup, base_url=base_url)
 
@@ -451,6 +699,7 @@ def extract_profile_records(markup: str, *, profile: str, base_url: str = "") ->
             excerpt=build_excerpt(text, limit=240),
             url=base_url or "",
             raw=(markup or "")[:4000],
+            record_type="page",
         )
     ]
 

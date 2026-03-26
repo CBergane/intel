@@ -10,5 +10,6 @@ urlpatterns = [
     path("feed-health/", views.feed_health_view, name="feed-health"),
     path("sources/", views.sources_view, name="sources"),
     path("dark/", views.dark_dashboard_view, name="dark-dashboard"),
+    path("dark/recent/", views.dark_recent_hits_view, name="dark-recent-hits"),
     path("about/", views.about_view, name="about"),
 ]

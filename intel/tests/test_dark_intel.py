@@ -496,6 +496,11 @@ class DarkIngestionTests(TestCase):
             <section class="hero">Landing page for monitoring updates and general notices.</section>
             <div class="incident-card">
                 <h2>AlphaCorp</h2>
+                <p>Group: Akira</p>
+                <p>Country: Sweden</p>
+                <p>Industry: Manufacturing</p>
+                <p>Company Website: <a href="https://alphacorp.example">alphacorp.example</a></p>
+                <p>Last Activity: 2026-03-20</p>
                 <p>Breach negotiation leak posted with fresh victim details.</p>
                 <a href="/live/alphacorp">Alpha entry</a>
             </div>
@@ -518,6 +523,13 @@ class DarkIngestionTests(TestCase):
             hit.matched_keywords,
             ["alphacorp", "breach", "negotiation", "leak"],
         )
+        self.assertEqual(hit.record_type, "incident")
+        self.assertEqual(hit.group_name, "Akira")
+        self.assertEqual(hit.victim_name, "AlphaCorp")
+        self.assertEqual(hit.country, "Sweden")
+        self.assertEqual(hit.industry, "Manufacturing")
+        self.assertEqual(hit.website_url, "https://alphacorp.example")
+        self.assertEqual(hit.last_activity_text, "2026-03-20")
         self.assertEqual(hit.url, "https://gamma.example.com/live/alphacorp")
         self.assertNotIn("landing page", hit.raw.lower())
 
@@ -551,6 +563,30 @@ class DarkIngestionTests(TestCase):
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_structured_record_without_link_falls_back_to_source_page_url(self):
+        self.source.watch_keywords = "alphacorp, breach"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Live Updates</title><body>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <p>Group: Akira</p>
+                <p>Company Website: <a href="https://alphacorp.example">alphacorp.example</a></p>
+                <p>Breach post with operator note.</p>
+            </div>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hit = DarkHit.objects.get(dark_source=self.source)
+        self.assertEqual(hit.url, self.source.url)
+        self.assertEqual(hit.website_url, "https://alphacorp.example")
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_group_cards_extract_normalized_fields(self):
         self.source.watch_keywords = "black basta"
         self.source.extractor_profile = DarkSource.ExtractorProfile.GROUP_CARDS
         self.source.save(
@@ -561,6 +597,8 @@ class DarkIngestionTests(TestCase):
             <div class="intro">Trusted-source overview page.</div>
             <article class="group-card">
                 <h2>Black Basta</h2>
+                <p>Victims: 41</p>
+                <p>Last Activity: 2026-03-22</p>
                 <p>Windows-focused extortion operations with recent disclosures.</p>
             </article>
             <article class="group-card">
@@ -575,6 +613,10 @@ class DarkIngestionTests(TestCase):
         hit = DarkHit.objects.get(dark_source=self.source)
         self.assertEqual(hit.title, "Black Basta")
         self.assertEqual(hit.matched_keywords, ["black basta"])
+        self.assertEqual(hit.record_type, "group")
+        self.assertEqual(hit.group_name, "Black Basta")
+        self.assertEqual(hit.victim_count, 41)
+        self.assertEqual(hit.last_activity_text, "2026-03-22")
         self.assertIn("extortion operations", hit.excerpt)
         self.assertEqual(hit.url, self.source.url)
 
@@ -616,16 +658,20 @@ class DarkIngestionTests(TestCase):
         <html><title>Group Summary</title><body>
             <section class="hero">Landing page with totals and charts.</section>
             <table>
-                <thead><tr><th>Group</th><th>Victims</th><th>Notes</th></tr></thead>
+                <thead><tr><th>Group</th><th>Victims</th><th>Country</th><th>Last Activity</th><th>Notes</th></tr></thead>
                 <tbody>
                     <tr>
                         <td><a href="/groups/akira">Akira</a></td>
                         <td>41</td>
+                        <td>Sweden</td>
+                        <td>2026-03-24</td>
                         <td>Double extortion activity</td>
                     </tr>
                     <tr>
                         <td><a href="/groups/play">Play</a></td>
                         <td>18</td>
+                        <td>Denmark</td>
+                        <td>2026-03-23</td>
                         <td>Recent surge in disclosures</td>
                     </tr>
                 </tbody>
@@ -642,3 +688,8 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(len(hits), 2)
         self.assertEqual([hit.title for hit in hits], ["Akira", "Play"])
         self.assertEqual(hits[0].url, "https://gamma.example.com/groups/akira")
+        self.assertEqual(hits[0].record_type, "group")
+        self.assertEqual(hits[0].group_name, "Akira")
+        self.assertEqual(hits[0].victim_count, 41)
+        self.assertEqual(hits[0].country, "Sweden")
+        self.assertEqual(hits[0].last_activity_text, "2026-03-24")
