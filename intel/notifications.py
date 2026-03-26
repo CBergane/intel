@@ -117,8 +117,8 @@ def send_high_epss_alert(item: Item) -> None:
 
 def send_ransomware_victim_alert(item: Item) -> None:
     # Primary: DARK_DISCORD_WEBHOOK (urgent intel); fallback: INTEL_DISCORD_WEBHOOK
-    webhook = getattr(settings, "DARK_DISCORD_WEBHOOK", "") or getattr(
-        settings, "INTEL_DISCORD_WEBHOOK", ""
+    webhook = getattr(settings, "INTEL_DISCORD_WEBHOOK", "") or getattr(
+        settings, "DARK_DISCORD_WEBHOOK", ""
     )
     if not webhook:
         return
