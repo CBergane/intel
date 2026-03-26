@@ -273,7 +273,9 @@ def _filtered_items(request, section=None, *, balance_per_source=False):
 
     if query:
         window_queryset = window_queryset.filter(
-            Q(title__icontains=query) | Q(summary__icontains=query)
+            Q(title__icontains=query)
+            | Q(summary__icontains=query)
+            | Q(source__name__icontains=query)
         )
 
     if source_slug:

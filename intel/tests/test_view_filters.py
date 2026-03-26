@@ -44,3 +44,34 @@ class ItemListFilterBehaviorTests(TestCase):
         self.assertEqual(response.context["filtered_total"], 1)
         self.assertEqual(response.context["hidden_by_filters"], 1)
         self.assertContains(response, "hidden by current source/search filters")
+
+    def test_q_search_matches_source_name(self):
+        self._create_item(title="Alpha advisory", days_ago=1)
+
+        other_source = Source.objects.create(name="Nordic Response Team", slug="nordic-response")
+        other_feed = Feed.objects.create(
+            source=other_source,
+            name="Nordic Feed",
+            url="https://example.com/nordic-feed.xml",
+            feed_type=Feed.FeedType.RSS,
+            section=Feed.Section.ADVISORIES,
+        )
+        Item.objects.create(
+            source=other_source,
+            feed=other_feed,
+            title="Plain bulletin",
+            url="https://example.com/plain-bulletin",
+            stable_id="",
+            published_at=timezone.now() - timedelta(days=1),
+            summary="General update",
+        )
+
+        response = self.client.get(
+            reverse("advisories"),
+            {"time": "7d", "q": "Nordic Response Team"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Plain bulletin")
+        self.assertNotContains(response, "Alpha advisory")
+        self.assertEqual(response.context["filtered_total"], 1)

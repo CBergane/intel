@@ -1,3 +1,4 @@
+import base64
 import calendar
 import json
 import logging
@@ -356,13 +357,24 @@ def _parse_epss(feed: Feed, payload: Any, *, fetched_at: datetime) -> list[Norma
     return results
 
 
-_NORDIC_COUNTRIES = {"Sweden", "Norway", "Denmark", "Finland", "Iceland"}
+_NORDIC_COUNTRY_TOKENS = {
+    "SWEDEN",
+    "NORWAY",
+    "DENMARK",
+    "FINLAND",
+    "ICELAND",
+    "SE",
+    "NO",
+    "DK",
+    "FI",
+    "IS",
+}
 _NORDIC_TLDS = {".se", ".no", ".dk", ".fi", ".is"}
 
 
 def _is_nordic_victim(offer: dict) -> bool:
-    country = str(offer.get("country") or "")
-    if country in _NORDIC_COUNTRIES:
+    country = str(offer.get("country") or "").strip().upper()
+    if country in _NORDIC_COUNTRY_TOKENS:
         return True
     victim = str(offer.get("victim") or "").lower()
     return any(victim.endswith(tld) for tld in _NORDIC_TLDS)
@@ -392,7 +404,8 @@ def _parse_ransomware_live_victims(
             continue
 
         title = f"{group.title()}: {victim}"
-        url = f"https://www.ransomware.live/victim/{victim}"
+        victim_token = base64.b64encode(f"{victim}@{group}".encode("utf-8")).decode("ascii")
+        url = f"https://www.ransomware.live/id/{victim_token}"
         canonical_url = canonicalize_url(url)
         external_id = f"{group}:{victim}"
         summary = sanitize_summary(str(offer.get("description") or "")[:500])
