@@ -110,38 +110,117 @@
         </div>
     {% endif %}
 
-    <div class="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)] xl:gap-5">
+    <div class="grid gap-4 xl:grid-cols-[minmax(16rem,0.9fr)_minmax(0,1.55fr)_minmax(18rem,1fr)] xl:gap-5">
+        <aside class="space-y-4">
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <div class="mb-3 flex items-center justify-between gap-2">
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Incoming Activity</h2>
+                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ incoming_activity|length }} shown</span>
+                </div>
+                <div class="space-y-3">
+                    {% for hit in incoming_activity %}
+                        <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                        {% if hit.is_watch_match %}
+                                            <span class="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200">Watch Match</span>
+                                        {% else %}
+                                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-400">Context</span>
+                                        {% endif %}
+                                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ hit.signal_label }}</span>
+                                        {% if hit.signal_group_name %}
+                                            <span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">{{ hit.signal_group_name }}</span>
+                                        {% endif %}
+                                        {% if hit.map_country %}
+                                            <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ hit.map_country }}</span>
+                                        {% endif %}
+                                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ hit.dark_source.name }}</span>
+                                    </div>
+                                    <p class="mt-2 text-sm font-medium text-white">{{ hit.signal_title }}</p>
+                                    {% if hit.excerpt %}
+                                        <p class="mt-2 overflow-hidden break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{{ hit.excerpt }}</p>
+                                    {% endif %}
+                                </div>
+                                <div class="text-right text-[11px] text-slate-500">
+                                    <p title="{{ hit.last_seen_at|date:'Y-m-d H:i' }} UTC">{{ hit.last_seen_at|naturaltime }}</p>
+                                    <a href="{{ recent_hits_url }}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}&q={{ hit.signal_title|urlencode }}" class="mt-2 inline-flex rounded-md border border-slate-700 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-900/70">Raw</a>
+                                </div>
+                            </div>
+                        </article>
+                    {% empty %}
+                        <p class="text-sm text-slate-400">{{ map_empty_state.message|default:"No incoming activity in the selected window." }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                <div class="mb-3 flex items-center justify-between gap-2">
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Matched Watch Context</h2>
+                    {% if match_filter == "matched" %}
+                        <span class="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200">matched-only</span>
+                    {% endif %}
+                </div>
+                <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                    <div class="rounded-xl border border-cyan-500/20 bg-slate-950/35 p-3">
+                        <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Matched Records</p>
+                        <p class="mt-2 text-xl font-semibold text-cyan-200">{{ matched_summary.record_count }}</p>
+                    </div>
+                    <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
+                        <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Matched Incidents</p>
+                        <p class="mt-2 text-xl font-semibold text-white">{{ matched_summary.incident_count }}</p>
+                    </div>
+                    <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
+                        <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Matched Groups</p>
+                        <p class="mt-2 text-xl font-semibold text-white">{{ matched_summary.group_count }}</p>
+                    </div>
+                    <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
+                        <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Matched Sources</p>
+                        <p class="mt-2 text-xl font-semibold text-white">{{ matched_summary.source_count }}</p>
+                    </div>
+                </div>
+                {% if matched_summary.top_groups %}
+                    <div class="mt-3 flex flex-wrap gap-1.5">
+                        {% for name in matched_summary.top_groups %}
+                            <span class="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200">{{ name }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </aside>
+
         <div class="space-y-4">
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-base font-semibold text-white sm:text-lg">{% if group_first_mode %}Country Map Secondary View{% else %}Operational Country Map{% endif %}</h2>
+                        <h2 class="text-base font-semibold text-white sm:text-lg">{% if group_first_mode %}Group-Led Threat Surface{% else %}Operational Threat Surface{% endif %}</h2>
                         <p class="mt-1 text-xs text-slate-500">
                             {% if group_first_mode %}
-                                The SVG stays available for orientation, but current value comes primarily from groups, source coverage, and watch matches.
+                                Current value is driven by group activity, source coverage, and watch matches. Geography remains visible but secondary until plot-ready incident countries arrive.
                             {% else %}
-                                Click an active country to focus incidents and highlight groups connected to that geography. Muted tiles have no activity in the current filtered dataset.
+                                Country tiles, group nodes, and connection lines reflect observed country/group relationships in the current trusted dataset. No inferred attack paths are fabricated.
                             {% endif %}
                         </p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 text-[11px]">
-                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-slate-300">{{ country_rows|length }} countries</span>
+                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-slate-300">{{ country_rows|length }} plot-ready countries</span>
                         {% if group_first_mode %}
-                            <span class="rounded-md border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-200">group-led view</span>
+                            <span class="rounded-md border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-200">group-led</span>
                         {% endif %}
-                        <span class="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">dot = watch match present</span>
+                        <span class="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">watch-match dots and links</span>
                     </div>
                 </div>
                 <div class="rounded-2xl border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.08),_transparent_55%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] p-3 sm:p-4 lg:p-5 {% if group_first_mode %}ring-1 ring-inset ring-slate-800/70{% endif %}">
                     <div class="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                         <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1">all stored records for analytics</span>
-                        <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">selected country highlighted</span>
-                        {% if match_filter == "matched" %}
-                            <span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">matched-only mode</span>
+                        <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">country drill-down stays real</span>
+                        {% if selected_country %}
+                            <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">{{ selected_country }}</span>
                         {% endif %}
                     </div>
                     {% if map_empty_state and group_first_mode %}
                         <div class="mb-4 rounded-2xl border border-sky-500/20 bg-sky-500/8 p-4">
+                            <p class="text-[11px] uppercase tracking-[0.18em] text-sky-300">Group-Led Mode</p>
                             <h3 class="text-sm font-semibold text-sky-100">{{ map_empty_state.title }}</h3>
                             <p class="mt-2 text-sm leading-6 text-slate-300">{{ map_empty_state.message }}</p>
                         </div>
@@ -152,7 +231,7 @@
                                 <div class="flex flex-wrap items-center justify-between gap-3">
                                     <div>
                                         <h3 class="text-sm font-semibold text-white">Quick Country Filter</h3>
-                                        <p class="mt-1 text-xs text-slate-500">Desktop shows the full map. On smaller screens, use the country buttons here and the panels below.</p>
+                                        <p class="mt-1 text-xs text-slate-500">Use country drill-down here on smaller screens, then read the incoming activity and analysis panels around it.</p>
                                     </div>
                                     <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ country_rows|length }} active</span>
                                 </div>
@@ -166,43 +245,91 @@
                                     {% endfor %}
                                 </div>
                             </div>
+                        {% elif map_empty_state %}
+                            <div class="rounded-2xl border border-line/80 bg-slate-950/45 p-4 text-sm text-slate-300">
+                                {{ map_empty_state.message }}
+                            </div>
                         {% endif %}
                     </div>
-                    <div class="hidden lg:block {% if group_first_mode %}opacity-35 saturate-50{% endif %}">
-                        <svg id="dark-threat-map" viewBox="0 0 1100 560" class="h-auto w-full max-w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Dark incident activity map">
-                            <rect x="0" y="0" width="1100" height="560" rx="22" fill="#020617" />
-                            <g opacity="0.16" stroke="#1e293b" stroke-width="1">
-                                <path d="M24 104H1076" />
-                                <path d="M24 188H1076" />
-                                <path d="M24 272H1076" />
-                                <path d="M24 356H1076" />
-                                <path d="M24 440H1076" />
-                                <path d="M180 24V536" />
-                                <path d="M348 24V536" />
-                                <path d="M516 24V536" />
-                                <path d="M684 24V536" />
-                                <path d="M852 24V536" />
+                    <div class="hidden lg:block">
+                        <svg id="dark-threat-map" viewBox="0 0 1100 560" class="h-auto w-full max-w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Dark threat surface map">
+                            <defs>
+                                <linearGradient id="dark-map-bg" x1="0%" x2="100%" y1="0%" y2="100%">
+                                    <stop offset="0%" stop-color="#020617" />
+                                    <stop offset="55%" stop-color="#071220" />
+                                    <stop offset="100%" stop-color="#020617" />
+                                </linearGradient>
+                                <radialGradient id="dark-map-glow-west" cx="0%" cy="30%" r="70%">
+                                    <stop offset="0%" stop-color="rgba(34,211,238,0.22)" />
+                                    <stop offset="100%" stop-color="rgba(34,211,238,0)" />
+                                </radialGradient>
+                                <radialGradient id="dark-map-glow-east" cx="100%" cy="30%" r="65%">
+                                    <stop offset="0%" stop-color="rgba(59,130,246,0.2)" />
+                                    <stop offset="100%" stop-color="rgba(59,130,246,0)" />
+                                </radialGradient>
+                                <filter id="dark-map-node-glow" x="-50%" y="-50%" width="200%" height="200%">
+                                    <feGaussianBlur stdDeviation="5" result="blur" />
+                                    <feMerge>
+                                        <feMergeNode in="blur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            <rect x="0" y="0" width="1100" height="560" rx="24" fill="url(#dark-map-bg)" />
+                            <circle cx="210" cy="176" r="154" fill="url(#dark-map-glow-west)" opacity="{% if group_first_mode %}0.35{% else %}0.7{% endif %}" />
+                            <circle cx="904" cy="156" r="170" fill="url(#dark-map-glow-east)" opacity="{% if group_first_mode %}0.3{% else %}0.65{% endif %}" />
+                            <g opacity="0.14" stroke="#17304a" stroke-width="1">
+                                <path d="M32 104H1068" />
+                                <path d="M32 188H1068" />
+                                <path d="M32 272H1068" />
+                                <path d="M32 356H1068" />
+                                <path d="M32 440H1068" />
+                                <path d="M180 32V528" />
+                                <path d="M348 32V528" />
+                                <path d="M516 32V528" />
+                                <path d="M684 32V528" />
+                                <path d="M852 32V528" />
                             </g>
                             {% for region in map_region_labels %}
-                                <text x="{{ region.x }}" y="{{ region.y }}" fill="#475569" font-size="12" letter-spacing="3">{{ region.label|upper }}</text>
+                                <text x="{{ region.x }}" y="{{ region.y }}" fill="#3b556f" font-size="12" letter-spacing="3">{{ region.label|upper }}</text>
                             {% endfor %}
-                            {% for tile in map_tiles %}
-                                {% if tile.url %}<a href="{{ tile.url }}">{% endif %}
-                                <g data-country-key="{{ tile.country_key }}" data-selected="{% if tile.is_selected %}true{% else %}false{% endif %}">
-                                    <title>{{ tile.tooltip }}</title>
-                                    {% if tile.is_selected %}
-                                        <rect x="{{ tile.x|add:'-3' }}" y="{{ tile.y|add:'-3' }}" width="{{ tile.width|add:'6' }}" height="{{ tile.height|add:'6' }}" rx="13" fill="none" stroke="#67e8f9" stroke-width="2.5" opacity="0.85" />
-                                    {% endif %}
-                                    <rect x="{{ tile.x }}" y="{{ tile.y }}" width="{{ tile.width }}" height="{{ tile.height }}" rx="10" fill="{{ tile.fill_color }}" stroke="{{ tile.stroke_color }}" stroke-width="{% if tile.is_selected %}2.2{% else %}1.35{% endif %}" />
-                                    <text x="{{ tile.label_x }}" y="{{ tile.label_y }}" fill="{{ tile.text_color }}" font-size="11" font-weight="700">{{ tile.short_label }}</text>
-                                    {% if tile.display_count %}
-                                        <text x="{{ tile.count_x }}" y="{{ tile.count_y }}" fill="{{ tile.text_color }}" font-size="13" font-weight="700" text-anchor="end">{{ tile.display_count }}</text>
-                                    {% endif %}
-                                    {% if tile.watch_match_count %}
-                                        <circle cx="{{ tile.badge_x }}" cy="{{ tile.badge_y }}" r="4" fill="{{ tile.badge_color }}" />
-                                    {% endif %}
+                            <g fill="none">
+                                {% for connection in map_connections %}
+                                    <path data-country-connection="{{ connection.country_key }}"
+                                          d="{{ connection.path_d }}"
+                                          stroke="{% if connection.is_selected %}#67e8f9{% elif connection.is_watch_match %}#22d3ee{% else %}#31506b{% endif %}"
+                                          stroke-width="{% if connection.is_selected %}2.2{% else %}1.2{% endif %}"
+                                          stroke-opacity="{% if group_first_mode %}0.22{% else %}0.48{% endif %}"
+                                          {% if not connection.is_watch_match %}stroke-dasharray="5 5"{% endif %} />
+                                {% endfor %}
+                            </g>
+                            <g opacity="{% if group_first_mode %}0.42{% else %}1{% endif %}">
+                                {% for tile in map_tiles %}
+                                    {% if tile.url %}<a href="{{ tile.url }}">{% endif %}
+                                    <g data-country-key="{{ tile.country_key }}" data-selected="{% if tile.is_selected %}true{% else %}false{% endif %}">
+                                        <title>{{ tile.tooltip }}</title>
+                                        {% if tile.is_selected %}
+                                            <rect x="{{ tile.x|add:'-3' }}" y="{{ tile.y|add:'-3' }}" width="{{ tile.width|add:'6' }}" height="{{ tile.height|add:'6' }}" rx="13" fill="none" stroke="#67e8f9" stroke-width="2.5" opacity="0.9" />
+                                        {% endif %}
+                                        <rect x="{{ tile.x }}" y="{{ tile.y }}" width="{{ tile.width }}" height="{{ tile.height }}" rx="10" fill="{{ tile.fill_color }}" stroke="{{ tile.stroke_color }}" stroke-width="{% if tile.is_selected %}2.2{% else %}1.35{% endif %}" />
+                                        <text x="{{ tile.label_x }}" y="{{ tile.label_y }}" fill="{{ tile.text_color }}" font-size="11" font-weight="700">{{ tile.short_label }}</text>
+                                        {% if tile.display_count %}
+                                            <text x="{{ tile.count_x }}" y="{{ tile.count_y }}" fill="{{ tile.text_color }}" font-size="13" font-weight="700" text-anchor="end">{{ tile.display_count }}</text>
+                                        {% endif %}
+                                        {% if tile.watch_match_count %}
+                                            <circle cx="{{ tile.badge_x }}" cy="{{ tile.badge_y }}" r="4" fill="{{ tile.badge_color }}" filter="url(#dark-map-node-glow)" />
+                                        {% endif %}
+                                    </g>
+                                    {% if tile.url %}</a>{% endif %}
+                                {% endfor %}
+                            </g>
+                            {% for node in group_nodes %}
+                                <g data-group-node="{{ node.group_name|lower }}">
+                                    <circle cx="{{ node.x }}" cy="{{ node.y }}" r="14" fill="#071827" stroke="{% if node.watch_match_count %}#22d3ee{% else %}#35526a{% endif %}" stroke-width="1.6" filter="url(#dark-map-node-glow)" />
+                                    <circle cx="{{ node.x }}" cy="{{ node.y }}" r="4.5" fill="{% if node.watch_match_count %}#67e8f9{% else %}#94a3b8{% endif %}" />
+                                    <text x="{{ node.label_x }}" y="{{ node.label_y }}" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="end">{{ node.group_name }}</text>
+                                    <text x="{{ node.label_x }}" y="{{ node.meta_y }}" fill="#7dd3fc" font-size="10" text-anchor="end">{{ node.incident_count }} records · {{ node.source_count }} sources{% if node.watch_match_count %} · {{ node.watch_match_count }} matched{% endif %}</text>
                                 </g>
-                                {% if tile.url %}</a>{% endif %}
                             {% endfor %}
                         </svg>
                     </div>
@@ -212,9 +339,13 @@
                             <p class="mt-2 text-sm leading-6 text-amber-50/85">{{ map_empty_state.message }}</p>
                         </div>
                     {% endif %}
+                    <div class="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                        <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1">connection lines only reflect observed group-country relationships</span>
+                        <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1">no inferred attack paths</span>
+                    </div>
                     {% if selected_country and not selected_country_on_map %}
                         <div class="mt-4 rounded-2xl border border-sky-500/20 bg-sky-500/5 p-4 text-sm text-sky-100">
-                            {{ selected_country }} is active in the current dataset, but it sits outside this first map layout. Use the lists on the right to keep drilling down.
+                            {{ selected_country }} is active in the current dataset, but it sits outside this first map layout. Use the plot-ready country list and incoming activity feed to keep drilling down.
                         </div>
                     {% endif %}
                     {% if unmapped_country_rows %}
@@ -240,50 +371,9 @@
                 </div>
             </div>
 
-            {% if group_first_mode and recent_group_activity %}
-                <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
-                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h2 class="text-base font-semibold text-white sm:text-lg">Recent Group Activity</h2>
-                            <p class="mt-1 text-xs text-slate-500">Most recent structured group/context activity in the current filters, with latest victim, country, source coverage, and watch-match signal.</p>
-                        </div>
-                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ recent_group_activity|length }} shown</span>
-                    </div>
-                    <div class="grid gap-3 xl:grid-cols-2">
-                        {% for group in recent_group_activity %}
-                            <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0">
-                                        <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
-                                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ group.incident_count }} records</span>
-                                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ group.source_count }} sources</span>
-                                            {% if group.watch_match_count %}
-                                                <span class="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200">{{ group.watch_match_count }} matched</span>
-                                            {% endif %}
-                                        </div>
-                                        <p class="mt-2 text-sm font-medium text-white">{{ group.group_name }}</p>
-                                        {% if group.latest_victim_name %}
-                                            <p class="mt-2 text-sm text-slate-300">Latest victim: {{ group.latest_victim_name }}</p>
-                                        {% endif %}
-                                        <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                                            {% if group.latest_country %}
-                                                <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ group.latest_country }}</span>
-                                            {% endif %}
-                                            {% if group.latest_activity_text %}
-                                                <span>{{ group.latest_activity_text }}</span>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                    <span class="text-[11px] text-slate-400">{{ group.latest_activity_at|naturaltime }}</span>
-                                </div>
-                            </article>
-                        {% endfor %}
-                    </div>
-                </div>
-            {% endif %}
         </div>
 
-        <aside class="flex flex-col gap-4">
+        <aside class="space-y-4">
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <div class="mb-3 flex items-center justify-between gap-2">
                     <h2 class="text-sm font-semibold text-white sm:text-base">Top Groups</h2>
@@ -318,11 +408,12 @@
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <div class="mb-3 flex items-center justify-between gap-2">
                     <h2 class="text-sm font-semibold text-white sm:text-base">Source Coverage</h2>
-                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ source_rows|length }} shown</span>
+                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ coverage_source_rows|length }} shown</span>
                 </div>
                 <div class="space-y-2.5">
-                    {% for row in source_rows %}
-                        <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
+                    {% for row in coverage_source_rows %}
+                        <a href="{% url 'dark-map' %}?window={{ window }}&source={{ row.source_slug|urlencode }}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}{% if selected_country %}&country={{ selected_country|urlencode }}{% endif %}"
+                           class="block rounded-xl border border-line/80 bg-slate-950/35 p-3 hover:bg-slate-950/55">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-medium text-white">{{ row.source_name }}</p>
@@ -333,7 +424,7 @@
                                 </div>
                                 <span class="text-[11px] text-slate-400">{{ row.latest_activity_at|naturaltime }}</span>
                             </div>
-                        </article>
+                        </a>
                     {% empty %}
                         <p class="text-sm text-slate-400">No source coverage in the selected window.</p>
                     {% endfor %}
@@ -361,50 +452,6 @@
                 </div>
             </div>
 
-            {% if not group_first_mode %}
-                <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-                    <div class="mb-3 flex items-center justify-between gap-2">
-                        <h2 class="text-sm font-semibold text-white sm:text-base">Latest Incidents</h2>
-                        {% if selected_country %}
-                            <span class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">{{ selected_country }}</span>
-                        {% endif %}
-                    </div>
-                    <div class="space-y-3">
-                        {% for hit in latest_incidents %}
-                            <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div class="min-w-0">
-                                        <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
-                                            {% if hit.is_watch_match %}
-                                                <span class="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200">Watch Match</span>
-                                            {% else %}
-                                                <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-400">Context</span>
-                                            {% endif %}
-                                            {% if hit.group_name %}
-                                                <span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">{{ hit.group_name }}</span>
-                                            {% endif %}
-                                            {% if hit.map_country|default:hit.country %}
-                                                <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ hit.map_country|default:hit.country }}</span>
-                                            {% endif %}
-                                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ hit.dark_source.name }}</span>
-                                        </div>
-                                        <p class="mt-2 text-sm font-medium text-white">{{ hit.victim_name|default:hit.title }}</p>
-                                        {% if hit.excerpt %}
-                                            <p class="mt-2 overflow-hidden break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{{ hit.excerpt }}</p>
-                                        {% endif %}
-                                    </div>
-                                    <div class="text-right text-[11px] text-slate-500">
-                                        <p title="{{ hit.last_seen_at|date:'Y-m-d H:i' }} UTC">{{ hit.last_seen_at|naturaltime }}</p>
-                                        <a href="{{ recent_hits_url }}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}&q={{ hit.title|urlencode }}" class="mt-2 inline-flex rounded-md border border-slate-700 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-900/70">Raw</a>
-                                    </div>
-                                </div>
-                            </article>
-                        {% empty %}
-                            <p class="text-sm text-slate-400">{{ latest_incident_empty_message }}</p>
-                        {% endfor %}
-                    </div>
-                </div>
-            {% endif %}
         </aside>
     </div>
 </section>

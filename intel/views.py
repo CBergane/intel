@@ -1046,14 +1046,6 @@ def _dark_map_empty_state(hits, country_rows, *, selected_source_name: str = "")
     }
 
 
-def _dark_map_latest_incident_empty_message(*, selected_country: str, map_empty_state: dict):
-    if selected_country:
-        return f"No incident-style records are currently mapped to {selected_country} in this view."
-    if map_empty_state:
-        return map_empty_state["message"]
-    return "No incident-style records matched the current map filters."
-
-
 def _dark_country_activity_rows(hits):
     grouped = {}
     max_record_count = 0
@@ -1215,19 +1207,119 @@ def _dark_map_source_rows(hits):
     return rows
 
 
-def _dark_map_latest_incidents(hits, *, selected_country: str = ""):
+def _dark_map_incoming_activity(hits, *, selected_country: str = ""):
     selected_country_key = _normalized_country_key(selected_country)
-    incidents = []
+    group_country_keys = {}
     for hit in hits:
-        if hit.record_type != "incident":
-            continue
+        group_name = resolve_group_name(
+            record_type=hit.record_type,
+            group_name=hit.group_name,
+            title=hit.title,
+            victim_name=hit.victim_name,
+        )
+        country_display, _country_code = normalize_dark_country(hit.country)
+        if group_name and country_display:
+            group_country_keys.setdefault(group_name.lower(), set()).add(country_display.lower())
+
+    rows = []
+    for hit in hits:
         country_display, country_code = normalize_dark_country(hit.country)
-        if selected_country_key and _normalized_country_key(country_display) != selected_country_key:
-            continue
+        group_name = resolve_group_name(
+            record_type=hit.record_type,
+            group_name=hit.group_name,
+            title=hit.title,
+            victim_name=hit.victim_name,
+        )
+        if selected_country_key:
+            if hit.record_type == "incident":
+                if _normalized_country_key(country_display) != selected_country_key:
+                    continue
+            elif selected_country_key not in group_country_keys.get(group_name.lower() if group_name else "", set()):
+                continue
+
         hit.map_country = country_display
         hit.map_country_code = country_code
-        incidents.append(hit)
-    return incidents[:8]
+        hit.signal_group_name = group_name
+        hit.signal_title = hit.victim_name or hit.title
+        if hit.record_type == "incident":
+            hit.signal_label = "Incident"
+        elif hit.record_type == "group":
+            hit.signal_label = "Group"
+        else:
+            hit.signal_label = "Context"
+        rows.append(hit)
+    return rows[:8]
+
+
+def _dark_map_match_summary(hits, group_rows):
+    matched_hits = [hit for hit in hits if hit.is_watch_match]
+    return {
+        "record_count": len(matched_hits),
+        "incident_count": len([hit for hit in matched_hits if hit.record_type == "incident"]),
+        "source_count": len({hit.dark_source_id for hit in matched_hits}),
+        "group_count": len([row for row in group_rows if row["watch_match_count"]]),
+        "top_groups": [row["group_name"] for row in group_rows if row["watch_match_count"]][:3],
+    }
+
+
+def _dark_map_overlay(top_groups, map_tiles, *, selected_country: str = ""):
+    selected_country_key = _normalized_country_key(selected_country)
+    tile_lookup = {
+        tile["country_key"]: tile
+        for tile in map_tiles
+        if tile["has_activity"]
+    }
+    group_nodes = []
+    map_connections = []
+    eligible_groups = []
+    for row in top_groups:
+        countries = [
+            country for country in row["countries"]
+            if _normalized_country_key(country) in tile_lookup
+        ]
+        if countries:
+            eligible_groups.append((row, countries[:3]))
+
+    for index, (row, countries) in enumerate(eligible_groups[:5]):
+        node_x = 1014
+        node_y = 136 + (index * 72)
+        group_nodes.append(
+            {
+                "group_name": row["group_name"],
+                "watch_match_count": row["watch_match_count"],
+                "incident_count": row["incident_count"],
+                "source_count": row["source_count"],
+                "x": node_x,
+                "y": node_y,
+                "label_x": node_x - 12,
+                "label_y": node_y - 4,
+                "meta_y": node_y + 13,
+            }
+        )
+        for country in countries:
+            country_key = _normalized_country_key(country)
+            tile = tile_lookup[country_key]
+            x1 = tile["x"] + (tile["width"] / 2)
+            y1 = tile["y"] + (tile["height"] / 2)
+            x2 = node_x - 34
+            y2 = node_y
+            c1x = x1 + 88
+            c2x = x2 - 44
+            path_d = (
+                f"M {x1:.1f} {y1:.1f} "
+                f"C {c1x:.1f} {y1:.1f}, {c2x:.1f} {y2:.1f}, {x2:.1f} {y2:.1f}"
+            )
+            map_connections.append(
+                {
+                    "group_name": row["group_name"],
+                    "country": country,
+                    "country_key": country_key,
+                    "path_d": path_d,
+                    "is_selected": bool(selected_country_key) and country_key == selected_country_key,
+                    "is_watch_match": row["watch_match_count"] > 0,
+                }
+            )
+    return group_nodes, map_connections
 
 
 @superuser_required
@@ -1307,20 +1399,21 @@ def dark_map_view(request):
     top_countries = country_rows[:8]
     group_rows = _dark_map_group_rows(selected_hits, selected_country=selected_country)
     top_groups = group_rows[:8]
-    source_rows = _dark_map_source_rows(selected_hits)[:6]
-    recent_group_activity = group_rows[:6]
-    latest_incidents = _dark_map_latest_incidents(
+    coverage_source_rows = _dark_map_source_rows(selected_hits)[:6]
+    incoming_activity = _dark_map_incoming_activity(
         selected_hits,
         selected_country=selected_country,
     )
-    latest_incident_empty_message = _dark_map_latest_incident_empty_message(
-        selected_country=selected_country,
-        map_empty_state=map_empty_state,
-    )
+    matched_summary = _dark_map_match_summary(selected_hits, group_rows)
 
     incident_count = len([hit for hit in selected_hits if hit.record_type == "incident"])
     mapped_incident_count = sum(row["incident_count"] for row in country_rows)
     group_first_mode = not country_rows and bool(group_rows)
+    group_nodes, map_connections = _dark_map_overlay(
+        top_groups,
+        map_tiles,
+        selected_country=selected_country,
+    )
 
     map_metrics = {
         "country_count": len(country_rows),
@@ -1345,10 +1438,11 @@ def dark_map_view(request):
             "unmapped_country_rows": unmapped_country_rows,
             "top_countries": top_countries,
             "top_groups": top_groups,
-            "source_rows": source_rows,
-            "recent_group_activity": recent_group_activity,
-            "latest_incidents": latest_incidents,
-            "latest_incident_empty_message": latest_incident_empty_message,
+            "coverage_source_rows": coverage_source_rows,
+            "incoming_activity": incoming_activity,
+            "matched_summary": matched_summary,
+            "group_nodes": group_nodes,
+            "map_connections": map_connections,
             "selected_country": selected_country,
             "selected_country_key": selected_country_key,
             "selected_country_on_map": any(tile["is_selected"] for tile in map_tiles),
