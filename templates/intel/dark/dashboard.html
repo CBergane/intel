@@ -15,6 +15,7 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                <a href="{% url 'dark-map' %}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Threat Map</a>
                 <a href="{{ recent_hits_url }}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Recent Hits</a>
                 {% if query or selected_source or window != "7d" %}
                     <a href="{% url 'dark-dashboard' %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Reset</a>

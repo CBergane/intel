@@ -796,6 +796,122 @@ def _live_incident_hits(hits):
     return [hit for hit in hits if hit.record_type == "incident"][:6]
 
 
+def _normalized_country_key(value: str) -> str:
+    return (value or "").strip().lower()
+
+
+def _dark_country_activity_rows(hits):
+    grouped = {}
+    max_record_count = 0
+    for hit in hits:
+        country = (hit.country or "").strip()
+        if not country:
+            continue
+        country_key = country.lower()
+        activity_at = hit.last_seen_at or hit.detected_at
+        row = grouped.get(country_key)
+        if row is None:
+            row = {
+                "country": country,
+                "record_count": 0,
+                "incident_count": 0,
+                "latest_activity_at": activity_at,
+                "latest_detected_at": hit.detected_at,
+                "group_names": [],
+                "group_keys": set(),
+                "source_ids": set(),
+            }
+            grouped[country_key] = row
+
+        row["record_count"] += 1
+        if hit.record_type == "incident":
+            row["incident_count"] += 1
+        if hit.dark_source_id not in row["source_ids"]:
+            row["source_ids"].add(hit.dark_source_id)
+
+        group_name = resolve_group_name(
+            record_type=hit.record_type,
+            group_name=hit.group_name,
+            title=hit.title,
+            victim_name=hit.victim_name,
+        )
+        if group_name and group_name.lower() not in row["group_keys"]:
+            row["group_keys"].add(group_name.lower())
+            row["group_names"].append(group_name)
+
+        if activity_at >= row["latest_activity_at"]:
+            row["latest_activity_at"] = activity_at
+            row["latest_detected_at"] = hit.detected_at
+
+        max_record_count = max(max_record_count, row["record_count"])
+
+    rows = []
+    for country_key, row in grouped.items():
+        row["country_key"] = country_key
+        row["source_count"] = len(row["source_ids"])
+        row["group_count"] = len(row["group_keys"])
+        row["activity_ratio"] = (
+            max(18, int((row["record_count"] / max_record_count) * 100))
+            if max_record_count
+            else 18
+        )
+        del row["source_ids"]
+        del row["group_keys"]
+        rows.append(row)
+
+    rows.sort(
+        key=lambda row: (
+            row["incident_count"],
+            row["record_count"],
+            row["latest_activity_at"],
+            row["country"].lower(),
+        ),
+        reverse=True,
+    )
+    return rows
+
+
+def _dark_map_group_rows(hits, *, selected_country: str = ""):
+    rows = _active_group_rows(hits)
+    group_countries = {}
+    for hit in hits:
+        group_name = resolve_group_name(
+            record_type=hit.record_type,
+            group_name=hit.group_name,
+            title=hit.title,
+            victim_name=hit.victim_name,
+        )
+        if not group_name:
+            continue
+        country = (hit.country or "").strip()
+        if not country:
+            continue
+        country_map = group_countries.setdefault(group_name.lower(), {})
+        country_map.setdefault(country.lower(), country)
+
+    selected_country_key = _normalized_country_key(selected_country)
+    for row in rows:
+        countries = sorted(group_countries.get(row["group_name"].lower(), {}).values())
+        row["countries"] = countries
+        row["country_match"] = (
+            bool(selected_country_key)
+            and selected_country_key in {country.lower() for country in countries}
+        )
+    return rows
+
+
+def _dark_map_latest_incidents(hits, *, selected_country: str = ""):
+    selected_country_key = _normalized_country_key(selected_country)
+    incidents = []
+    for hit in hits:
+        if hit.record_type != "incident":
+            continue
+        if selected_country_key and _normalized_country_key(hit.country) != selected_country_key:
+            continue
+        incidents.append(hit)
+    return incidents[:8]
+
+
 @superuser_required
 def dark_dashboard_view(request):
     base_hits, hits, filter_context = _dark_filtered_hits_queryset(request)
@@ -823,6 +939,64 @@ def dark_dashboard_view(request):
             "recent_hits_url": reverse("dark-recent-hits"),
             "window_options": DARK_WINDOW_OPTIONS,
             **health_context,
+            **filter_context,
+        },
+    )
+
+
+@superuser_required
+def dark_map_view(request):
+    _, hits, filter_context = _dark_filtered_hits_queryset(request)
+    selected_hits = list(hits)
+    country_rows = _dark_country_activity_rows(selected_hits)
+
+    selected_country = ""
+    requested_country = (request.GET.get("country") or "").strip()
+    if requested_country:
+        requested_country_key = _normalized_country_key(requested_country)
+        for row in country_rows:
+            if row["country_key"] == requested_country_key:
+                selected_country = row["country"]
+                break
+        if not selected_country:
+            selected_country = requested_country
+
+    selected_country_key = _normalized_country_key(selected_country)
+    for row in country_rows:
+        row["is_selected"] = row["country_key"] == selected_country_key
+
+    top_countries = country_rows[:8]
+    group_rows = _dark_map_group_rows(selected_hits, selected_country=selected_country)
+    top_groups = group_rows[:8]
+    latest_incidents = _dark_map_latest_incidents(
+        selected_hits,
+        selected_country=selected_country,
+    )
+
+    map_metrics = {
+        "country_count": len(country_rows),
+        "group_count": len(group_rows),
+        "incident_count": len([hit for hit in selected_hits if hit.record_type == "incident"]),
+        "source_count": len({hit.dark_source_id for hit in selected_hits}),
+    }
+
+    return render(
+        request,
+        "intel/dark/map.html",
+        {
+            "page_title": "Dark Intel Threat Map",
+            "current_page": "dark",
+            "country_rows": country_rows,
+            "top_countries": top_countries,
+            "top_groups": top_groups,
+            "latest_incidents": latest_incidents,
+            "selected_country": selected_country,
+            "selected_country_key": selected_country_key,
+            "map_metrics": map_metrics,
+            "dashboard_url": reverse("dark-dashboard"),
+            "recent_hits_url": reverse("dark-recent-hits"),
+            "window_options": DARK_WINDOW_OPTIONS,
+            **_dark_source_health_context(),
             **filter_context,
         },
     )

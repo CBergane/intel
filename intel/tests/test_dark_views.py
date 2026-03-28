@@ -10,6 +10,7 @@ from intel.dark_models import DarkHit, DarkSource
 
 User = get_user_model()
 DARK_GROUPS_URL = reverse("dark-dashboard")
+DARK_MAP_URL = reverse("dark-map")
 DARK_RECENT_URL = reverse("dark-recent-hits")
 
 
@@ -71,22 +72,27 @@ class DarkViewAccessTests(TestCase):
 
     def test_anonymous_user_redirected_from_dark_pages(self):
         self.assertEqual(self.client.get(DARK_GROUPS_URL).status_code, 302)
+        self.assertEqual(self.client.get(DARK_MAP_URL).status_code, 302)
         self.assertEqual(self.client.get(DARK_RECENT_URL).status_code, 302)
 
     def test_superuser_can_open_active_groups_and_recent_hits(self):
         self.client.force_login(self.superuser)
 
         groups_response = self.client.get(DARK_GROUPS_URL)
+        map_response = self.client.get(DARK_MAP_URL)
         recent_response = self.client.get(DARK_RECENT_URL)
 
         self.assertEqual(groups_response.status_code, 200)
+        self.assertEqual(map_response.status_code, 200)
         self.assertEqual(recent_response.status_code, 200)
         self.assertContains(groups_response, "Active Groups")
+        self.assertContains(map_response, "Threat Map")
         self.assertContains(recent_response, "Recent Hits")
 
     def test_non_superuser_does_not_get_dark_pages(self):
         self.client.force_login(self.regular_user)
         self.assertNotEqual(self.client.get(DARK_GROUPS_URL).status_code, 200)
+        self.assertNotEqual(self.client.get(DARK_MAP_URL).status_code, 200)
         self.assertNotEqual(self.client.get(DARK_RECENT_URL).status_code, 200)
 
 
@@ -263,3 +269,119 @@ class ActiveGroupsViewTests(TestCase):
         self.assertContains(response, "Alpha Manufacturing")
         self.assertContains(response, "Beta Retail")
         self.assertContains(response, reverse("dark-dashboard"))
+
+
+class DarkMapViewTests(TestCase):
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username="dark-map-root",
+            password="dark-map-pass-123",
+        )
+        self.source_a = _make_source(slug="map-akira", name="Map Akira Source")
+        self.source_b = _make_source(slug="map-play", name="Map Play Source")
+        self.source_c = _make_source(slug="map-lockbit", name="Map LockBit Source")
+
+        _make_hit(
+            self.source_a,
+            title="Alpha Manufacturing",
+            group_name="Akira",
+            victim_name="Alpha Manufacturing",
+            country="Sweden",
+            record_type="incident",
+            detected_offset_hours=2,
+        )
+        _make_hit(
+            self.source_a,
+            title="Akira Profile",
+            group_name="Akira",
+            country="Sweden",
+            record_type="group",
+            detected_offset_hours=4,
+        )
+        _make_hit(
+            self.source_b,
+            title="Beta Retail",
+            group_name="Akira",
+            victim_name="Beta Retail",
+            country="Sweden",
+            record_type="incident",
+            detected_offset_hours=9,
+        )
+        _make_hit(
+            self.source_b,
+            title="Gamma Health",
+            group_name="Play",
+            victim_name="Gamma Health",
+            country="Norway",
+            record_type="incident",
+            detected_offset_hours=5,
+        )
+        _make_hit(
+            self.source_c,
+            title="Legacy Finland",
+            group_name="LockBit",
+            victim_name="Legacy Finland",
+            country="Finland",
+            record_type="incident",
+            detected_offset_days=12,
+        )
+
+    def test_map_page_renders_country_panels(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_MAP_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Threat Map")
+        self.assertContains(response, "Country Activity")
+        self.assertContains(response, "Top Countries")
+        self.assertContains(response, "Top Groups")
+        self.assertContains(response, "Latest Incidents")
+
+    def test_map_page_aggregates_countries_and_groups(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_MAP_URL)
+
+        country_rows = response.context["country_rows"]
+        self.assertEqual(country_rows[0]["country"], "Sweden")
+        self.assertEqual(country_rows[0]["incident_count"], 2)
+        self.assertEqual(country_rows[0]["record_count"], 3)
+
+        top_groups = response.context["top_groups"]
+        akira_row = next(row for row in top_groups if row["group_name"] == "Akira")
+        self.assertEqual(akira_row["incident_count"], 3)
+        self.assertIn("Sweden", akira_row["countries"])
+
+    def test_map_page_window_filter_includes_older_country_only_in_30d(self):
+        self.client.force_login(self.superuser)
+
+        response_7d = self.client.get(DARK_MAP_URL, {"window": "7d"})
+        response_30d = self.client.get(DARK_MAP_URL, {"window": "30d"})
+
+        countries_7d = [row["country"] for row in response_7d.context["country_rows"]]
+        countries_30d = [row["country"] for row in response_30d.context["country_rows"]]
+        self.assertNotIn("Finland", countries_7d)
+        self.assertIn("Finland", countries_30d)
+
+    def test_map_country_drilldown_filters_latest_incidents_and_highlights_groups(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_MAP_URL, {"country": "Sweden"})
+
+        self.assertEqual(response.context["selected_country"], "Sweden")
+        latest_incidents = response.context["latest_incidents"]
+        self.assertTrue(latest_incidents)
+        self.assertTrue(all(hit.country == "Sweden" for hit in latest_incidents))
+
+        top_groups = response.context["top_groups"]
+        akira_row = next(row for row in top_groups if row["group_name"] == "Akira")
+        play_row = next(row for row in top_groups if row["group_name"] == "Play")
+        self.assertTrue(akira_row["country_match"])
+        self.assertFalse(play_row["country_match"])
+
+    def test_map_latest_incidents_exclude_group_records(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_MAP_URL)
+
+        latest_titles = [hit.title for hit in response.context["latest_incidents"]]
+        self.assertIn("Alpha Manufacturing", latest_titles)
+        self.assertIn("Gamma Health", latest_titles)
+        self.assertNotIn("Akira Profile", latest_titles)
