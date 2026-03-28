@@ -2,6 +2,7 @@ import json
 import re
 from collections import Counter
 from datetime import timedelta
+from urllib.parse import urlencode
 
 import feedparser
 from django import forms
@@ -618,6 +619,71 @@ DARK_WINDOW_RANGES = {
 }
 DARK_WINDOW_OPTIONS = [("24h", "24h"), ("7d", "7d"), ("30d", "30d")]
 DARK_MATCH_OPTIONS = [("all", "All records"), ("matched", "Watch matches")]
+DARK_MAP_TILE_SIZE = {"width": 56, "height": 38}
+DARK_MAP_REGION_LABELS = (
+    {"label": "Americas", "x": 88, "y": 52},
+    {"label": "Europe", "x": 430, "y": 52},
+    {"label": "MENA", "x": 706, "y": 238},
+    {"label": "APAC", "x": 864, "y": 120},
+    {"label": "Africa", "x": 636, "y": 426},
+)
+DARK_MAP_COUNTRY_ALIASES = {
+    "us": "united states",
+    "usa": "united states",
+    "u.s.": "united states",
+    "u.s.a.": "united states",
+    "uk": "united kingdom",
+    "great britain": "united kingdom",
+    "england": "united kingdom",
+    "czech republic": "czechia",
+    "uae": "united arab emirates",
+    "u.a.e.": "united arab emirates",
+    "south korea": "korea, republic of",
+    "republic of korea": "korea, republic of",
+}
+DARK_MAP_TILE_LAYOUT = (
+    {"key": "canada", "label": "Canada", "short_label": "Canada", "x": 86, "y": 102},
+    {"key": "united states", "label": "United States", "short_label": "US", "x": 122, "y": 156},
+    {"key": "mexico", "label": "Mexico", "short_label": "Mexico", "x": 150, "y": 214},
+    {"key": "brazil", "label": "Brazil", "short_label": "Brazil", "x": 240, "y": 314},
+    {"key": "argentina", "label": "Argentina", "short_label": "Argentina", "x": 246, "y": 384},
+    {"key": "iceland", "label": "Iceland", "short_label": "Iceland", "x": 352, "y": 88},
+    {"key": "ireland", "label": "Ireland", "short_label": "Ireland", "x": 374, "y": 126},
+    {"key": "united kingdom", "label": "United Kingdom", "short_label": "UK", "x": 418, "y": 122},
+    {"key": "portugal", "label": "Portugal", "short_label": "Portugal", "x": 400, "y": 196},
+    {"key": "spain", "label": "Spain", "short_label": "Spain", "x": 452, "y": 196},
+    {"key": "france", "label": "France", "short_label": "France", "x": 468, "y": 160},
+    {"key": "belgium", "label": "Belgium", "short_label": "Belgium", "x": 522, "y": 140},
+    {"key": "netherlands", "label": "Netherlands", "short_label": "NL", "x": 542, "y": 108},
+    {"key": "switzerland", "label": "Switzerland", "short_label": "CH", "x": 520, "y": 212},
+    {"key": "germany", "label": "Germany", "short_label": "Germany", "x": 562, "y": 158},
+    {"key": "denmark", "label": "Denmark", "short_label": "Denmark", "x": 566, "y": 102},
+    {"key": "norway", "label": "Norway", "short_label": "Norway", "x": 548, "y": 44},
+    {"key": "sweden", "label": "Sweden", "short_label": "Sweden", "x": 614, "y": 56},
+    {"key": "finland", "label": "Finland", "short_label": "Finland", "x": 680, "y": 56},
+    {"key": "estonia", "label": "Estonia", "short_label": "Estonia", "x": 702, "y": 108},
+    {"key": "latvia", "label": "Latvia", "short_label": "Latvia", "x": 706, "y": 146},
+    {"key": "lithuania", "label": "Lithuania", "short_label": "Lithuania", "x": 694, "y": 184},
+    {"key": "poland", "label": "Poland", "short_label": "Poland", "x": 632, "y": 158},
+    {"key": "czechia", "label": "Czechia", "short_label": "Czechia", "x": 610, "y": 204},
+    {"key": "austria", "label": "Austria", "short_label": "Austria", "x": 658, "y": 212},
+    {"key": "italy", "label": "Italy", "short_label": "Italy", "x": 548, "y": 270},
+    {"key": "romania", "label": "Romania", "short_label": "Romania", "x": 724, "y": 214},
+    {"key": "ukraine", "label": "Ukraine", "short_label": "Ukraine", "x": 770, "y": 162},
+    {"key": "greece", "label": "Greece", "short_label": "Greece", "x": 696, "y": 286},
+    {"key": "turkey", "label": "Turkey", "short_label": "Turkey", "x": 790, "y": 256},
+    {"key": "israel", "label": "Israel", "short_label": "Israel", "x": 786, "y": 318},
+    {"key": "saudi arabia", "label": "Saudi Arabia", "short_label": "Saudi", "x": 834, "y": 338},
+    {"key": "united arab emirates", "label": "United Arab Emirates", "short_label": "UAE", "x": 900, "y": 344},
+    {"key": "south africa", "label": "South Africa", "short_label": "S. Africa", "x": 690, "y": 454},
+    {"key": "india", "label": "India", "short_label": "India", "x": 876, "y": 262},
+    {"key": "china", "label": "China", "short_label": "China", "x": 940, "y": 204},
+    {"key": "korea, republic of", "label": "South Korea", "short_label": "S. Korea", "x": 992, "y": 188},
+    {"key": "japan", "label": "Japan", "short_label": "Japan", "x": 1008, "y": 132},
+    {"key": "australia", "label": "Australia", "short_label": "Australia", "x": 946, "y": 418},
+    {"key": "new zealand", "label": "New Zealand", "short_label": "NZ", "x": 1010, "y": 474},
+)
+DARK_MAP_LAYOUT_KEYS = {tile["key"] for tile in DARK_MAP_TILE_LAYOUT}
 
 
 def _dark_filtered_hits_queryset(request):
@@ -811,6 +877,182 @@ def _normalized_country_key(value: str) -> str:
     return (value or "").strip().lower()
 
 
+def _dark_map_country_key(value: str) -> str:
+    normalized = _normalized_country_key(value)
+    return DARK_MAP_COUNTRY_ALIASES.get(normalized, normalized)
+
+
+def _dark_map_tile_palette(*, intensity_level: int, is_selected: bool, has_activity: bool):
+    if not has_activity:
+        return {
+            "fill": "#0f172a",
+            "stroke": "#1e293b",
+            "text": "#475569",
+            "badge": "#0f172a",
+        }
+
+    palette = {
+        1: {"fill": "#10263c", "stroke": "#1d4ed8", "text": "#dbeafe", "badge": "#38bdf8"},
+        2: {"fill": "#10334a", "stroke": "#0ea5e9", "text": "#e0f2fe", "badge": "#22d3ee"},
+        3: {"fill": "#11485d", "stroke": "#14b8a6", "text": "#ecfeff", "badge": "#2dd4bf"},
+        4: {"fill": "#0f766e", "stroke": "#5eead4", "text": "#f0fdfa", "badge": "#67e8f9"},
+    }.get(max(1, min(intensity_level, 4)))
+    if is_selected:
+        return {
+            "fill": palette["fill"],
+            "stroke": "#a5f3fc",
+            "text": "#f0fdfa",
+            "badge": "#67e8f9",
+        }
+    return palette
+
+
+def _dark_map_intensity_level(record_count: int, max_record_count: int) -> int:
+    if record_count <= 0:
+        return 0
+    if max_record_count <= 1:
+        return 4
+    ratio = record_count / max_record_count
+    if ratio >= 0.8:
+        return 4
+    if ratio >= 0.55:
+        return 3
+    if ratio >= 0.3:
+        return 2
+    return 1
+
+
+def _dark_map_country_url(*, window: str, selected_source: str, match_filter: str, country: str = "") -> str:
+    params = {"window": window}
+    if selected_source:
+        params["source"] = selected_source
+    if match_filter != "all":
+        params["match"] = match_filter
+    if country:
+        params["country"] = country
+    return f"{reverse('dark-map')}?{urlencode(params)}"
+
+
+def _dark_map_tiles(country_rows, *, selected_country: str, window: str, selected_source: str, match_filter: str):
+    row_by_layout_key = {}
+    unmapped_rows = []
+    for row in country_rows:
+        map_key = _dark_map_country_key(row["country"])
+        row["map_country_key"] = map_key
+        if map_key not in DARK_MAP_LAYOUT_KEYS:
+            unmapped_rows.append(row)
+            continue
+        row_by_layout_key[map_key] = row
+
+    max_record_count = max((row["record_count"] for row in country_rows), default=0)
+    width = DARK_MAP_TILE_SIZE["width"]
+    height = DARK_MAP_TILE_SIZE["height"]
+    tiles = []
+    for tile in DARK_MAP_TILE_LAYOUT:
+        row = row_by_layout_key.get(tile["key"])
+        has_activity = row is not None
+        is_selected = has_activity and row["country_key"] == _normalized_country_key(selected_country)
+        intensity_level = _dark_map_intensity_level(
+            row["record_count"] if row else 0,
+            max_record_count,
+        )
+        palette = _dark_map_tile_palette(
+            intensity_level=intensity_level,
+            is_selected=is_selected,
+            has_activity=has_activity,
+        )
+        display_count = row["incident_count"] if row and row["incident_count"] else (row["record_count"] if row else "")
+        tiles.append(
+            {
+                "country_key": tile["key"],
+                "label": tile["label"],
+                "short_label": tile["short_label"],
+                "x": tile["x"],
+                "y": tile["y"],
+                "width": width,
+                "height": height,
+                "label_x": tile["x"] + 8,
+                "label_y": tile["y"] + 15,
+                "count_x": tile["x"] + width - 10,
+                "count_y": tile["y"] + 26,
+                "badge_x": tile["x"] + width - 8,
+                "badge_y": tile["y"] + 9,
+                "has_activity": has_activity,
+                "is_selected": is_selected,
+                "fill_color": palette["fill"],
+                "stroke_color": palette["stroke"],
+                "text_color": palette["text"],
+                "badge_color": palette["badge"],
+                "record_count": row["record_count"] if row else 0,
+                "incident_count": row["incident_count"] if row else 0,
+                "watch_match_count": row["watch_match_count"] if row else 0,
+                "country": row["country"] if row else tile["label"],
+                "url": (
+                    _dark_map_country_url(
+                        window=window,
+                        selected_source=selected_source,
+                        match_filter=match_filter,
+                        country="" if is_selected else row["country"],
+                    )
+                    if has_activity
+                    else ""
+                ),
+                "tooltip": (
+                    f"{row['country']}: {row['record_count']} records, "
+                    f"{row['incident_count']} incidents, {row['watch_match_count']} watch-matched"
+                    if row
+                    else f"{tile['label']}: no activity in current filters"
+                ),
+                "display_count": display_count,
+            }
+        )
+
+    unmapped_rows.sort(
+        key=lambda row: (
+            row["incident_count"],
+            row["record_count"],
+            row["country"].lower(),
+        ),
+        reverse=True,
+    )
+    return tiles, unmapped_rows
+
+
+def _dark_map_empty_state(hits, country_rows, *, selected_source_name: str = ""):
+    if country_rows:
+        return {}
+    if not hits:
+        return {
+            "title": "No records in current window",
+            "message": "No dark records matched the current window, source, and record filters.",
+        }
+    incident_hits = [hit for hit in hits if hit.record_type == "incident"]
+    if not incident_hits:
+        source_phrase = f"{selected_source_name} is" if selected_source_name else "The current selection is"
+        return {
+            "title": "No incident geography to plot",
+            "message": (
+                f"{source_phrase} currently contributing only group/context records. "
+                "The map activates when incident-style records carry normalized country data."
+            ),
+        }
+    return {
+        "title": "Country data missing",
+        "message": (
+            "Incident-style records matched the current filters, but they do not yet include "
+            "normalized country values for plotting."
+        ),
+    }
+
+
+def _dark_map_latest_incident_empty_message(*, selected_country: str, map_empty_state: dict):
+    if selected_country:
+        return f"No incident-style records are currently mapped to {selected_country} in this view."
+    if map_empty_state:
+        return map_empty_state["message"]
+    return "No incident-style records matched the current map filters."
+
+
 def _dark_country_activity_rows(hits):
     grouped = {}
     max_record_count = 0
@@ -831,12 +1073,15 @@ def _dark_country_activity_rows(hits):
                 "group_names": [],
                 "group_keys": set(),
                 "source_ids": set(),
+                "watch_match_count": 0,
             }
             grouped[country_key] = row
 
         row["record_count"] += 1
         if hit.record_type == "incident":
             row["incident_count"] += 1
+        if hit.is_watch_match:
+            row["watch_match_count"] += 1
         if hit.dark_source_id not in row["source_ids"]:
             row["source_ids"].add(hit.dark_source_id)
 
@@ -960,6 +1205,14 @@ def dark_map_view(request):
     _, hits, filter_context = _dark_filtered_hits_queryset(request)
     selected_hits = list(hits)
     country_rows = _dark_country_activity_rows(selected_hits)
+    selected_source_name = ""
+    if filter_context["selected_source"]:
+        selected_source_name = (
+            DarkSource.objects.filter(slug=filter_context["selected_source"])
+            .values_list("name", flat=True)
+            .first()
+            or filter_context["selected_source"]
+        )
 
     selected_country = ""
     requested_country = (request.GET.get("country") or "").strip()
@@ -976,12 +1229,28 @@ def dark_map_view(request):
     for row in country_rows:
         row["is_selected"] = row["country_key"] == selected_country_key
 
+    map_tiles, unmapped_country_rows = _dark_map_tiles(
+        country_rows,
+        selected_country=selected_country,
+        window=filter_context["window"],
+        selected_source=filter_context["selected_source"],
+        match_filter=filter_context["match_filter"],
+    )
+    map_empty_state = _dark_map_empty_state(
+        selected_hits,
+        country_rows,
+        selected_source_name=selected_source_name,
+    )
     top_countries = country_rows[:8]
     group_rows = _dark_map_group_rows(selected_hits, selected_country=selected_country)
     top_groups = group_rows[:8]
     latest_incidents = _dark_map_latest_incidents(
         selected_hits,
         selected_country=selected_country,
+    )
+    latest_incident_empty_message = _dark_map_latest_incident_empty_message(
+        selected_country=selected_country,
+        map_empty_state=map_empty_state,
     )
 
     map_metrics = {
@@ -998,11 +1267,18 @@ def dark_map_view(request):
             "page_title": "Dark Intel Threat Map",
             "current_page": "dark",
             "country_rows": country_rows,
+            "map_tiles": map_tiles,
+            "map_region_labels": DARK_MAP_REGION_LABELS,
+            "map_empty_state": map_empty_state,
+            "unmapped_country_rows": unmapped_country_rows,
             "top_countries": top_countries,
             "top_groups": top_groups,
             "latest_incidents": latest_incidents,
+            "latest_incident_empty_message": latest_incident_empty_message,
             "selected_country": selected_country,
             "selected_country_key": selected_country_key,
+            "selected_country_on_map": any(tile["is_selected"] for tile in map_tiles),
+            "selected_source_name": selected_source_name,
             "map_metrics": map_metrics,
             "dashboard_url": reverse("dark-dashboard"),
             "recent_hits_url": reverse("dark-recent-hits"),

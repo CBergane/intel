@@ -373,10 +373,12 @@ class DarkMapViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Threat Map")
-        self.assertContains(response, "Country Activity")
+        self.assertContains(response, "Operational Country Map")
         self.assertContains(response, "Top Countries")
         self.assertContains(response, "Top Groups")
         self.assertContains(response, "Latest Incidents")
+        self.assertContains(response, 'id="dark-threat-map"')
+        self.assertContains(response, 'data-country-key="sweden"')
 
     def test_map_page_aggregates_countries_and_groups(self):
         self.client.force_login(self.superuser)
@@ -426,6 +428,12 @@ class DarkMapViewTests(TestCase):
         play_row = next(row for row in top_groups if row["group_name"] == "Play")
         self.assertTrue(akira_row["country_match"])
         self.assertFalse(play_row["country_match"])
+        sweden_tile = next(
+            tile for tile in response.context["map_tiles"] if tile["country_key"] == "sweden"
+        )
+        self.assertTrue(sweden_tile["is_selected"])
+        self.assertContains(response, 'data-country-key="sweden"')
+        self.assertContains(response, 'data-selected="true"')
 
     def test_map_latest_incidents_exclude_group_records(self):
         self.client.force_login(self.superuser)
@@ -456,3 +464,38 @@ class DarkMapViewTests(TestCase):
         top_groups = response.context["top_groups"]
         self.assertEqual(len(top_groups), 1)
         self.assertEqual(top_groups[0]["group_name"], "DragonForce")
+
+    def test_map_source_filter_limits_visual_map_and_incidents(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_MAP_URL, {"source": self.source_b.slug})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_source"], self.source_b.slug)
+        self.assertEqual(response.context["map_metrics"]["country_count"], 2)
+        countries = [row["country"] for row in response.context["country_rows"]]
+        self.assertEqual(countries, ["Norway", "Sweden"])
+        latest_titles = [hit.title for hit in response.context["latest_incidents"]]
+        self.assertEqual(latest_titles, ["Gamma Health", "Beta Retail"])
+        norway_tile = next(
+            tile for tile in response.context["map_tiles"] if tile["country_key"] == "norway"
+        )
+        self.assertTrue(norway_tile["has_activity"])
+
+    def test_map_empty_state_explains_group_only_source_selection(self):
+        group_only_source = _make_source(slug="map-group-only", name="Map Group Only")
+        _make_hit(
+            group_only_source,
+            title="Group Context",
+            group_name="Context Crew",
+            record_type="group",
+            detected_offset_hours=1,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(DARK_MAP_URL, {"source": group_only_source.slug})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["map_metrics"]["country_count"], 0)
+        self.assertContains(response, "No incident geography to plot")
+        self.assertContains(response, "currently contributing only group/context records")
+        self.assertContains(response, "The map activates when incident-style records carry normalized country data")
