@@ -22,7 +22,12 @@ def _make_dark_source(slug="test-onion", url="http://test.onion/"):
     )
 
 
-def _make_dark_hit(source, title="Ransomware target found", excerpt="Some excerpt text"):
+def _make_dark_hit(
+    source,
+    title="Ransomware target found",
+    excerpt="Some excerpt text",
+    record_type="",
+):
     import hashlib
     content_hash = hashlib.md5(f"{source.slug}{title}".encode()).hexdigest()
     return DarkHit.objects.create(
@@ -32,6 +37,7 @@ def _make_dark_hit(source, title="Ransomware target found", excerpt="Some excerp
         url=source.url,
         content_hash=content_hash,
         matched_keywords=["ransomware", "credentials"],
+        record_type=record_type,
     )
 
 
@@ -72,9 +78,9 @@ class DarkHitAlertTests(TestCase):
             mock_post.assert_not_called()
 
     @override_settings(DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token")
-    def test_dark_hit_sends_correct_payload(self):
+    def test_incident_dark_hit_sends_correct_payload(self):
         source = _make_dark_source()
-        hit = _make_dark_hit(source, title="Breach data found")
+        hit = _make_dark_hit(source, title="Breach data found", record_type="incident")
         with patch("intel.notifications.requests.post") as mock_post:
             send_dark_hit_alert(hit)
             mock_post.assert_called_once()
@@ -84,9 +90,17 @@ class DarkHitAlertTests(TestCase):
             self.assertEqual(embed["title"], "Breach data found")
 
     @override_settings(DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token")
+    def test_group_dark_hit_does_not_send_alert(self):
+        source = _make_dark_source()
+        hit = _make_dark_hit(source, title="Black Basta", record_type="group")
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_dark_hit_alert(hit)
+            mock_post.assert_not_called()
+
+    @override_settings(DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token")
     def test_dark_hit_request_fails(self):
         source = _make_dark_source()
-        hit = _make_dark_hit(source)
+        hit = _make_dark_hit(source, record_type="incident")
         with patch(
             "intel.notifications.requests.post",
             side_effect=requests.RequestException("connection refused"),
@@ -97,7 +111,7 @@ class DarkHitAlertTests(TestCase):
     @override_settings(DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token")
     def test_dark_hit_onion_url_masked(self):
         source = _make_dark_source(url="http://abc123xyz.onion/secret-forum")
-        hit = _make_dark_hit(source)
+        hit = _make_dark_hit(source, record_type="incident")
         with patch("intel.notifications.requests.post") as mock_post:
             send_dark_hit_alert(hit)
             mock_post.assert_called_once()

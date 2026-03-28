@@ -13,10 +13,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def should_send_dark_hit_alert(hit: DarkHit) -> bool:
+    record_type = (hit.record_type or "").strip().lower()
+    if record_type in {"group", "table_row"}:
+        return False
+    return True
+
+
 def send_dark_hit_alert(hit: DarkHit) -> None:
     webhook = getattr(settings, "DARK_DISCORD_WEBHOOK", "")
     if not webhook:
         logger.debug("DARK_DISCORD_WEBHOOK not configured, skipping dark hit alert.")
+        return
+    if not should_send_dark_hit_alert(hit):
+        logger.debug(
+            "Skipping dark hit alert for non-operational record_type=%s",
+            hit.record_type or "(blank)",
+        )
         return
 
     keywords = hit.matched_keywords

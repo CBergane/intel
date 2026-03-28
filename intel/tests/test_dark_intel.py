@@ -620,6 +620,35 @@ class DarkIngestionTests(TestCase):
         self.assertIn("extortion operations", hit.excerpt)
         self.assertEqual(hit.url, self.source.url)
 
+    @override_settings(
+        DARK_FETCH_RETRIES=1,
+        DARK_MAX_BYTES=5000,
+        DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
+    )
+    def test_group_cards_are_stored_without_sending_discord_alert(self):
+        self.source.watch_keywords = "black basta"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.GROUP_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Threat Groups</title><body>
+            <article class="group-card">
+                <h2>Black Basta</h2>
+                <p>Victims: 41</p>
+                <p>Recent disclosures from this actor.</p>
+            </article>
+        </body></html>
+        """
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            self._ingest_markup(markup)
+
+        hit = DarkHit.objects.get(dark_source=self.source)
+        self.assertEqual(hit.record_type, "group")
+        self.assertEqual(hit.group_name, "Black Basta")
+        mock_post.assert_not_called()
+
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_partial_duplicate_card_records_are_pruned_in_favor_of_fuller_record(self):
         self.source.watch_keywords = "alphacorp, leak, timeline"
