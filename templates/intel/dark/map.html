@@ -11,7 +11,7 @@
                 <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Dark Intel</p>
                 <h1 class="mt-1 text-xl font-semibold text-white sm:text-2xl">Threat Map</h1>
                 <p class="mt-2 max-w-3xl text-sm text-slate-400">
-                    Country activity view built from normalized dark-hit records. Select a country to tighten the incident lane and highlight groups connected to that geography.
+                    Group activity and incident geography built from trusted dark hits. When plot-ready country data is sparse, the page shifts focus to groups, source coverage, and watch matches.
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
@@ -23,28 +23,32 @@
             </div>
         </div>
         <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div class="rounded-xl border border-emerald-500/20 bg-slate-950/35 p-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Countries</p>
-                <p class="mt-3 text-2xl font-semibold text-emerald-200">{{ map_metrics.country_count }}</p>
-                <p class="mt-1 text-[11px] text-slate-500">With activity in {{ window }}</p>
-            </div>
-            <div class="rounded-xl border border-rose-500/20 bg-slate-950/35 p-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Incident Records</p>
-                <p class="mt-3 text-2xl font-semibold text-rose-200">{{ map_metrics.incident_count }}</p>
-                <p class="mt-1 text-[11px] text-slate-500">Incident-style dark hits only</p>
-            </div>
             <div class="rounded-xl border border-sky-500/20 bg-slate-950/35 p-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Groups</p>
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Group / Context Intel</p>
                 <p class="mt-3 text-2xl font-semibold text-sky-200">{{ map_metrics.group_count }}</p>
-                <p class="mt-1 text-[11px] text-slate-500">Structured group activity in window</p>
+                <p class="mt-1 text-[11px] text-slate-500">
+                    Active groups in {{ window }}{% if group_first_mode %} · primary signal right now{% endif %}
+                </p>
+            </div>
+            <div class="rounded-xl border border-cyan-500/20 bg-slate-950/35 p-3">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Watch Matches</p>
+                <p class="mt-3 text-2xl font-semibold text-cyan-200">{{ map_metrics.watch_match_count }}</p>
+                <p class="mt-1 text-[11px] text-slate-500">Operational records that matched current watches</p>
+            </div>
+            <div class="rounded-xl border border-emerald-500/20 bg-slate-950/35 p-3">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Incident / Country Intel</p>
+                <p class="mt-3 text-2xl font-semibold text-emerald-200">{{ map_metrics.country_count }}</p>
+                <p class="mt-1 text-[11px] text-slate-500">
+                    {{ map_metrics.mapped_incident_count }} mapped incidents{% if map_metrics.countryless_incident_count %} · {{ map_metrics.countryless_incident_count }} not plot-ready{% endif %}
+                </p>
             </div>
             <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Sources</p>
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Source Coverage</p>
                 <p class="mt-3 text-2xl font-semibold text-white">{{ map_metrics.source_count }}</p>
                 {% if selected_country %}
                     <p class="mt-1 text-[11px] text-slate-500">Drill-down: {{ selected_country }}</p>
                 {% else %}
-                    <p class="mt-1 text-[11px] text-slate-500">All countries selected</p>
+                    <p class="mt-1 text-[11px] text-slate-500">Sources contributing dark activity in {{ window }}</p>
                 {% endif %}
             </div>
         </div>
@@ -85,6 +89,19 @@
         </div>
     </form>
 
+    {% if group_first_mode and map_empty_state %}
+        <div class="rounded-2xl border border-sky-500/20 bg-sky-500/8 px-4 py-4 shadow-glow">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="max-w-3xl">
+                    <p class="text-[11px] uppercase tracking-[0.2em] text-sky-300">Group-Led Mode</p>
+                    <h2 class="mt-1 text-base font-semibold text-white sm:text-lg">{{ map_empty_state.title }}</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-300">{{ map_empty_state.message }}</p>
+                </div>
+                <span class="rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-[11px] text-sky-200">Map becomes secondary until plot-ready geography lands</span>
+            </div>
+        </div>
+    {% endif %}
+
     {% if selected_country %}
         <div class="flex flex-wrap items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-100">
             <span class="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] uppercase tracking-wide text-emerald-200">Country Focus</span>
@@ -98,15 +115,24 @@
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
                 <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h2 class="text-base font-semibold text-white sm:text-lg">Operational Country Map</h2>
-                        <p class="mt-1 text-xs text-slate-500">Click an active country to focus incidents and highlight connected groups. Muted tiles have no activity in the current filtered dataset.</p>
+                        <h2 class="text-base font-semibold text-white sm:text-lg">{% if group_first_mode %}Country Map Secondary View{% else %}Operational Country Map{% endif %}</h2>
+                        <p class="mt-1 text-xs text-slate-500">
+                            {% if group_first_mode %}
+                                The SVG stays available for orientation, but current value comes primarily from groups, source coverage, and watch matches.
+                            {% else %}
+                                Click an active country to focus incidents and highlight groups connected to that geography. Muted tiles have no activity in the current filtered dataset.
+                            {% endif %}
+                        </p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 text-[11px]">
                         <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-slate-300">{{ country_rows|length }} countries</span>
+                        {% if group_first_mode %}
+                            <span class="rounded-md border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-200">group-led view</span>
+                        {% endif %}
                         <span class="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">dot = watch match present</span>
                     </div>
                 </div>
-                <div class="rounded-2xl border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.08),_transparent_55%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] p-3 sm:p-4 lg:p-5">
+                <div class="rounded-2xl border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.08),_transparent_55%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] p-3 sm:p-4 lg:p-5 {% if group_first_mode %}ring-1 ring-inset ring-slate-800/70{% endif %}">
                     <div class="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                         <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1">all stored records for analytics</span>
                         <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">selected country highlighted</span>
@@ -114,6 +140,12 @@
                             <span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">matched-only mode</span>
                         {% endif %}
                     </div>
+                    {% if map_empty_state and group_first_mode %}
+                        <div class="mb-4 rounded-2xl border border-sky-500/20 bg-sky-500/8 p-4">
+                            <h3 class="text-sm font-semibold text-sky-100">{{ map_empty_state.title }}</h3>
+                            <p class="mt-2 text-sm leading-6 text-slate-300">{{ map_empty_state.message }}</p>
+                        </div>
+                    {% endif %}
                     <div class="lg:hidden">
                         {% if country_rows %}
                             <div class="rounded-2xl border border-line/80 bg-slate-950/45 p-3">
@@ -136,7 +168,7 @@
                             </div>
                         {% endif %}
                     </div>
-                    <div class="hidden lg:block">
+                    <div class="hidden lg:block {% if group_first_mode %}opacity-35 saturate-50{% endif %}">
                         <svg id="dark-threat-map" viewBox="0 0 1100 560" class="h-auto w-full max-w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Dark incident activity map">
                             <rect x="0" y="0" width="1100" height="560" rx="22" fill="#020617" />
                             <g opacity="0.16" stroke="#1e293b" stroke-width="1">
@@ -174,7 +206,7 @@
                             {% endfor %}
                         </svg>
                     </div>
-                    {% if map_empty_state %}
+                    {% if map_empty_state and not group_first_mode %}
                         <div class="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
                             <h3 class="text-sm font-semibold text-amber-100">{{ map_empty_state.title }}</h3>
                             <p class="mt-2 text-sm leading-6 text-amber-50/85">{{ map_empty_state.message }}</p>
@@ -207,34 +239,57 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if group_first_mode and recent_group_activity %}
+                <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
+                    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-semibold text-white sm:text-lg">Recent Group Activity</h2>
+                            <p class="mt-1 text-xs text-slate-500">Most recent structured group/context activity in the current filters, with latest victim, country, source coverage, and watch-match signal.</p>
+                        </div>
+                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ recent_group_activity|length }} shown</span>
+                    </div>
+                    <div class="grid gap-3 xl:grid-cols-2">
+                        {% for group in recent_group_activity %}
+                            <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ group.incident_count }} records</span>
+                                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ group.source_count }} sources</span>
+                                            {% if group.watch_match_count %}
+                                                <span class="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200">{{ group.watch_match_count }} matched</span>
+                                            {% endif %}
+                                        </div>
+                                        <p class="mt-2 text-sm font-medium text-white">{{ group.group_name }}</p>
+                                        {% if group.latest_victim_name %}
+                                            <p class="mt-2 text-sm text-slate-300">Latest victim: {{ group.latest_victim_name }}</p>
+                                        {% endif %}
+                                        <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                                            {% if group.latest_country %}
+                                                <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ group.latest_country }}</span>
+                                            {% endif %}
+                                            {% if group.latest_activity_text %}
+                                                <span>{{ group.latest_activity_text }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <span class="text-[11px] text-slate-400">{{ group.latest_activity_at|naturaltime }}</span>
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
         </div>
 
-        <aside class="space-y-4">
-            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-                <div class="mb-3 flex items-center justify-between gap-2">
-                    <h2 class="text-sm font-semibold text-white sm:text-base">Top Countries</h2>
-                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span>
-                </div>
-                <div class="space-y-2.5">
-                    {% for row in top_countries %}
-                        <a href="{% url 'dark-map' %}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}&country={{ row.country|urlencode }}"
-                           class="flex items-center justify-between gap-3 rounded-xl border p-3 {% if row.is_selected %}border-emerald-500/40 bg-emerald-500/10{% else %}border-line/80 bg-slate-950/35 hover:bg-slate-950/55{% endif %}">
-                            <div class="min-w-0">
-                                <p class="truncate text-sm font-medium text-white">{{ row.country }}</p>
-                                <p class="mt-1 text-[11px] text-slate-500">{{ row.record_count }} records · {{ row.group_count }} groups{% if row.watch_match_count %} · {{ row.watch_match_count }} matched{% endif %}</p>
-                            </div>
-                            <span class="text-sm font-semibold text-emerald-200">{{ row.incident_count }}</span>
-                        </a>
-                    {% empty %}
-                        <p class="text-sm text-slate-400">{{ map_empty_state.message|default:"No countries in the selected window." }}</p>
-                    {% endfor %}
-                </div>
-            </div>
-
+        <aside class="flex flex-col gap-4">
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <div class="mb-3 flex items-center justify-between gap-2">
                     <h2 class="text-sm font-semibold text-white sm:text-base">Top Groups</h2>
-                    {% if selected_country %}
+                    {% if group_first_mode %}
+                        <span class="rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-200">primary signal</span>
+                    {% elif selected_country %}
                         <span class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">highlighting {{ selected_country }}</span>
                     {% endif %}
                 </div>
@@ -262,46 +317,94 @@
 
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <div class="mb-3 flex items-center justify-between gap-2">
-                    <h2 class="text-sm font-semibold text-white sm:text-base">Latest Incidents</h2>
-                    {% if selected_country %}
-                        <span class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">{{ selected_country }}</span>
-                    {% endif %}
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Source Coverage</h2>
+                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ source_rows|length }} shown</span>
                 </div>
-                <div class="space-y-3">
-                    {% for hit in latest_incidents %}
+                <div class="space-y-2.5">
+                    {% for row in source_rows %}
                         <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
-                                    <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
-                                        {% if hit.is_watch_match %}
-                                            <span class="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200">Watch Match</span>
-                                        {% else %}
-                                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-400">Context</span>
-                                        {% endif %}
-                                        {% if hit.group_name %}
-                                            <span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">{{ hit.group_name }}</span>
-                                        {% endif %}
-                                        {% if hit.map_country|default:hit.country %}
-                                            <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ hit.map_country|default:hit.country }}</span>
-                                        {% endif %}
-                                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ hit.dark_source.name }}</span>
+                                    <p class="truncate text-sm font-medium text-white">{{ row.source_name }}</p>
+                                    <p class="mt-1 text-[11px] text-slate-500">{{ row.record_count }} records · {{ row.group_count }} groups{% if row.watch_match_count %} · {{ row.watch_match_count }} matched{% endif %}</p>
+                                    <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ row.mapped_incident_count }}/{{ row.incident_count }} incidents mapped</span>
                                     </div>
-                                    <p class="mt-2 text-sm font-medium text-white">{{ hit.victim_name|default:hit.title }}</p>
-                                    {% if hit.excerpt %}
-                                        <p class="mt-2 overflow-hidden break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{{ hit.excerpt }}</p>
-                                    {% endif %}
                                 </div>
-                                <div class="text-right text-[11px] text-slate-500">
-                                    <p title="{{ hit.last_seen_at|date:'Y-m-d H:i' }} UTC">{{ hit.last_seen_at|naturaltime }}</p>
-                                    <a href="{{ recent_hits_url }}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}&q={{ hit.title|urlencode }}" class="mt-2 inline-flex rounded-md border border-slate-700 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-900/70">Raw</a>
-                                </div>
+                                <span class="text-[11px] text-slate-400">{{ row.latest_activity_at|naturaltime }}</span>
                             </div>
                         </article>
                     {% empty %}
-                        <p class="text-sm text-slate-400">{{ latest_incident_empty_message }}</p>
+                        <p class="text-sm text-slate-400">No source coverage in the selected window.</p>
                     {% endfor %}
                 </div>
             </div>
+
+            <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow {% if group_first_mode %}opacity-80{% endif %}">
+                <div class="mb-3 flex items-center justify-between gap-2">
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Plot-Ready Countries</h2>
+                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span>
+                </div>
+                <div class="space-y-2.5">
+                    {% for row in top_countries %}
+                        <a href="{% url 'dark-map' %}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}&country={{ row.country|urlencode }}"
+                           class="flex items-center justify-between gap-3 rounded-xl border p-3 {% if row.is_selected %}border-emerald-500/40 bg-emerald-500/10{% else %}border-line/80 bg-slate-950/35 hover:bg-slate-950/55{% endif %}">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium text-white">{{ row.country }}</p>
+                                <p class="mt-1 text-[11px] text-slate-500">{{ row.record_count }} records · {{ row.group_count }} groups{% if row.watch_match_count %} · {{ row.watch_match_count }} matched{% endif %}</p>
+                            </div>
+                            <span class="text-sm font-semibold text-emerald-200">{{ row.incident_count }}</span>
+                        </a>
+                    {% empty %}
+                        <p class="text-sm text-slate-400">{{ map_empty_state.message|default:"No countries in the selected window." }}</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if not group_first_mode %}
+                <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
+                    <div class="mb-3 flex items-center justify-between gap-2">
+                        <h2 class="text-sm font-semibold text-white sm:text-base">Latest Incidents</h2>
+                        {% if selected_country %}
+                            <span class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">{{ selected_country }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="space-y-3">
+                        {% for hit in latest_incidents %}
+                            <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                            {% if hit.is_watch_match %}
+                                                <span class="rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-cyan-200">Watch Match</span>
+                                            {% else %}
+                                                <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-400">Context</span>
+                                            {% endif %}
+                                            {% if hit.group_name %}
+                                                <span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">{{ hit.group_name }}</span>
+                                            {% endif %}
+                                            {% if hit.map_country|default:hit.country %}
+                                                <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ hit.map_country|default:hit.country }}</span>
+                                            {% endif %}
+                                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ hit.dark_source.name }}</span>
+                                        </div>
+                                        <p class="mt-2 text-sm font-medium text-white">{{ hit.victim_name|default:hit.title }}</p>
+                                        {% if hit.excerpt %}
+                                            <p class="mt-2 overflow-hidden break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{{ hit.excerpt }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-right text-[11px] text-slate-500">
+                                        <p title="{{ hit.last_seen_at|date:'Y-m-d H:i' }} UTC">{{ hit.last_seen_at|naturaltime }}</p>
+                                        <a href="{{ recent_hits_url }}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}&q={{ hit.title|urlencode }}" class="mt-2 inline-flex rounded-md border border-slate-700 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-900/70">Raw</a>
+                                    </div>
+                                </div>
+                            </article>
+                        {% empty %}
+                            <p class="text-sm text-slate-400">{{ latest_incident_empty_message }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
         </aside>
     </div>
 </section>

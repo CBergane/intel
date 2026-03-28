@@ -1019,26 +1019,29 @@ def _dark_map_empty_state(hits, country_rows, *, selected_source_name: str = "")
             f"{selected_source_name} is" if selected_source_name else "The current selection is"
         )
         return {
-            "title": "No incident data to map",
+            "title": "Group activity available, geography pending",
             "message": (
-                f"{source_phrase} currently contributing only group/context records. "
-                "The map activates when incident-style records carry normalized country data."
+                f"{source_phrase} currently contributing group/context-driven intelligence. "
+                "Top Groups, Recent Group Activity, and Source Coverage are the primary signals "
+                "until incident geography starts landing."
             ),
         }
     raw_country_values = [(hit.country or "").strip() for hit in incident_hits if (hit.country or "").strip()]
     if not raw_country_values:
         return {
-            "title": "Incident country data missing",
+            "title": "Incident records found, but not plot-ready",
             "message": (
                 "Incident-style records matched the current filters, but they do not yet carry "
-                "country values for plotting."
+                "country values for plotting. Group activity and source coverage remain the "
+                "strongest signals in this view."
             ),
         }
     return {
-        "title": "Country data missing",
+        "title": "Country normalization still in progress",
         "message": (
             "Incident-style records matched the current filters, but their country values still "
-            "need cleaner normalization before they can be plotted reliably."
+            "need cleaner normalization before they can be plotted reliably. Group activity and "
+            "source coverage remain actionable in the meantime."
         ),
     }
 
@@ -1155,6 +1158,63 @@ def _dark_map_group_rows(hits, *, selected_country: str = ""):
     return rows
 
 
+def _dark_map_source_rows(hits):
+    grouped = {}
+    for hit in hits:
+        activity_at = hit.last_seen_at or hit.detected_at
+        row = grouped.get(hit.dark_source_id)
+        if row is None:
+            row = {
+                "source_name": hit.dark_source.name,
+                "source_slug": hit.dark_source.slug,
+                "record_count": 0,
+                "incident_count": 0,
+                "mapped_incident_count": 0,
+                "watch_match_count": 0,
+                "group_keys": set(),
+                "latest_activity_at": activity_at,
+            }
+            grouped[hit.dark_source_id] = row
+
+        row["record_count"] += 1
+        if hit.record_type == "incident":
+            row["incident_count"] += 1
+            country_display, _country_code = normalize_dark_country(hit.country)
+            if country_display:
+                row["mapped_incident_count"] += 1
+        if hit.is_watch_match:
+            row["watch_match_count"] += 1
+
+        group_name = resolve_group_name(
+            record_type=hit.record_type,
+            group_name=hit.group_name,
+            title=hit.title,
+            victim_name=hit.victim_name,
+        )
+        if group_name:
+            row["group_keys"].add(group_name.lower())
+        if activity_at >= row["latest_activity_at"]:
+            row["latest_activity_at"] = activity_at
+
+    rows = []
+    for row in grouped.values():
+        row["group_count"] = len(row["group_keys"])
+        del row["group_keys"]
+        rows.append(row)
+
+    rows.sort(
+        key=lambda row: (
+            row["record_count"],
+            row["watch_match_count"],
+            row["mapped_incident_count"],
+            row["latest_activity_at"],
+            row["source_name"].lower(),
+        ),
+        reverse=True,
+    )
+    return rows
+
+
 def _dark_map_latest_incidents(hits, *, selected_country: str = ""):
     selected_country_key = _normalized_country_key(selected_country)
     incidents = []
@@ -1247,6 +1307,8 @@ def dark_map_view(request):
     top_countries = country_rows[:8]
     group_rows = _dark_map_group_rows(selected_hits, selected_country=selected_country)
     top_groups = group_rows[:8]
+    source_rows = _dark_map_source_rows(selected_hits)[:6]
+    recent_group_activity = group_rows[:6]
     latest_incidents = _dark_map_latest_incidents(
         selected_hits,
         selected_country=selected_country,
@@ -1256,10 +1318,17 @@ def dark_map_view(request):
         map_empty_state=map_empty_state,
     )
 
+    incident_count = len([hit for hit in selected_hits if hit.record_type == "incident"])
+    mapped_incident_count = sum(row["incident_count"] for row in country_rows)
+    group_first_mode = not country_rows and bool(group_rows)
+
     map_metrics = {
         "country_count": len(country_rows),
         "group_count": len(group_rows),
-        "incident_count": len([hit for hit in selected_hits if hit.record_type == "incident"]),
+        "incident_count": incident_count,
+        "mapped_incident_count": mapped_incident_count,
+        "countryless_incident_count": max(incident_count - mapped_incident_count, 0),
+        "watch_match_count": len([hit for hit in selected_hits if hit.is_watch_match]),
         "source_count": len({hit.dark_source_id for hit in selected_hits}),
     }
 
@@ -1276,12 +1345,15 @@ def dark_map_view(request):
             "unmapped_country_rows": unmapped_country_rows,
             "top_countries": top_countries,
             "top_groups": top_groups,
+            "source_rows": source_rows,
+            "recent_group_activity": recent_group_activity,
             "latest_incidents": latest_incidents,
             "latest_incident_empty_message": latest_incident_empty_message,
             "selected_country": selected_country,
             "selected_country_key": selected_country_key,
             "selected_country_on_map": any(tile["is_selected"] for tile in map_tiles),
             "selected_source_name": selected_source_name,
+            "group_first_mode": group_first_mode,
             "map_metrics": map_metrics,
             "dashboard_url": reverse("dark-dashboard"),
             "recent_hits_url": reverse("dark-recent-hits"),

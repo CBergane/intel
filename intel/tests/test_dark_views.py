@@ -374,7 +374,10 @@ class DarkMapViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Threat Map")
         self.assertContains(response, "Operational Country Map")
-        self.assertContains(response, "Top Countries")
+        self.assertContains(response, "Group / Context Intel")
+        self.assertContains(response, "Incident / Country Intel")
+        self.assertContains(response, "Source Coverage")
+        self.assertContains(response, "Plot-Ready Countries")
         self.assertContains(response, "Top Groups")
         self.assertContains(response, "Latest Incidents")
         self.assertContains(response, 'id="dark-threat-map"')
@@ -382,6 +385,7 @@ class DarkMapViewTests(TestCase):
         self.assertContains(response, "Quick Country Filter")
         self.assertNotContains(response, "overflow-x-auto")
         self.assertNotContains(response, "min-w-[68rem]")
+        self.assertFalse(response.context["group_first_mode"])
 
     def test_map_page_aggregates_countries_and_groups(self):
         self.client.force_login(self.superuser)
@@ -525,10 +529,13 @@ class DarkMapViewTests(TestCase):
         response = self.client.get(DARK_MAP_URL, {"source": group_only_source.slug})
 
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["group_first_mode"])
         self.assertEqual(response.context["map_metrics"]["country_count"], 0)
-        self.assertContains(response, "No incident data to map")
-        self.assertContains(response, "currently contributing only group/context records")
-        self.assertContains(response, "The map activates when incident-style records carry normalized country data")
+        self.assertContains(response, "Group activity available, geography pending")
+        self.assertContains(response, "Group-Led Mode")
+        self.assertContains(response, "Recent Group Activity")
+        self.assertContains(response, "Source Coverage")
+        self.assertNotContains(response, "Latest Incidents")
 
     def test_map_empty_state_explains_missing_incident_country_values(self):
         countryless_source = _make_source(slug="map-countryless", name="Map Countryless")
@@ -546,9 +553,11 @@ class DarkMapViewTests(TestCase):
         response = self.client.get(DARK_MAP_URL, {"source": countryless_source.slug})
 
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["group_first_mode"])
         self.assertEqual(response.context["map_metrics"]["country_count"], 0)
-        self.assertContains(response, "Incident country data missing")
-        self.assertContains(response, "do not yet carry country values for plotting")
+        self.assertContains(response, "Incident records found, but not plot-ready")
+        self.assertContains(response, "Group activity and source coverage remain the strongest signals in this view")
+        self.assertContains(response, "Recent Group Activity")
 
     def test_map_empty_state_explains_placeholder_country_values_that_need_normalization(self):
         unknown_country_source = _make_source(slug="map-unknown-country", name="Map Unknown Country")
@@ -566,6 +575,7 @@ class DarkMapViewTests(TestCase):
         response = self.client.get(DARK_MAP_URL, {"source": unknown_country_source.slug})
 
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["group_first_mode"])
         self.assertEqual(response.context["map_metrics"]["country_count"], 0)
-        self.assertContains(response, "Country data missing")
-        self.assertContains(response, "need cleaner normalization before they can be plotted reliably")
+        self.assertContains(response, "Country normalization still in progress")
+        self.assertContains(response, "Group activity and source coverage remain actionable in the meantime")
