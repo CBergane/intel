@@ -37,6 +37,10 @@ RECORD_TITLE_RE = re.compile(
     r"<(h1|h2|h3|h4|strong|b|th)[^>]*>(.*?)</\1>",
     re.IGNORECASE | re.DOTALL,
 )
+INCIDENT_HEADING_RE = re.compile(
+    r"<(h2|h3|h4)[^>]*>(.*?)</\1>",
+    re.IGNORECASE | re.DOTALL,
+)
 OPEN_BLOCK_RE = re.compile(r"<(?P<tag>article|section|div|li)\b(?P<attrs>[^>]*)>", re.IGNORECASE)
 TABLE_RE = re.compile(r"<table[^>]*>.*?</table>", re.IGNORECASE | re.DOTALL)
 ROW_RE = re.compile(r"<tr[^>]*>.*?</tr>", re.IGNORECASE | re.DOTALL)
@@ -62,16 +66,6 @@ NEWSLIKE_HOST_HINTS = (
     "arstechnica",
     "threatpost",
     "medium",
-)
-INCIDENT_BLOCK_HINTS = (
-    "card",
-    "item",
-    "entry",
-    "listing",
-    "victim",
-    "case",
-    "post",
-    "incident",
 )
 GROUP_BLOCK_HINTS = (
     "card",
@@ -115,7 +109,7 @@ COUNTRY_LABELS = (
 INDUSTRY_LABELS = ("industry", "sector")
 VICTIM_COUNT_LABELS = ("victim count", "victims", "listed victims")
 LAST_ACTIVITY_LABELS = ("last activity", "last seen", "last update", "updated", "activity")
-WEBSITE_LABELS = ("company website", "website", "site")
+WEBSITE_LABELS = ("company website", "official website", "website", "site")
 GENERIC_INCIDENT_TITLE_RE = re.compile(
     r"(?i)\b("
     r"ransom-db\s*\|\s*live threat command center|"
@@ -137,6 +131,16 @@ INCIDENT_NAV_TEXT_RE = re.compile(
     r"about|"
     r"pricing|"
     r"dashboard"
+    r")\b"
+)
+INCIDENT_FRAGMENT_CUTOFF_RE = re.compile(
+    r"(?i)\b("
+    r"showing\s+\d+\s+of\s+\d+\s+results|"
+    r"free plan limits search|"
+    r"page\s+\d+\s+of\s+\d+|"
+    r"pro users see all|"
+    r"upgrade to researcher|"
+    r"view pricing plans"
     r")\b"
 )
 INCIDENT_CARD_SIGNAL_RE = re.compile(
@@ -539,6 +543,17 @@ def _extract_website_url(fragment: str, lines: list[str], *, base_url: str) -> s
         if url_match:
             return _absolute_http_url(url_match.group(0), base_url=base_url)
         return _absolute_http_url(labeled_text, base_url=base_url)
+    inline_pattern = re.compile(
+        r"(?i)\b(?:company website|official website|website|site)\s*:\s*(https?://[^\s<>\"]+)"
+    )
+    for line in lines:
+        match = inline_pattern.search(line)
+        if match:
+            return _absolute_http_url(match.group(1), base_url=base_url)
+    fragment_text = normalize_text(html.unescape(TAG_RE.sub(" ", fragment or "")))
+    match = inline_pattern.search(fragment_text)
+    if match:
+        return _absolute_http_url(match.group(1), base_url=base_url)
     return ""
 
 
@@ -856,6 +871,31 @@ def _extract_card_records(
     return _dedupe_records(records)
 
 
+def _extract_incident_records(markup: str, *, base_url: str) -> list[ExtractedRecord]:
+    cleaned = _strip_markup_noise(markup or "")
+    heading_matches = list(INCIDENT_HEADING_RE.finditer(cleaned))
+    if not heading_matches:
+        return []
+
+    records = []
+    for index, match in enumerate(heading_matches):
+        fragment_start = match.start()
+        fragment_end = (
+            heading_matches[index + 1].start()
+            if index + 1 < len(heading_matches)
+            else len(cleaned)
+        )
+        fragment = cleaned[fragment_start:fragment_end]
+        cutoff_match = INCIDENT_FRAGMENT_CUTOFF_RE.search(fragment)
+        if cutoff_match:
+            fragment = fragment[:cutoff_match.start()]
+        record = _build_record(fragment, base_url=base_url, profile="incident_cards")
+        if record is None:
+            continue
+        records.append(record)
+    return _dedupe_records(records)
+
+
 def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecord]:
     cleaned = _strip_markup_noise(markup or "")
     records = []
@@ -953,12 +993,7 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
 
 def extract_profile_records(markup: str, *, profile: str, base_url: str = "") -> list[ExtractedRecord]:
     if profile == "incident_cards":
-        return _extract_card_records(
-            markup,
-            base_url=base_url,
-            hints=INCIDENT_BLOCK_HINTS,
-            profile=profile,
-        )
+        return _extract_incident_records(markup, base_url=base_url)
     if profile == "group_cards":
         return _extract_card_records(
             markup,

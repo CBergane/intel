@@ -581,41 +581,52 @@ class DarkIngestionTests(TestCase):
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_ransomdb_live_updates_cards_extract_normalized_incidents_only(self):
-        self.source.watch_keywords = "alphacorp, beta retail"
+        self.source.watch_keywords = "living in green, fruktimporten"
         self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
         self.source.save(
             update_fields=["watch_keywords", "extractor_profile", "updated_at"]
         )
         markup = """
         <html><title>Ransom-DB | Live Threat Command Center</title><body>
-            <section class="incident-card hero">
-                <h2>Ransom-DB | Live Threat Command Center</h2>
-                <p>Monitor live extortion activity with API access and threat groups analytics.</p>
+            <main class="space-y-6">
+            <section class="rounded-xl border border-zinc-800 bg-zinc-950/70 p-6">
+                <h1>Live Updates</h1>
+                <p>Free Real-time feed of ransomware incidents with detailed victim information and threat group attribution.</p>
+                <p>Showing last 10 results. Upgrade for more results.</p>
             </section>
-            <div class="incident-listing">
-                <div class="incident-card">
-                    <h3>AlphaCorp</h3>
-                    <p>Threat Group: Akira</p>
+            <section class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5">
+                <h3>Registration Required</h3>
+                <p>Sign in to unlock the full feed, search, and export tools.</p>
+            </section>
+            <div class="grid gap-4 md:grid-cols-2">
+                <article class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 shadow-sm">
+                    <img src="/static/flags/cz.png" alt="CZ" />
+                    <h3>Living in green, s. r. o.</h3>
+                    <p>Mar 26, 2026</p>
+                    <p>17 minutes ago</p>
+                    <p>Threat Group: Qilin</p>
+                    <p>Country: Czech Republic</p>
+                    <p>Industry: Home Improvement &amp; Hardware Retail</p>
+                    <p>Living in green, s. r. o. is a Czech company. Website: https://www.livingingreen.cz/</p>
+                </article>
+                <article class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 shadow-sm">
+                    <img src="/static/flags/se.png" alt="SE" />
+                    <h3>Fruktimporten Stockholm</h3>
+                    <p>Mar 26, 2026</p>
+                    <p>1 hour ago</p>
+                    <p>Threat Group: The_Gentelman</p>
                     <p>Country: Sverige</p>
-                    <p>Industry: Manufacturing</p>
-                    <p>Website: <a href="https://alphacorp.example">alphacorp.example</a></p>
-                    <p>Breach negotiations and disclosure details.</p>
-                </div>
-                <div class="incident-card">
-                    <h3>Beta Retail</h3>
-                    <p>Threat Group: Play</p>
-                    <p>Country: USA</p>
-                    <p>Industry: Retail</p>
-                    <p>Website: https://beta.example</p>
-                    <p>Victim page updated with operational notes.</p>
-                </div>
+                    <p>Industry: Wholesale of fruit and vegetables</p>
+                    <p>Nordic produce distributor facing extortion pressure. Official website: https://www.fruktimporten.se/</p>
+                </article>
             </div>
-            <section class="incident-entry">
-                <h3>Threat Groups</h3>
-                <p>Blog</p>
-                <p>API Access</p>
+            <section class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-5">
+                <h3>Quick Links</h3>
                 <p>Threat Groups</p>
+                <p>API Access</p>
+                <p>Blog</p>
             </section>
+            </main>
         </body></html>
         """
 
@@ -623,27 +634,33 @@ class DarkIngestionTests(TestCase):
 
         hits = list(DarkHit.objects.filter(dark_source=self.source).order_by("title"))
         self.assertEqual(len(hits), 2)
-        self.assertEqual([hit.title for hit in hits], ["AlphaCorp", "Beta Retail"])
+        self.assertEqual(
+            [hit.title for hit in hits],
+            ["Fruktimporten Stockholm", "Living in green, s. r. o."],
+        )
 
-        alpha = hits[0]
-        self.assertEqual(alpha.record_type, "incident")
-        self.assertEqual(alpha.victim_name, "AlphaCorp")
-        self.assertEqual(alpha.group_name, "Akira")
-        self.assertEqual(alpha.country, "Sweden")
-        self.assertEqual(alpha.industry, "Manufacturing")
-        self.assertEqual(alpha.website_url, "https://alphacorp.example")
-        self.assertEqual(alpha.url, self.source.url)
+        stockholm = hits[0]
+        self.assertEqual(stockholm.record_type, "incident")
+        self.assertEqual(stockholm.victim_name, "Fruktimporten Stockholm")
+        self.assertEqual(stockholm.group_name, "The_Gentelman")
+        self.assertEqual(stockholm.country, "Sweden")
+        self.assertEqual(stockholm.industry, "Wholesale of fruit and vegetables")
+        self.assertEqual(stockholm.website_url, "https://www.fruktimporten.se/")
+        self.assertEqual(stockholm.url, self.source.url)
 
-        beta = hits[1]
-        self.assertEqual(beta.record_type, "incident")
-        self.assertEqual(beta.group_name, "Play")
-        self.assertEqual(beta.country, "United States")
-        self.assertEqual(beta.industry, "Retail")
-        self.assertEqual(beta.website_url, "https://beta.example")
+        living = hits[1]
+        self.assertEqual(living.record_type, "incident")
+        self.assertEqual(living.victim_name, "Living in green, s. r. o.")
+        self.assertEqual(living.group_name, "Qilin")
+        self.assertEqual(living.country, "Czechia")
+        self.assertEqual(living.industry, "Home Improvement & Hardware Retail")
+        self.assertEqual(living.website_url, "https://www.livingingreen.cz/")
 
         raw_text = "\n".join(hit.raw.lower() for hit in hits)
         self.assertNotIn("live threat command center", raw_text)
-        self.assertNotIn("api access", raw_text)
+        self.assertNotIn("registration required", raw_text)
+        self.assertNotIn("showing 10 of", raw_text)
+        self.assertNotIn("quick links", raw_text)
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_ransomdb_live_updates_rejects_weak_incident_cards_without_structured_fields(self):
