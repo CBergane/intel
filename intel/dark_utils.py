@@ -103,7 +103,15 @@ GROUP_NAME_LABELS = (
     "operator",
 )
 VICTIM_NAME_LABELS = ("victim name", "victim", "company", "organization")
-COUNTRY_LABELS = ("country", "location")
+COUNTRY_LABELS = (
+    "country",
+    "victim country",
+    "country / region",
+    "country/region",
+    "location",
+    "headquarters",
+    "hq",
+)
 INDUSTRY_LABELS = ("industry", "sector")
 VICTIM_COUNT_LABELS = ("victim count", "victims", "listed victims")
 LAST_ACTIVITY_LABELS = ("last activity", "last seen", "last update", "updated", "activity")
@@ -131,6 +139,85 @@ INCIDENT_NAV_TEXT_RE = re.compile(
     r"dashboard"
     r")\b"
 )
+INCIDENT_CARD_SIGNAL_RE = re.compile(
+    r"(?i)\b("
+    r"breach|"
+    r"claim|claimed|"
+    r"compromise|compromised|"
+    r"disclosure|disclosed|"
+    r"extortion|"
+    r"leak|leaked|"
+    r"negotiation|"
+    r"posted|published|"
+    r"ransom|"
+    r"victim"
+    r")\b"
+)
+COUNTRY_VALUE_SPLIT_RE = re.compile(r"\s*(?:/|\||;)\s*")
+COUNTRY_NORMALIZATION_RULES = (
+    ("United States", "US", ("united states", "united states of america", "us", "usa", "u.s.", "u.s.a.", "america")),
+    ("United Kingdom", "GB", ("united kingdom", "uk", "u.k.", "great britain", "britain", "england")),
+    ("Canada", "CA", ("canada", "ca")),
+    ("Mexico", "MX", ("mexico", "mx")),
+    ("Brazil", "BR", ("brazil", "br", "brasil")),
+    ("Argentina", "AR", ("argentina", "ar")),
+    ("Iceland", "IS", ("iceland", "is", "island")),
+    ("Ireland", "IE", ("ireland", "ie")),
+    ("Portugal", "PT", ("portugal", "pt")),
+    ("Spain", "ES", ("spain", "es", "espana", "españa")),
+    ("France", "FR", ("france", "fr")),
+    ("Belgium", "BE", ("belgium", "be")),
+    ("Netherlands", "NL", ("netherlands", "nl", "holland")),
+    ("Switzerland", "CH", ("switzerland", "ch")),
+    ("Germany", "DE", ("germany", "de", "deutschland")),
+    ("Denmark", "DK", ("denmark", "dk", "danmark")),
+    ("Norway", "NO", ("norway", "no", "norge")),
+    ("Sweden", "SE", ("sweden", "se", "sverige")),
+    ("Finland", "FI", ("finland", "fi", "suomi")),
+    ("Estonia", "EE", ("estonia", "ee")),
+    ("Latvia", "LV", ("latvia", "lv")),
+    ("Lithuania", "LT", ("lithuania", "lt")),
+    ("Poland", "PL", ("poland", "pl")),
+    ("Czechia", "CZ", ("czechia", "cz", "czech republic")),
+    ("Austria", "AT", ("austria", "at")),
+    ("Italy", "IT", ("italy", "it")),
+    ("Romania", "RO", ("romania", "ro")),
+    ("Ukraine", "UA", ("ukraine", "ua")),
+    ("Greece", "GR", ("greece", "gr")),
+    ("Turkey", "TR", ("turkey", "tr", "turkiye", "türkiye")),
+    ("Israel", "IL", ("israel", "il")),
+    ("Saudi Arabia", "SA", ("saudi arabia", "sa")),
+    ("United Arab Emirates", "AE", ("united arab emirates", "uae", "u.a.e.", "ae")),
+    ("South Africa", "ZA", ("south africa", "za")),
+    ("India", "IN", ("india", "in")),
+    ("China", "CN", ("china", "cn")),
+    ("South Korea", "KR", ("south korea", "korea, republic of", "republic of korea", "kr")),
+    ("Japan", "JP", ("japan", "jp")),
+    ("Australia", "AU", ("australia", "au")),
+    ("New Zealand", "NZ", ("new zealand", "nz")),
+)
+COUNTRY_PLACEHOLDER_VALUES = {
+    "",
+    "-",
+    "--",
+    "n/a",
+    "na",
+    "none",
+    "unknown",
+    "global",
+    "worldwide",
+    "multiple",
+    "various",
+    "international",
+}
+COUNTRY_ALIAS_TO_DISPLAY = {
+    alias: display
+    for display, _code, aliases in COUNTRY_NORMALIZATION_RULES
+    for alias in aliases
+}
+COUNTRY_DISPLAY_TO_CODE = {
+    display: code for display, code, _aliases in COUNTRY_NORMALIZATION_RULES
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -327,6 +414,42 @@ def _clean_structured_text(value: str, *, max_length: int = 255) -> str:
     return cleaned[:max_length].strip()
 
 
+def _country_display_fallback(value: str) -> str:
+    cleaned = _clean_structured_text(value, max_length=120)
+    if not cleaned:
+        return ""
+    if cleaned.islower():
+        return cleaned.title()
+    return cleaned
+
+
+def normalize_dark_country(value: str) -> tuple[str, str]:
+    cleaned = _clean_structured_text(value, max_length=120)
+    if not cleaned:
+        return "", ""
+
+    candidates = [cleaned]
+    for part in COUNTRY_VALUE_SPLIT_RE.split(cleaned):
+        part = _clean_structured_text(part, max_length=120)
+        if part and part not in candidates:
+            candidates.append(part)
+
+    for candidate in candidates:
+        lowered = normalize_text(candidate).lower().replace("&", "and").strip(" .:-")
+        if lowered in COUNTRY_PLACEHOLDER_VALUES:
+            continue
+        display = COUNTRY_ALIAS_TO_DISPLAY.get(lowered)
+        if display:
+            return display, COUNTRY_DISPLAY_TO_CODE.get(display, "")
+
+    lowered_cleaned = normalize_text(cleaned).lower().replace("&", "and").strip(" .:-")
+    if lowered_cleaned in COUNTRY_PLACEHOLDER_VALUES:
+        return "", ""
+
+    fallback = _country_display_fallback(cleaned)
+    return fallback, COUNTRY_DISPLAY_TO_CODE.get(fallback, "")
+
+
 def resolve_group_name(
     *,
     record_type: str = "",
@@ -466,11 +589,14 @@ def _structured_metadata_for_profile(
     profile: str,
     base_url: str,
 ) -> dict:
+    country_name, _country_code = normalize_dark_country(
+        _extract_labeled_line_value(lines, COUNTRY_LABELS, max_length=120)
+    )
     metadata = {
         "record_type": "",
         "group_name": "",
         "victim_name": "",
-        "country": _extract_labeled_line_value(lines, COUNTRY_LABELS, max_length=120),
+        "country": country_name,
         "industry": _extract_labeled_line_value(lines, INDUSTRY_LABELS, max_length=120),
         "website_url": _extract_website_url(fragment, lines, base_url=base_url),
         "victim_count": None,
@@ -555,6 +681,42 @@ def _has_repeated_incident_metadata(lines: list[str]) -> bool:
     return any(_count_labeled_lines(lines, labels) > 1 for labels in label_groups)
 
 
+def _looks_valid_incident_card(metadata: dict, detail_text: str) -> bool:
+    has_structured_fields = any(
+        metadata.get(field)
+        for field in ("group_name", "country", "industry", "website_url")
+    )
+    if has_structured_fields:
+        return True
+    normalized_detail = normalize_text(detail_text)
+    return bool(
+        INCIDENT_CARD_SIGNAL_RE.search(normalized_detail)
+        and len(normalized_detail) >= 48
+    )
+
+
+def _looks_group_metadata_title(title: str) -> bool:
+    normalized = normalize_text(title)
+    if not normalized:
+        return True
+    lowered = normalized.lower()
+    simplified = lowered.strip(".:|- ")
+    if simplified in {"loading", "recent activity timeline", "recent activity", "activity timeline"}:
+        return True
+    metadata_labels = (
+        "last activity",
+        "victim count",
+        "victims",
+        "country",
+        "industry",
+        "website",
+        "company website",
+    )
+    if simplified in metadata_labels:
+        return True
+    return any(lowered.startswith(f"{label}:") for label in metadata_labels)
+
+
 def _build_record(fragment: str, *, base_url: str, profile: str = "") -> ExtractedRecord | None:
     text = _fragment_text(fragment)
     if len(text) < 24 or len(text) > MAX_STRUCTURED_RECORD_TEXT:
@@ -569,12 +731,6 @@ def _build_record(fragment: str, *, base_url: str, profile: str = "") -> Extract
     detail_text = _strip_title_from_text(text, title)
     if _looks_fragment_only(detail_text):
         return None
-    if profile == "incident_cards":
-        if _looks_generic_incident_card(title, detail_text):
-            return None
-        if _has_repeated_incident_metadata(lines):
-            return None
-    match_text = normalize_text("\n".join(part for part in (title, detail_text) if part))
     metadata = _structured_metadata_for_profile(
         fragment=fragment,
         lines=lines,
@@ -582,6 +738,16 @@ def _build_record(fragment: str, *, base_url: str, profile: str = "") -> Extract
         profile=profile,
         base_url=base_url,
     )
+    if profile == "incident_cards":
+        if _looks_generic_incident_card(title, detail_text):
+            return None
+        if _has_repeated_incident_metadata(lines):
+            return None
+        if not _looks_valid_incident_card(metadata, detail_text):
+            return None
+    if profile == "group_cards" and _looks_group_metadata_title(title):
+        return None
+    match_text = normalize_text("\n".join(part for part in (title, detail_text) if part))
     return ExtractedRecord(
         title=title,
         text=match_text,
@@ -739,7 +905,7 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
                 elif any(token in header for token in ("victim", "company", "organization")):
                     metadata["victim_name"] = _clean_structured_text(cell)
                 elif any(token in header for token in ("country", "location")):
-                    metadata["country"] = _clean_structured_text(cell, max_length=120)
+                    metadata["country"] = normalize_dark_country(cell)[0]
                 elif any(token in header for token in ("industry", "sector")):
                     metadata["industry"] = _clean_structured_text(cell, max_length=120)
                 elif "website" in header or "domain" in header:

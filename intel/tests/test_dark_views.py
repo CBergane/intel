@@ -379,6 +379,9 @@ class DarkMapViewTests(TestCase):
         self.assertContains(response, "Latest Incidents")
         self.assertContains(response, 'id="dark-threat-map"')
         self.assertContains(response, 'data-country-key="sweden"')
+        self.assertContains(response, "Quick Country Filter")
+        self.assertNotContains(response, "overflow-x-auto")
+        self.assertNotContains(response, "min-w-[68rem]")
 
     def test_map_page_aggregates_countries_and_groups(self):
         self.client.force_login(self.superuser)
@@ -413,6 +416,33 @@ class DarkMapViewTests(TestCase):
         self.assertEqual(response.context["match_filter"], "all")
         self.assertGreater(response.context["map_metrics"]["incident_count"], 0)
         self.assertContains(response, "Sweden")
+
+    def test_map_page_normalizes_country_aliases_for_aggregation_and_drilldown(self):
+        _make_hit(
+            self.source_a,
+            title="Alias Sweden Incident",
+            group_name="Akira",
+            victim_name="Alias Sweden Incident",
+            country="Sverige",
+            record_type="incident",
+            detected_offset_hours=1,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(DARK_MAP_URL, {"country": "Sverige"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["selected_country"], "Sweden")
+        sweden_row = next(
+            row for row in response.context["country_rows"] if row["country"] == "Sweden"
+        )
+        self.assertEqual(sweden_row["incident_count"], 3)
+        latest_incidents = response.context["latest_incidents"]
+        self.assertTrue(latest_incidents)
+        self.assertIn("Alias Sweden Incident", [hit.title for hit in latest_incidents])
+        self.assertTrue(
+            all((getattr(hit, "map_country", "") or hit.country) == "Sweden" for hit in latest_incidents)
+        )
 
     def test_map_country_drilldown_filters_latest_incidents_and_highlights_groups(self):
         self.client.force_login(self.superuser)
@@ -496,6 +526,46 @@ class DarkMapViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["map_metrics"]["country_count"], 0)
-        self.assertContains(response, "No incident geography to plot")
+        self.assertContains(response, "No incident data to map")
         self.assertContains(response, "currently contributing only group/context records")
         self.assertContains(response, "The map activates when incident-style records carry normalized country data")
+
+    def test_map_empty_state_explains_missing_incident_country_values(self):
+        countryless_source = _make_source(slug="map-countryless", name="Map Countryless")
+        _make_hit(
+            countryless_source,
+            title="Countryless Incident",
+            group_name="Akira",
+            victim_name="Countryless Incident",
+            country="",
+            record_type="incident",
+            detected_offset_hours=1,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(DARK_MAP_URL, {"source": countryless_source.slug})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["map_metrics"]["country_count"], 0)
+        self.assertContains(response, "Incident country data missing")
+        self.assertContains(response, "do not yet carry country values for plotting")
+
+    def test_map_empty_state_explains_placeholder_country_values_that_need_normalization(self):
+        unknown_country_source = _make_source(slug="map-unknown-country", name="Map Unknown Country")
+        _make_hit(
+            unknown_country_source,
+            title="Unknown Geography Incident",
+            group_name="Akira",
+            victim_name="Unknown Geography Incident",
+            country="Unknown",
+            record_type="incident",
+            detected_offset_hours=1,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(DARK_MAP_URL, {"source": unknown_country_source.slug})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["map_metrics"]["country_count"], 0)
+        self.assertContains(response, "Country data missing")
+        self.assertContains(response, "need cleaner normalization before they can be plotted reliably")

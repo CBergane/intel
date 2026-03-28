@@ -24,6 +24,7 @@ from django.views.decorators.http import require_POST
 from .dark_utils import (
     dark_source_suitability_warning,
     extract_links,
+    normalize_dark_country,
     resolve_group_name,
     summarize_profile_content,
 )
@@ -627,20 +628,6 @@ DARK_MAP_REGION_LABELS = (
     {"label": "APAC", "x": 864, "y": 120},
     {"label": "Africa", "x": 636, "y": 426},
 )
-DARK_MAP_COUNTRY_ALIASES = {
-    "us": "united states",
-    "usa": "united states",
-    "u.s.": "united states",
-    "u.s.a.": "united states",
-    "uk": "united kingdom",
-    "great britain": "united kingdom",
-    "england": "united kingdom",
-    "czech republic": "czechia",
-    "uae": "united arab emirates",
-    "u.a.e.": "united arab emirates",
-    "south korea": "korea, republic of",
-    "republic of korea": "korea, republic of",
-}
 DARK_MAP_TILE_LAYOUT = (
     {"key": "canada", "label": "Canada", "short_label": "Canada", "x": 86, "y": 102},
     {"key": "united states", "label": "United States", "short_label": "US", "x": 122, "y": 156},
@@ -796,6 +783,7 @@ def _active_group_rows(hits):
         )
         if not group_name:
             continue
+        country_display, _country_code = normalize_dark_country(hit.country)
         group_key = group_name.lower()
         activity_at = hit.last_seen_at or hit.detected_at
         row = grouped.get(group_key)
@@ -829,7 +817,7 @@ def _active_group_rows(hits):
             row["latest_activity_at"] = activity_at
             row["latest_detected_at"] = hit.detected_at
             row["latest_victim_name"] = hit.victim_name or row["latest_victim_name"]
-            row["latest_country"] = hit.country or row["latest_country"]
+            row["latest_country"] = country_display or row["latest_country"]
             row["latest_activity_text"] = hit.last_activity_text or row["latest_activity_text"]
 
     rows = []
@@ -853,9 +841,10 @@ def _dark_dashboard_summary(base_hits, selected_hits):
     hits_7d = base_hits.filter(detected_at__gte=timezone.now() - DARK_WINDOW_RANGES["7d"])
     selected_hits_list = list(selected_hits)
     countries = {
-        (hit.country or "").strip()
+        country_display
         for hit in selected_hits_list
-        if (hit.country or "").strip()
+        for country_display, _country_code in [normalize_dark_country(hit.country)]
+        if country_display
     }
     source_ids = {hit.dark_source_id for hit in selected_hits_list}
 
@@ -874,12 +863,10 @@ def _live_incident_hits(hits):
 
 
 def _normalized_country_key(value: str) -> str:
+    country_display, _country_code = normalize_dark_country(value)
+    if country_display:
+        return country_display.lower()
     return (value or "").strip().lower()
-
-
-def _dark_map_country_key(value: str) -> str:
-    normalized = _normalized_country_key(value)
-    return DARK_MAP_COUNTRY_ALIASES.get(normalized, normalized)
 
 
 def _dark_map_tile_palette(*, intensity_level: int, is_selected: bool, has_activity: bool):
@@ -937,7 +924,7 @@ def _dark_map_tiles(country_rows, *, selected_country: str, window: str, selecte
     row_by_layout_key = {}
     unmapped_rows = []
     for row in country_rows:
-        map_key = _dark_map_country_key(row["country"])
+        map_key = row["country_key"]
         row["map_country_key"] = map_key
         if map_key not in DARK_MAP_LAYOUT_KEYS:
             unmapped_rows.append(row)
@@ -1028,19 +1015,30 @@ def _dark_map_empty_state(hits, country_rows, *, selected_source_name: str = "")
         }
     incident_hits = [hit for hit in hits if hit.record_type == "incident"]
     if not incident_hits:
-        source_phrase = f"{selected_source_name} is" if selected_source_name else "The current selection is"
+        source_phrase = (
+            f"{selected_source_name} is" if selected_source_name else "The current selection is"
+        )
         return {
-            "title": "No incident geography to plot",
+            "title": "No incident data to map",
             "message": (
                 f"{source_phrase} currently contributing only group/context records. "
                 "The map activates when incident-style records carry normalized country data."
             ),
         }
+    raw_country_values = [(hit.country or "").strip() for hit in incident_hits if (hit.country or "").strip()]
+    if not raw_country_values:
+        return {
+            "title": "Incident country data missing",
+            "message": (
+                "Incident-style records matched the current filters, but they do not yet carry "
+                "country values for plotting."
+            ),
+        }
     return {
         "title": "Country data missing",
         "message": (
-            "Incident-style records matched the current filters, but they do not yet include "
-            "normalized country values for plotting."
+            "Incident-style records matched the current filters, but their country values still "
+            "need cleaner normalization before they can be plotted reliably."
         ),
     }
 
@@ -1057,15 +1055,16 @@ def _dark_country_activity_rows(hits):
     grouped = {}
     max_record_count = 0
     for hit in hits:
-        country = (hit.country or "").strip()
-        if not country:
+        country_display, country_code = normalize_dark_country(hit.country)
+        if not country_display:
             continue
-        country_key = country.lower()
+        country_key = country_display.lower()
         activity_at = hit.last_seen_at or hit.detected_at
         row = grouped.get(country_key)
         if row is None:
             row = {
-                "country": country,
+                "country": country_display,
+                "country_code": country_code,
                 "record_count": 0,
                 "incident_count": 0,
                 "latest_activity_at": activity_at,
@@ -1139,11 +1138,11 @@ def _dark_map_group_rows(hits, *, selected_country: str = ""):
         )
         if not group_name:
             continue
-        country = (hit.country or "").strip()
-        if not country:
+        country_display, _country_code = normalize_dark_country(hit.country)
+        if not country_display:
             continue
         country_map = group_countries.setdefault(group_name.lower(), {})
-        country_map.setdefault(country.lower(), country)
+        country_map.setdefault(country_display.lower(), country_display)
 
     selected_country_key = _normalized_country_key(selected_country)
     for row in rows:
@@ -1162,8 +1161,11 @@ def _dark_map_latest_incidents(hits, *, selected_country: str = ""):
     for hit in hits:
         if hit.record_type != "incident":
             continue
-        if selected_country_key and _normalized_country_key(hit.country) != selected_country_key:
+        country_display, country_code = normalize_dark_country(hit.country)
+        if selected_country_key and _normalized_country_key(country_display) != selected_country_key:
             continue
+        hit.map_country = country_display
+        hit.map_country_code = country_code
         incidents.append(hit)
     return incidents[:8]
 
@@ -1223,7 +1225,8 @@ def dark_map_view(request):
                 selected_country = row["country"]
                 break
         if not selected_country:
-            selected_country = requested_country
+            normalized_country, _country_code = normalize_dark_country(requested_country)
+            selected_country = normalized_country or requested_country
 
     selected_country_key = _normalized_country_key(selected_country)
     for row in country_rows:

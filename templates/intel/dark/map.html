@@ -106,7 +106,7 @@
                         <span class="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">dot = watch match present</span>
                     </div>
                 </div>
-                <div class="rounded-2xl border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.08),_transparent_55%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] p-3 sm:p-4">
+                <div class="rounded-2xl border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.08),_transparent_55%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] p-3 sm:p-4 lg:p-5">
                     <div class="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
                         <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1">all stored records for analytics</span>
                         <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">selected country highlighted</span>
@@ -114,8 +114,30 @@
                             <span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-200">matched-only mode</span>
                         {% endif %}
                     </div>
-                    <div class="overflow-x-auto">
-                        <svg id="dark-threat-map" viewBox="0 0 1100 560" class="h-auto min-w-[68rem] w-full" role="img" aria-label="Dark incident activity map">
+                    <div class="lg:hidden">
+                        {% if country_rows %}
+                            <div class="rounded-2xl border border-line/80 bg-slate-950/45 p-3">
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-sm font-semibold text-white">Quick Country Filter</h3>
+                                        <p class="mt-1 text-xs text-slate-500">Desktop shows the full map. On smaller screens, use the country buttons here and the panels below.</p>
+                                    </div>
+                                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ country_rows|length }} active</span>
+                                </div>
+                                <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                                    {% for row in country_rows|slice:":8" %}
+                                        <a href="{% url 'dark-map' %}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}{% if not row.is_selected %}&country={{ row.country|urlencode }}{% endif %}"
+                                           class="rounded-xl border px-3 py-2 text-left {% if row.is_selected %}border-emerald-500/40 bg-emerald-500/10{% else %}border-line/80 bg-slate-900/70 hover:bg-slate-900/85{% endif %}">
+                                            <span class="block text-sm font-medium text-white">{{ row.country }}</span>
+                                            <span class="mt-1 block text-[11px] text-slate-400">{{ row.incident_count }} incidents · {{ row.record_count }} records{% if row.watch_match_count %} · {{ row.watch_match_count }} matched{% endif %}</span>
+                                        </a>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="hidden lg:block">
+                        <svg id="dark-threat-map" viewBox="0 0 1100 560" class="h-auto w-full max-w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Dark incident activity map">
                             <rect x="0" y="0" width="1100" height="560" rx="22" fill="#020617" />
                             <g opacity="0.16" stroke="#1e293b" stroke-width="1">
                                 <path d="M24 104H1076" />
@@ -259,8 +281,8 @@
                                         {% if hit.group_name %}
                                             <span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">{{ hit.group_name }}</span>
                                         {% endif %}
-                                        {% if hit.country %}
-                                            <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ hit.country }}</span>
+                                        {% if hit.map_country|default:hit.country %}
+                                            <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ hit.map_country|default:hit.country }}</span>
                                         {% endif %}
                                         <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ hit.dark_source.name }}</span>
                                     </div>

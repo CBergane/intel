@@ -506,7 +506,11 @@ class DarkIngestionTests(TestCase):
             </div>
             <div class="incident-card">
                 <h2>Beta Retail</h2>
-                <p>Discussion thread without watched terms.</p>
+                <p>Threat Group: Play</p>
+                <p>Country: Norway</p>
+                <p>Industry: Retail</p>
+                <p>Website: https://beta.example</p>
+                <p>Disclosure page updated for operator review.</p>
             </div>
         </body></html>
         """
@@ -541,6 +545,10 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(unmatched_hit.matched_keywords, [])
         self.assertEqual(unmatched_hit.matched_regex, [])
         self.assertEqual(unmatched_hit.record_type, "incident")
+        self.assertEqual(unmatched_hit.group_name, "Play")
+        self.assertEqual(unmatched_hit.country, "Norway")
+        self.assertEqual(unmatched_hit.industry, "Retail")
+        self.assertEqual(unmatched_hit.website_url, "https://beta.example")
 
     @override_settings(
         DARK_FETCH_RETRIES=1,
@@ -588,7 +596,7 @@ class DarkIngestionTests(TestCase):
                 <div class="incident-card">
                     <h3>AlphaCorp</h3>
                     <p>Threat Group: Akira</p>
-                    <p>Country: Sweden</p>
+                    <p>Country: Sverige</p>
                     <p>Industry: Manufacturing</p>
                     <p>Website: <a href="https://alphacorp.example">alphacorp.example</a></p>
                     <p>Breach negotiations and disclosure details.</p>
@@ -596,7 +604,7 @@ class DarkIngestionTests(TestCase):
                 <div class="incident-card">
                     <h3>Beta Retail</h3>
                     <p>Threat Group: Play</p>
-                    <p>Country: Norway</p>
+                    <p>Country: USA</p>
                     <p>Industry: Retail</p>
                     <p>Website: https://beta.example</p>
                     <p>Victim page updated with operational notes.</p>
@@ -629,13 +637,47 @@ class DarkIngestionTests(TestCase):
         beta = hits[1]
         self.assertEqual(beta.record_type, "incident")
         self.assertEqual(beta.group_name, "Play")
-        self.assertEqual(beta.country, "Norway")
+        self.assertEqual(beta.country, "United States")
         self.assertEqual(beta.industry, "Retail")
         self.assertEqual(beta.website_url, "https://beta.example")
 
         raw_text = "\n".join(hit.raw.lower() for hit in hits)
         self.assertNotIn("live threat command center", raw_text)
         self.assertNotIn("api access", raw_text)
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_ransomdb_live_updates_rejects_weak_incident_cards_without_structured_fields(self):
+        self.source.watch_keywords = "alphacorp"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Ransom-DB | Live Threat Command Center</title><body>
+            <div class="incident-card">
+                <h3>AlphaCorp</h3>
+                <p>Threat Group: Akira</p>
+                <p>Country: Sweden</p>
+                <p>Industry: Manufacturing</p>
+                <p>Website: https://alphacorp.example</p>
+                <p>Victim page updated with extortion details.</p>
+            </div>
+            <div class="incident-card">
+                <h3>Beta Retail</h3>
+                <p>Brief note for analysts.</p>
+            </div>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hits = list(DarkHit.objects.filter(dark_source=self.source))
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0].title, "AlphaCorp")
+        self.assertEqual(hits[0].group_name, "Akira")
+        self.assertEqual(hits[0].country, "Sweden")
+        self.assertEqual(hits[0].industry, "Manufacturing")
+        self.assertEqual(hits[0].website_url, "https://alphacorp.example")
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_fragment_only_card_blocks_are_ignored(self):
@@ -730,6 +772,64 @@ class DarkIngestionTests(TestCase):
         akira = DarkHit.objects.get(dark_source=self.source, title="Akira")
         self.assertFalse(akira.is_watch_match)
         self.assertEqual(akira.matched_keywords, [])
+
+    @override_settings(
+        DARK_FETCH_RETRIES=1,
+        DARK_MAX_BYTES=5000,
+    )
+    def test_ransomdb_threat_groups_reject_timeline_and_loading_fragments(self):
+        self.source.watch_keywords = "akira, dragonforce"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.GROUP_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Threat Groups</title><body>
+            <article class="group-card">
+                <h2>Loading...</h2>
+                <p>Please wait while profile data loads.</p>
+                <p>Recent disclosure placeholders remain visible.</p>
+            </article>
+            <article class="group-card">
+                <h2>Recent Activity Timeline</h2>
+                <p>Last Activity: 2026-03-22</p>
+                <p>Timeline of recent disclosures and extortion updates.</p>
+            </article>
+            <article class="group-card">
+                <h2>Last Activity: 2026-03-21</h2>
+                <p>Victims: 12</p>
+                <p>Metadata panel for sorting cards.</p>
+            </article>
+            <article class="group-card">
+                <h2>Victim Count</h2>
+                <p>41</p>
+                <p>Sorting helper card for the timeline panel.</p>
+            </article>
+            <article class="group-card">
+                <h2>Country: Sweden</h2>
+                <p>Regional metadata label used by the activity timeline.</p>
+            </article>
+            <article class="group-card">
+                <h2>Akira</h2>
+                <p>Victims: 41</p>
+                <p>Last Activity: 2026-03-22</p>
+                <p>Recent extortion disclosures across manufacturing and retail.</p>
+            </article>
+            <article class="group-card">
+                <h2>DragonForce</h2>
+                <p>Victims: 12</p>
+                <p>Last Activity: 2026-03-20</p>
+                <p>Leak site posts and pressure tactics continue.</p>
+            </article>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hits = list(DarkHit.objects.filter(dark_source=self.source).order_by("title"))
+        self.assertEqual([hit.title for hit in hits], ["Akira", "DragonForce"])
+        self.assertEqual(hits[0].group_name, "Akira")
+        self.assertEqual(hits[1].group_name, "DragonForce")
 
     @override_settings(
         DARK_FETCH_RETRIES=1,
