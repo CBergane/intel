@@ -485,7 +485,7 @@ class DarkIngestionTests(TestCase):
         self.assertNotIn("privacy policy", hit.excerpt.lower())
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
-    def test_incident_card_with_multiple_keyword_matches_creates_one_hit(self):
+    def test_incident_cards_store_unmatched_records_and_aggregate_watch_matches(self):
         self.source.watch_keywords = "alphacorp, breach, negotiation, leak"
         self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
         self.source.save(
@@ -513,12 +513,15 @@ class DarkIngestionTests(TestCase):
 
         self._ingest_markup(markup)
 
-        hits = list(DarkHit.objects.filter(dark_source=self.source))
+        hits = {
+            hit.title: hit for hit in DarkHit.objects.filter(dark_source=self.source)
+        }
         run = DarkFetchRun.objects.get(dark_source=self.source)
-        self.assertEqual(run.hits_new, 1)
-        self.assertEqual(len(hits), 1)
-        hit = hits[0]
-        self.assertEqual(hit.title, "AlphaCorp")
+        self.assertEqual(run.hits_new, 2)
+        self.assertEqual(set(hits), {"AlphaCorp", "Beta Retail"})
+
+        hit = hits["AlphaCorp"]
+        self.assertTrue(hit.is_watch_match)
         self.assertEqual(
             hit.matched_keywords,
             ["alphacorp", "breach", "negotiation", "leak"],
@@ -532,6 +535,41 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(hit.last_activity_text, "2026-03-20")
         self.assertEqual(hit.url, "https://gamma.example.com/live/alphacorp")
         self.assertNotIn("landing page", hit.raw.lower())
+
+        unmatched_hit = hits["Beta Retail"]
+        self.assertFalse(unmatched_hit.is_watch_match)
+        self.assertEqual(unmatched_hit.matched_keywords, [])
+        self.assertEqual(unmatched_hit.matched_regex, [])
+        self.assertEqual(unmatched_hit.record_type, "incident")
+
+    @override_settings(
+        DARK_FETCH_RETRIES=1,
+        DARK_MAX_BYTES=5000,
+        DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
+    )
+    def test_watch_matched_incident_records_still_send_discord_alerts(self):
+        self.source.watch_keywords = "alphacorp"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Live Updates</title><body>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <p>Threat Group: Akira</p>
+                <p>Country: Sweden</p>
+                <p>Victim disclosure updated.</p>
+            </div>
+        </body></html>
+        """
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            self._ingest_markup(markup)
+
+        hit = DarkHit.objects.get(dark_source=self.source, title="AlphaCorp")
+        self.assertTrue(hit.is_watch_match)
+        mock_post.assert_called_once()
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_ransomdb_live_updates_cards_extract_normalized_incidents_only(self):
@@ -676,8 +714,11 @@ class DarkIngestionTests(TestCase):
 
         self._ingest_markup(markup)
 
-        hit = DarkHit.objects.get(dark_source=self.source)
+        self.assertEqual(DarkHit.objects.filter(dark_source=self.source).count(), 2)
+
+        hit = DarkHit.objects.get(dark_source=self.source, title="Black Basta")
         self.assertEqual(hit.title, "Black Basta")
+        self.assertTrue(hit.is_watch_match)
         self.assertEqual(hit.matched_keywords, ["black basta"])
         self.assertEqual(hit.record_type, "group")
         self.assertEqual(hit.group_name, "Black Basta")
@@ -685,6 +726,10 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(hit.last_activity_text, "2026-03-22")
         self.assertIn("extortion operations", hit.excerpt)
         self.assertEqual(hit.url, self.source.url)
+
+        akira = DarkHit.objects.get(dark_source=self.source, title="Akira")
+        self.assertFalse(akira.is_watch_match)
+        self.assertEqual(akira.matched_keywords, [])
 
     @override_settings(
         DARK_FETCH_RETRIES=1,
@@ -713,6 +758,7 @@ class DarkIngestionTests(TestCase):
         hit = DarkHit.objects.get(dark_source=self.source)
         self.assertEqual(hit.record_type, "group")
         self.assertEqual(hit.group_name, "Black Basta")
+        self.assertTrue(hit.is_watch_match)
         mock_post.assert_not_called()
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)

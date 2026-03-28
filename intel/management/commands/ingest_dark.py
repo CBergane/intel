@@ -227,11 +227,17 @@ class Command(BaseCommand):
 
             hits_new = 0
             hits_updated = 0
+            store_structured_records = source.extractor_profile in {
+                DarkSource.ExtractorProfile.INCIDENT_CARDS,
+                DarkSource.ExtractorProfile.GROUP_CARDS,
+                DarkSource.ExtractorProfile.TABLE_ROWS,
+            }
             for record in records:
                 match_text = f"{record.title}\n{record.text}"
                 keyword_matches = matched_keywords(match_text, source.watch_keywords)
                 regex_matches = matched_regex(match_text, source.watch_regex)
-                if not keyword_matches and not regex_matches:
+                is_watch_match = bool(keyword_matches or regex_matches)
+                if not is_watch_match and not store_structured_records:
                     continue
                 normalized_group_name = resolve_group_name(
                     record_type=record.record_type,
@@ -252,6 +258,7 @@ class Command(BaseCommand):
                     defaults={
                         "matched_keywords": keyword_matches,
                         "matched_regex": regex_matches,
+                        "is_watch_match": is_watch_match,
                         "record_type": record.record_type,
                         "group_name": normalized_group_name,
                         "victim_name": record.victim_name,
@@ -268,12 +275,14 @@ class Command(BaseCommand):
                     },
                 )
                 if hit_created:
-                    send_dark_hit_alert(hit)
+                    if is_watch_match:
+                        send_dark_hit_alert(hit)
                     hits_new += 1
                     continue
 
                 hit.matched_keywords = keyword_matches
                 hit.matched_regex = regex_matches
+                hit.is_watch_match = is_watch_match
                 hit.record_type = record.record_type
                 hit.group_name = normalized_group_name
                 hit.victim_name = record.victim_name

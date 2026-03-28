@@ -44,3 +44,10 @@ deduplicates and scores items, and presents them in a structured way (not an RSS
    - Run with strict network isolation and egress controls.
 
 11. Deliver with “What changed” + “How to test” in PR descriptions.
+
+12. Important:
+   - If you replace an existing implementation, remove dead code, unused templates, unused helpers, obsolete branches, and stale routes that are no longer needed.
+   - Do not leave parallel legacy code behind unless it is still actively referenced.
+   - If something looks unused but is uncertain, identify it clearly instead of silently keeping it.
+   - Prefer replacement over duplication.
+   - If a new extractor/profile system makes old source-specific logic obsolete, remove the obsolete logic in the same change when safe.

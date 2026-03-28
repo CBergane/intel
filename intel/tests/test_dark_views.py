@@ -30,6 +30,7 @@ def _make_hit(
     victim_name: str = "",
     country: str = "",
     record_type: str = "incident",
+    is_watch_match: bool = False,
     detected_offset_days: int = 0,
     detected_offset_hours: int = 0,
 ):
@@ -43,6 +44,8 @@ def _make_hit(
         victim_name=victim_name,
         country=country,
         record_type=record_type,
+        is_watch_match=is_watch_match,
+        matched_keywords=["watch"] if is_watch_match else [],
     )
     if detected_offset_days or detected_offset_hours:
         activity_at = timezone.now() - timedelta(
@@ -261,6 +264,27 @@ class ActiveGroupsViewTests(TestCase):
         self.assertEqual(response_30d.context["active_group_count"], 3)
         self.assertEqual(response_30d.context["summary_metrics"]["affected_country_count"], 4)
 
+    def test_active_groups_match_filter_shows_only_watch_matched_records(self):
+        _make_hit(
+            self.source_a,
+            title="Matched Alert",
+            group_name="DragonForce",
+            victim_name="Matched Alert",
+            country="Sweden",
+            is_watch_match=True,
+            detected_offset_hours=1,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(DARK_GROUPS_URL, {"match": "matched"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["match_filter"], "matched")
+        rows = list(response.context["group_rows"].object_list)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["group_name"], "DragonForce")
+        self.assertEqual(rows[0]["watch_match_count"], 1)
+
     def test_recent_hits_view_keeps_raw_hits_available(self):
         self.client.force_login(self.superuser)
         response = self.client.get(DARK_RECENT_URL)
@@ -269,6 +293,23 @@ class ActiveGroupsViewTests(TestCase):
         self.assertContains(response, "Alpha Manufacturing")
         self.assertContains(response, "Beta Retail")
         self.assertContains(response, reverse("dark-dashboard"))
+
+    def test_recent_hits_match_filter_hides_unmatched_context_records(self):
+        _make_hit(
+            self.source_a,
+            title="Matched Context",
+            group_name="DragonForce",
+            victim_name="Matched Context",
+            is_watch_match=True,
+            detected_offset_hours=1,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(DARK_RECENT_URL, {"match": "matched"})
+
+        self.assertContains(response, "Matched Context")
+        self.assertNotContains(response, "Alpha Manufacturing")
+        self.assertContains(response, "Watch Match")
 
 
 class DarkMapViewTests(TestCase):
@@ -362,6 +403,15 @@ class DarkMapViewTests(TestCase):
         self.assertNotIn("Finland", countries_7d)
         self.assertIn("Finland", countries_30d)
 
+    def test_map_page_uses_unmatched_incident_records_by_default(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_MAP_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["match_filter"], "all")
+        self.assertGreater(response.context["map_metrics"]["incident_count"], 0)
+        self.assertContains(response, "Sweden")
+
     def test_map_country_drilldown_filters_latest_incidents_and_highlights_groups(self):
         self.client.force_login(self.superuser)
         response = self.client.get(DARK_MAP_URL, {"country": "Sweden"})
@@ -385,3 +435,24 @@ class DarkMapViewTests(TestCase):
         self.assertIn("Alpha Manufacturing", latest_titles)
         self.assertIn("Gamma Health", latest_titles)
         self.assertNotIn("Akira Profile", latest_titles)
+
+    def test_map_match_filter_can_focus_on_watch_matched_records(self):
+        _make_hit(
+            self.source_a,
+            title="Matched Sweden Incident",
+            group_name="DragonForce",
+            victim_name="Matched Sweden Incident",
+            country="Sweden",
+            is_watch_match=True,
+            detected_offset_hours=1,
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(DARK_MAP_URL, {"match": "matched"})
+
+        self.assertEqual(response.context["match_filter"], "matched")
+        latest_titles = [hit.title for hit in response.context["latest_incidents"]]
+        self.assertEqual(latest_titles, ["Matched Sweden Incident"])
+        top_groups = response.context["top_groups"]
+        self.assertEqual(len(top_groups), 1)
+        self.assertEqual(top_groups[0]["group_name"], "DragonForce")

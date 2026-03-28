@@ -155,6 +155,7 @@ class DarkHit(models.Model):
     last_seen_at = models.DateTimeField(default=timezone.now)
     matched_keywords = models.JSONField(default=list, blank=True)
     matched_regex = models.JSONField(default=list, blank=True)
+    is_watch_match = models.BooleanField(default=False, db_index=True)
     record_type = models.CharField(max_length=32, blank=True, db_index=True)
     group_name = models.CharField(max_length=255, blank=True, db_index=True)
     victim_name = models.CharField(max_length=255, blank=True)

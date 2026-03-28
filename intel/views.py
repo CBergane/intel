@@ -617,11 +617,15 @@ DARK_WINDOW_RANGES = {
     "30d": timedelta(days=30),
 }
 DARK_WINDOW_OPTIONS = [("24h", "24h"), ("7d", "7d"), ("30d", "30d")]
+DARK_MATCH_OPTIONS = [("all", "All records"), ("matched", "Watch matches")]
 
 
 def _dark_filtered_hits_queryset(request):
     query = (request.GET.get("q") or "").strip()
     selected_source = (request.GET.get("source") or "").strip()
+    match_filter = (request.GET.get("match") or "all").strip()
+    if match_filter not in {"all", "matched"}:
+        match_filter = "all"
     legacy_window_map = {"7": "7d", "30": "30d", "90": "30d"}
     window = (request.GET.get("window") or "").strip()
     if not window:
@@ -631,6 +635,8 @@ def _dark_filtered_hits_queryset(request):
     since = timezone.now() - DARK_WINDOW_RANGES[window]
 
     base_hits = DarkHit.objects.select_related("dark_source", "dark_document")
+    if match_filter == "matched":
+        base_hits = base_hits.filter(is_watch_match=True)
     if selected_source:
         base_hits = base_hits.filter(dark_source__slug=selected_source)
     if query:
@@ -653,6 +659,8 @@ def _dark_filtered_hits_queryset(request):
     return base_hits, selected_hits, {
         "query": query,
         "selected_source": selected_source,
+        "match_filter": match_filter,
+        "match_options": DARK_MATCH_OPTIONS,
         "window": window,
         "since": since,
     }
@@ -735,12 +743,15 @@ def _active_group_rows(hits):
                 "latest_country": "",
                 "latest_activity_text": "",
                 "victim_count": None,
+                "watch_match_count": 0,
                 "source_names": [],
                 "source_ids": set(),
             }
             grouped[group_key] = row
 
         row["incident_count"] += 1
+        if hit.is_watch_match:
+            row["watch_match_count"] += 1
         row["group_name"] = _preferred_group_display(row["group_name"], group_name)
         if hit.dark_source_id not in row["source_ids"]:
             row["source_ids"].add(hit.dark_source_id)
