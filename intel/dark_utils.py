@@ -107,6 +107,30 @@ COUNTRY_LABELS = ("country", "location")
 INDUSTRY_LABELS = ("industry", "sector")
 VICTIM_COUNT_LABELS = ("victim count", "victims", "listed victims")
 LAST_ACTIVITY_LABELS = ("last activity", "last seen", "last update", "updated", "activity")
+WEBSITE_LABELS = ("company website", "website", "site")
+GENERIC_INCIDENT_TITLE_RE = re.compile(
+    r"(?i)\b("
+    r"ransom-db\s*\|\s*live threat command center|"
+    r"live threat command center|"
+    r"threat groups|"
+    r"api access|"
+    r"blog|"
+    r"documentation|"
+    r"latest updates"
+    r")\b"
+)
+INCIDENT_NAV_TEXT_RE = re.compile(
+    r"(?i)\b("
+    r"blog|"
+    r"api access|"
+    r"threat groups|"
+    r"documentation|"
+    r"contact|"
+    r"about|"
+    r"pricing|"
+    r"dashboard"
+    r")\b"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -383,11 +407,10 @@ def _extract_anchor_after_label(fragment: str, labels: tuple[str, ...], *, base_
 
 
 def _extract_website_url(fragment: str, lines: list[str], *, base_url: str) -> str:
-    label_candidates = ("company website", "website", "site")
-    labeled_anchor = _extract_anchor_after_label(fragment, label_candidates, base_url=base_url)
+    labeled_anchor = _extract_anchor_after_label(fragment, WEBSITE_LABELS, base_url=base_url)
     if labeled_anchor:
         return labeled_anchor
-    labeled_text = _extract_labeled_line_value(lines, label_candidates, max_length=1500)
+    labeled_text = _extract_labeled_line_value(lines, WEBSITE_LABELS, max_length=1500)
     if labeled_text:
         url_match = URL_TEXT_RE.search(labeled_text)
         if url_match:
@@ -480,16 +503,78 @@ def _structured_metadata_for_profile(
     return metadata
 
 
+def _heading_title(fragment: str) -> str:
+    title_match = RECORD_TITLE_RE.search(fragment or "")
+    if not title_match:
+        return ""
+    return normalize_text(html.unescape(TAG_RE.sub(" ", title_match.group(2))))
+
+
+def _count_labeled_lines(lines: list[str], labels: tuple[str, ...]) -> int:
+    label_pattern = "|".join(re.escape(label) for label in sorted(labels, key=len, reverse=True))
+    pattern = re.compile(
+        rf"^(?:{label_pattern})\s*(?::|-|\||\s)\s*.+$",
+        re.IGNORECASE,
+    )
+    return sum(1 for line in lines if pattern.match(line))
+
+
+def _incident_card_title(fragment: str, lines: list[str]) -> str:
+    heading_title = _heading_title(fragment)
+    if heading_title:
+        return heading_title
+    victim_title = _extract_labeled_line_value(lines, VICTIM_NAME_LABELS, max_length=255)
+    if victim_title:
+        return victim_title
+    return ""
+
+
+def _looks_generic_incident_card(title: str, detail_text: str) -> bool:
+    normalized_title = normalize_text(title)
+    normalized_detail = normalize_text(detail_text)
+    if not normalized_title:
+        return True
+    if GENERIC_INCIDENT_TITLE_RE.search(normalized_title):
+        return True
+    if (
+        INCIDENT_NAV_TEXT_RE.findall(normalized_detail)
+        and not STRUCTURED_CONTENT_HINT_RE.search(normalized_detail)
+    ):
+        return True
+    return False
+
+
+def _has_repeated_incident_metadata(lines: list[str]) -> bool:
+    label_groups = (
+        GROUP_NAME_LABELS,
+        COUNTRY_LABELS,
+        INDUSTRY_LABELS,
+        WEBSITE_LABELS,
+        VICTIM_NAME_LABELS,
+    )
+    return any(_count_labeled_lines(lines, labels) > 1 for labels in label_groups)
+
+
 def _build_record(fragment: str, *, base_url: str, profile: str = "") -> ExtractedRecord | None:
     text = _fragment_text(fragment)
     if len(text) < 24 or len(text) > MAX_STRUCTURED_RECORD_TEXT:
         return None
-    title = _fragment_title(fragment, text)
+    lines = _fragment_lines(fragment)
+    if profile == "incident_cards":
+        title = _incident_card_title(fragment, lines)
+    else:
+        title = _fragment_title(fragment, text)
+    if not title:
+        return None
     detail_text = _strip_title_from_text(text, title)
     if _looks_fragment_only(detail_text):
         return None
+    if profile == "incident_cards":
+        if _looks_generic_incident_card(title, detail_text):
+            return None
+        if _has_repeated_incident_metadata(lines):
+            return None
     match_text = normalize_text("\n".join(part for part in (title, detail_text) if part))
-    lines = _fragment_lines(fragment)
     metadata = _structured_metadata_for_profile(
         fragment=fragment,
         lines=lines,

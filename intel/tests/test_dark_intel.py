@@ -534,6 +534,72 @@ class DarkIngestionTests(TestCase):
         self.assertNotIn("landing page", hit.raw.lower())
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_ransomdb_live_updates_cards_extract_normalized_incidents_only(self):
+        self.source.watch_keywords = "alphacorp, beta retail"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Ransom-DB | Live Threat Command Center</title><body>
+            <section class="incident-card hero">
+                <h2>Ransom-DB | Live Threat Command Center</h2>
+                <p>Monitor live extortion activity with API access and threat groups analytics.</p>
+            </section>
+            <div class="incident-listing">
+                <div class="incident-card">
+                    <h3>AlphaCorp</h3>
+                    <p>Threat Group: Akira</p>
+                    <p>Country: Sweden</p>
+                    <p>Industry: Manufacturing</p>
+                    <p>Website: <a href="https://alphacorp.example">alphacorp.example</a></p>
+                    <p>Breach negotiations and disclosure details.</p>
+                </div>
+                <div class="incident-card">
+                    <h3>Beta Retail</h3>
+                    <p>Threat Group: Play</p>
+                    <p>Country: Norway</p>
+                    <p>Industry: Retail</p>
+                    <p>Website: https://beta.example</p>
+                    <p>Victim page updated with operational notes.</p>
+                </div>
+            </div>
+            <section class="incident-entry">
+                <h3>Threat Groups</h3>
+                <p>Blog</p>
+                <p>API Access</p>
+                <p>Threat Groups</p>
+            </section>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hits = list(DarkHit.objects.filter(dark_source=self.source).order_by("title"))
+        self.assertEqual(len(hits), 2)
+        self.assertEqual([hit.title for hit in hits], ["AlphaCorp", "Beta Retail"])
+
+        alpha = hits[0]
+        self.assertEqual(alpha.record_type, "incident")
+        self.assertEqual(alpha.victim_name, "AlphaCorp")
+        self.assertEqual(alpha.group_name, "Akira")
+        self.assertEqual(alpha.country, "Sweden")
+        self.assertEqual(alpha.industry, "Manufacturing")
+        self.assertEqual(alpha.website_url, "https://alphacorp.example")
+        self.assertEqual(alpha.url, self.source.url)
+
+        beta = hits[1]
+        self.assertEqual(beta.record_type, "incident")
+        self.assertEqual(beta.group_name, "Play")
+        self.assertEqual(beta.country, "Norway")
+        self.assertEqual(beta.industry, "Retail")
+        self.assertEqual(beta.website_url, "https://beta.example")
+
+        raw_text = "\n".join(hit.raw.lower() for hit in hits)
+        self.assertNotIn("live threat command center", raw_text)
+        self.assertNotIn("api access", raw_text)
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_fragment_only_card_blocks_are_ignored(self):
         self.source.watch_keywords = "alphacorp, sweden, manufacturing, breach"
         self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
