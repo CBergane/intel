@@ -614,6 +614,392 @@ def sources_view(request):
     )
 
 
+RANSOMWARE_MAP_WINDOW_RANGES = {
+    "24h": timedelta(hours=24),
+    "7d": timedelta(days=7),
+    "30d": timedelta(days=30),
+}
+RANSOMWARE_MAP_WINDOW_OPTIONS = [("24h", "24h"), ("7d", "7d"), ("30d", "30d")]
+RANSOMWARE_MAP_ADAPTER_KEY = "ransomware_live_victims"
+
+
+def _ransomware_group_name(item) -> str:
+    raw = item.raw_payload or {}
+    title_prefix, separator, _title_suffix = (item.title or "").partition(":")
+    title_group = title_prefix.strip() if separator else ""
+    raw_group = str(raw.get("group") or "").strip()
+    if title_group and raw_group and title_group.lower() == raw_group.lower():
+        return title_group
+    if title_group:
+        return title_group
+    if raw_group:
+        return raw_group.title() if raw_group == raw_group.lower() else raw_group
+    return ""
+
+
+def _ransomware_victim_name(item) -> str:
+    raw = item.raw_payload or {}
+    victim_name = str(raw.get("victim") or "").strip()
+    if victim_name:
+        return victim_name
+    _title_prefix, separator, title_suffix = (item.title or "").partition(":")
+    if separator and title_suffix.strip():
+        return title_suffix.strip()
+    return item.title
+
+
+def _serialize_ransomware_item(item):
+    raw = item.raw_payload or {}
+    group_name = _ransomware_group_name(item)
+    victim_name = _ransomware_victim_name(item)
+    raw_country = str(raw.get("country") or "").strip()
+    country_display, country_code = normalize_dark_country(raw_country)
+    activity_at = getattr(item, "activity_at", None) or item.published_at or item.created_at
+    return {
+        "id": item.id,
+        "item": item,
+        "title": item.title,
+        "url": item.url,
+        "group_name": group_name,
+        "group_key": slugify(group_name),
+        "victim_name": victim_name,
+        "country": country_display,
+        "country_code": country_code,
+        "country_key": _normalized_country_key(country_display),
+        "activity_at": activity_at,
+        "excerpt": item.summary or str(raw.get("description") or "").strip(),
+    }
+
+
+def _ransomware_group_rows(records):
+    grouped = {}
+    for record in records:
+        group_name = record["group_name"]
+        if not group_name:
+            continue
+        row = grouped.get(record["group_key"])
+        if row is None:
+            row = {
+                "group_name": group_name,
+                "group_key": record["group_key"],
+                "record_count": 0,
+                "latest_activity_at": record["activity_at"],
+                "latest_victim_name": "",
+                "latest_country": "",
+                "country_keys": set(),
+                "countries": [],
+            }
+            grouped[record["group_key"]] = row
+
+        row["record_count"] += 1
+        if record["country"] and record["country_key"] not in row["country_keys"]:
+            row["country_keys"].add(record["country_key"])
+            row["countries"].append(record["country"])
+        if record["activity_at"] >= row["latest_activity_at"]:
+            row["latest_activity_at"] = record["activity_at"]
+            row["latest_victim_name"] = record["victim_name"]
+            row["latest_country"] = record["country"]
+
+    rows = []
+    for row in grouped.values():
+        row["country_count"] = len(row["country_keys"])
+        del row["country_keys"]
+        rows.append(row)
+    rows.sort(
+        key=lambda row: (
+            row["record_count"],
+            row["latest_activity_at"],
+            row["group_name"].lower(),
+        ),
+        reverse=True,
+    )
+    return rows
+
+
+def _ransomware_country_rows(records):
+    grouped = {}
+    for record in records:
+        if not record["country"]:
+            continue
+        row = grouped.get(record["country_key"])
+        if row is None:
+            row = {
+                "country": record["country"],
+                "country_code": record["country_code"],
+                "country_key": record["country_key"],
+                "record_count": 0,
+                "group_keys": set(),
+                "latest_activity_at": record["activity_at"],
+                "latest_group_name": "",
+                "latest_victim_name": "",
+            }
+            grouped[record["country_key"]] = row
+
+        row["record_count"] += 1
+        if record["group_name"]:
+            row["group_keys"].add(record["group_key"])
+        if record["activity_at"] >= row["latest_activity_at"]:
+            row["latest_activity_at"] = record["activity_at"]
+            row["latest_group_name"] = record["group_name"]
+            row["latest_victim_name"] = record["victim_name"]
+
+    rows = []
+    for row in grouped.values():
+        row["group_count"] = len(row["group_keys"])
+        del row["group_keys"]
+        rows.append(row)
+    rows.sort(
+        key=lambda row: (
+            row["record_count"],
+            row["latest_activity_at"],
+            row["country"].lower(),
+        ),
+        reverse=True,
+    )
+    return rows
+
+
+def _ransomware_map_url(*, window: str, selected_group: str = "", country: str = "") -> str:
+    params = {"window": window}
+    if selected_group:
+        params["group"] = selected_group
+    if country:
+        params["country"] = country
+    return f"{reverse('ransomware-map')}?{urlencode(params)}"
+
+
+def _ransomware_map_tiles(country_rows, *, selected_country: str, window: str, selected_group: str):
+    row_by_layout_key = {}
+    unmapped_rows = []
+    for row in country_rows:
+        if row["country_key"] not in DARK_MAP_LAYOUT_KEYS:
+            unmapped_rows.append(row)
+            continue
+        row_by_layout_key[row["country_key"]] = row
+
+    max_record_count = max((row["record_count"] for row in country_rows), default=0)
+    width = DARK_MAP_TILE_SIZE["width"]
+    height = DARK_MAP_TILE_SIZE["height"]
+    selected_country_key = _normalized_country_key(selected_country)
+    tiles = []
+    for tile in DARK_MAP_TILE_LAYOUT:
+        row = row_by_layout_key.get(tile["key"])
+        has_activity = row is not None
+        is_selected = has_activity and row["country_key"] == selected_country_key
+        intensity_level = _dark_map_intensity_level(
+            row["record_count"] if row else 0,
+            max_record_count,
+        )
+        palette = _dark_map_tile_palette(
+            intensity_level=intensity_level,
+            is_selected=is_selected,
+            has_activity=has_activity,
+        )
+        tiles.append(
+            {
+                "country_key": tile["key"],
+                "label": tile["label"],
+                "short_label": tile["short_label"],
+                "x": tile["x"],
+                "y": tile["y"],
+                "width": width,
+                "height": height,
+                "center_x": tile["x"] + (width / 2),
+                "center_y": tile["y"] + (height / 2),
+                "label_x": tile["x"] + 8,
+                "label_y": tile["y"] + 15,
+                "count_x": tile["x"] + width - 10,
+                "count_y": tile["y"] + 26,
+                "badge_x": tile["x"] + width - 8,
+                "badge_y": tile["y"] + 9,
+                "has_activity": has_activity,
+                "is_selected": is_selected,
+                "fill_color": palette["fill"],
+                "stroke_color": palette["stroke"],
+                "text_color": palette["text"],
+                "badge_color": palette["badge"],
+                "record_count": row["record_count"] if row else 0,
+                "country": row["country"] if row else tile["label"],
+                "url": (
+                    _ransomware_map_url(
+                        window=window,
+                        selected_group=selected_group,
+                        country="" if is_selected else row["country"],
+                    )
+                    if has_activity
+                    else ""
+                ),
+                "tooltip": (
+                    f"{row['country']}: {row['record_count']} victims across {row['group_count']} groups"
+                    if row
+                    else f"{tile['label']}: no victim activity in current filters"
+                ),
+            }
+        )
+
+    unmapped_rows.sort(
+        key=lambda row: (
+            row["record_count"],
+            row["latest_activity_at"],
+            row["country"].lower(),
+        ),
+        reverse=True,
+    )
+    return tiles, unmapped_rows
+
+
+def _ransomware_map_empty_state(records, country_rows):
+    if country_rows:
+        return {}
+    if not records:
+        return {
+            "title": "No ransomware victims in current scope",
+            "message": "No ransomware.live victim records matched the current window and filters.",
+        }
+    return {
+        "title": "Victim activity found, geography still sparse",
+        "message": (
+            "Victim records matched the current filters, but they do not yet carry enough "
+            "plot-ready country data to light up the map. Latest victims and top groups "
+            "remain actionable while geography fills in."
+        ),
+    }
+
+
+def ransomware_map_view(request):
+    window = (request.GET.get("window") or "7d").strip()
+    if window not in RANSOMWARE_MAP_WINDOW_RANGES:
+        window = "7d"
+    since = timezone.now() - RANSOMWARE_MAP_WINDOW_RANGES[window]
+
+    window_items = list(
+        Item.objects.select_related("source", "feed")
+        .filter(feed__adapter_key=RANSOMWARE_MAP_ADAPTER_KEY)
+        .annotate(activity_at=Coalesce("published_at", "created_at"))
+        .filter(activity_at__gte=since)
+        .order_by("-activity_at", "-id")
+    )
+    window_records = [_serialize_ransomware_item(item) for item in window_items]
+
+    all_group_rows = _ransomware_group_rows(window_records)
+    group_options = [
+        {"slug": row["group_key"], "name": row["group_name"], "count": row["record_count"]}
+        for row in all_group_rows
+    ]
+    selected_group = (request.GET.get("group") or "").strip()
+    valid_group_slugs = {row["slug"] for row in group_options}
+    if selected_group not in valid_group_slugs:
+        selected_group = ""
+    selected_group_name = next(
+        (row["name"] for row in group_options if row["slug"] == selected_group),
+        "",
+    )
+
+    group_records = window_records
+    if selected_group:
+        group_records = [record for record in group_records if record["group_key"] == selected_group]
+
+    country_rows = _ransomware_country_rows(group_records)
+    selected_country = ""
+    requested_country = (request.GET.get("country") or "").strip()
+    if requested_country:
+        requested_country_key = _normalized_country_key(requested_country)
+        for row in country_rows:
+            if row["country_key"] == requested_country_key:
+                selected_country = row["country"]
+                break
+        if not selected_country:
+            normalized_country, _country_code = normalize_dark_country(requested_country)
+            selected_country = normalized_country or requested_country
+
+    focused_records = group_records
+    selected_country_key = _normalized_country_key(selected_country)
+    if selected_country_key:
+        focused_records = [
+            record for record in focused_records if record["country_key"] == selected_country_key
+        ]
+
+    for row in country_rows:
+        row["is_selected"] = row["country_key"] == selected_country_key
+
+    top_groups = _ransomware_group_rows(focused_records)[:8]
+    top_countries = country_rows[:8]
+    latest_victims = focused_records[:10]
+    map_tiles, unmapped_country_rows = _ransomware_map_tiles(
+        country_rows,
+        selected_country=selected_country,
+        window=window,
+        selected_group=selected_group,
+    )
+    map_empty_state = _ransomware_map_empty_state(group_records, country_rows)
+
+    for row in top_groups:
+        row["url"] = _ransomware_map_url(
+            window=window,
+            selected_group="" if row["group_key"] == selected_group else row["group_key"],
+            country=selected_country,
+        )
+    for row in top_countries:
+        row["url"] = _ransomware_map_url(
+            window=window,
+            selected_group=selected_group,
+            country="" if row["is_selected"] else row["country"],
+        )
+    for record in latest_victims:
+        record["group_url"] = _ransomware_map_url(
+            window=window,
+            selected_group=record["group_key"],
+            country=selected_country,
+        )
+        record["country_url"] = (
+            _ransomware_map_url(
+                window=window,
+                selected_group=selected_group,
+                country=record["country"],
+            )
+            if record["country"]
+            else ""
+        )
+
+    summary = {
+        "victim_count": len(focused_records),
+        "country_count": len(country_rows),
+        "group_count": len(_ransomware_group_rows(focused_records)),
+        "countryless_count": max(len(group_records) - sum(row["record_count"] for row in country_rows), 0),
+    }
+
+    return render(
+        request,
+        "intel/ransomware_map.html",
+        {
+            "page_title": "Ransomware Incident Map",
+            "current_page": "ransomware-map",
+            "window": window,
+            "window_options": RANSOMWARE_MAP_WINDOW_OPTIONS,
+            "selected_group": selected_group,
+            "selected_group_name": selected_group_name,
+            "group_options": group_options,
+            "selected_country": selected_country,
+            "selected_country_key": selected_country_key,
+            "summary": summary,
+            "latest_victims": latest_victims,
+            "top_groups": top_groups,
+            "top_countries": top_countries,
+            "country_rows": country_rows,
+            "map_tiles": map_tiles,
+            "map_regions": DARK_MAP_REGION_LABELS,
+            "unmapped_country_rows": unmapped_country_rows,
+            "map_empty_state": map_empty_state,
+            "selected_country_on_map": any(tile["is_selected"] for tile in map_tiles),
+            "reset_url": reverse("ransomware-map"),
+            "clear_country_url": _ransomware_map_url(
+                window=window,
+                selected_group=selected_group,
+            ),
+        },
+    )
+
+
 DARK_WINDOW_RANGES = {
     "24h": timedelta(hours=24),
     "7d": timedelta(days=7),

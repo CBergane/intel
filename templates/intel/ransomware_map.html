@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ page_title }} | BorealSec Intel{% endblock %}
+
+{% block content %}
+<section class="space-y-5 xl:space-y-6">
+    <div class="rounded-2xl border border-line bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.13),_transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-4 shadow-glow sm:p-5 xl:p-6">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div class="max-w-3xl">
+                <div class="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-sky-300/80">
+                    <span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1">Normal Intel Flow</span>
+                    <span class="rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1">Ransomware.live Victims</span>
+                </div>
+                <h1 class="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl xl:text-[2.35rem]">{{ page_title }}</h1>
+                <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-[15px]">
+                    Concrete victim activity from the normal intel pipeline. Countries are only plotted when the item carries usable geography, while countryless victims still stay visible in the activity and group panels.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs">
+                <a href="{% url 'dark-map' %}" class="rounded-lg border border-line/80 bg-slate-900/70 px-3 py-2 text-slate-200 transition hover:border-sky-400/40 hover:text-white">Dark Group Map</a>
+                <a href="{{ reset_url }}" class="rounded-lg border border-line/80 bg-slate-900/70 px-3 py-2 text-slate-200 transition hover:border-sky-400/40 hover:text-white">Reset View</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Victims In Scope</p>
+            <p class="mt-3 text-3xl font-semibold text-white">{{ summary.victim_count }}</p>
+            <p class="mt-2 text-xs text-slate-400">Visible after the current window, group, and country filters.</p>
+        </div>
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Plot-Ready Countries</p>
+            <p class="mt-3 text-3xl font-semibold text-emerald-200">{{ summary.country_count }}</p>
+            <p class="mt-2 text-xs text-slate-400">Countries with enough normalized geography to light up the map.</p>
+        </div>
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Active Groups</p>
+            <p class="mt-3 text-3xl font-semibold text-rose-200">{{ summary.group_count }}</p>
+            <p class="mt-2 text-xs text-slate-400">Groups visible in the current ransomware victim dataset.</p>
+        </div>
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Country Pending</p>
+            <p class="mt-3 text-3xl font-semibold text-amber-200">{{ summary.countryless_count }}</p>
+            <p class="mt-2 text-xs text-slate-400">Victims that remain in the lists even though they cannot be plotted yet.</p>
+        </div>
+    </div>
+
+    <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div class="space-y-3">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Window</p>
+                <div class="flex flex-wrap gap-2">
+                    {% for value, label in window_options %}
+                        <a href="{% url 'ransomware-map' %}?window={{ value }}{% if selected_group %}&group={{ selected_group|urlencode }}{% endif %}{% if selected_country %}&country={{ selected_country|urlencode }}{% endif %}"
+                           class="rounded-full border px-3 py-1.5 text-xs font-medium transition {% if window == value %}border-sky-400/40 bg-sky-500/10 text-sky-100{% else %}border-line/80 bg-slate-950/70 text-slate-300 hover:border-slate-500 hover:text-white{% endif %}">
+                            {{ label }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+            <form method="get" class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+                <input type="hidden" name="window" value="{{ window }}">
+                {% if selected_country %}
+                    <input type="hidden" name="country" value="{{ selected_country }}">
+                {% endif %}
+                <div class="min-w-[16rem]">
+                    <label class="mb-1.5 block text-[11px] uppercase tracking-[0.2em] text-slate-500" for="id_group">Group Focus</label>
+                    <select id="id_group" name="group" class="w-full rounded-xl border border-line/80 bg-slate-950/80 px-3 py-2.5 text-sm text-slate-100 focus:border-sky-400 focus:outline-none">
+                        <option value="">All groups</option>
+                        {% for option in group_options %}
+                            <option value="{{ option.slug }}" {% if selected_group == option.slug %}selected{% endif %}>{{ option.name }} · {{ option.count }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="rounded-xl bg-sky-400 px-4 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-sky-300">Apply</button>
+                <a href="{{ reset_url }}" class="rounded-xl border border-line/80 bg-slate-950/70 px-4 py-2.5 text-center text-sm text-slate-200 transition hover:border-slate-500 hover:text-white">Clear</a>
+            </form>
+        </div>
+
+        {% if selected_country or selected_group_name %}
+            <div class="mt-4 flex flex-wrap gap-2">
+                {% if selected_group_name %}
+                    <span class="rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-100">Group: {{ selected_group_name }}</span>
+                {% endif %}
+                {% if selected_country %}
+                    <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-100">Country: {{ selected_country }}</span>
+                    <a href="{{ clear_country_url }}" class="rounded-full border border-line/80 bg-slate-950/70 px-3 py-1.5 text-xs text-slate-300 transition hover:border-slate-500 hover:text-white">Clear country focus</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="grid gap-4 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.7fr)_minmax(0,0.95fr)] xl:items-start">
+        <aside class="order-2 space-y-4 xl:order-1 xl:sticky xl:top-32">
+            <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Latest Victims</p>
+                        <h2 class="mt-2 text-lg font-semibold text-white">Recent ransomware incidents</h2>
+                    </div>
+                    <span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ latest_victims|length }} shown</span>
+                </div>
+                <div class="mt-4 space-y-3" id="ransomware-latest-victims">
+                    {% for record in latest_victims %}
+                        <article class="rounded-xl border border-line/80 bg-slate-950/45 p-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <a href="{{ record.url }}" class="block truncate text-sm font-medium text-white transition hover:text-sky-200">{{ record.victim_name }}</a>
+                                    <p class="mt-1 text-[11px] text-slate-500">{{ record.activity_at|naturaltime }}</p>
+                                </div>
+                                <span class="shrink-0 rounded-md border border-line/80 bg-slate-950/80 px-2 py-1 text-[11px] text-slate-300">{{ record.item.source.name }}</span>
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                                {% if record.group_name %}
+                                    <a href="{{ record.group_url }}" class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200 transition hover:border-rose-400/40 hover:text-rose-100">{{ record.group_name }}</a>
+                                {% endif %}
+                                {% if record.country %}
+                                    <a href="{{ record.country_url }}" class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200 transition hover:border-emerald-400/40 hover:text-emerald-100">{{ record.country }}</a>
+                                {% else %}
+                                    <span class="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-amber-200">Country pending</span>
+                                {% endif %}
+                            </div>
+                            {% if record.excerpt %}
+                                <p class="mt-3 text-xs leading-5 text-slate-400">{{ record.excerpt|truncatechars:135 }}</p>
+                            {% endif %}
+                        </article>
+                    {% empty %}
+                        <p class="text-sm text-slate-400">No ransomware victims matched the current window and filters.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </aside>
+
+        <div class="order-1 xl:order-2">
+            <div class="rounded-[1.8rem] border border-line bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.13),_transparent_38%),radial-gradient(circle_at_80%_20%,_rgba(190,24,93,0.1),_transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.99))] p-3 shadow-glow sm:p-4 xl:p-5">
+                <div class="flex flex-col gap-3 border-b border-line/70 px-2 pb-3 sm:px-3 sm:pb-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Threat Surface</p>
+                            <h2 class="mt-2 text-xl font-semibold text-white sm:text-[1.45rem]">Ransomware victim geography</h2>
+                        </div>
+                        <div class="flex flex-wrap gap-2 text-[11px]">
+                            <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">{{ country_rows|length }} plot-ready countries</span>
+                            <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">{{ summary.countryless_count }} pending country</span>
+                        </div>
+                    </div>
+                    <p class="max-w-3xl text-sm leading-6 text-slate-300">
+                        Countries are highlighted from the recent ransomware.live victim feed. Clicking a country focuses the incident lane and group context on that geography without inventing attack paths the dataset does not support.
+                    </p>
+                </div>
+
+                <div class="relative mt-3 overflow-hidden rounded-[1.6rem] border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.11),_transparent_48%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))] p-2.5 sm:p-3 xl:p-3.5">
+                    {% if map_empty_state %}
+                        <div class="absolute inset-x-4 top-4 z-10 rounded-2xl border border-amber-500/25 bg-slate-950/88 p-4 backdrop-blur">
+                            <p class="text-[11px] uppercase tracking-[0.2em] text-amber-300">Geography Limited</p>
+                            <h3 class="mt-2 text-lg font-semibold text-white">{{ map_empty_state.title }}</h3>
+                            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{{ map_empty_state.message }}</p>
+                        </div>
+                    {% endif %}
+
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+                        <div class="flex flex-wrap gap-2 text-[11px]">
+                            <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">click a country to focus victims</span>
+                            {% if selected_country %}
+                                <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">{{ selected_country }}</span>
+                            {% endif %}
+                        </div>
+                        <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">no fabricated attack paths</span>
+                    </div>
+
+                    <div class="relative">
+                        <svg id="ransomware-map-surface" class="h-[22rem] w-full sm:h-[26rem] lg:h-[30rem] xl:h-[35rem]" viewBox="0 0 1080 560" role="img" aria-label="Ransomware victim country activity map" preserveAspectRatio="xMidYMid meet">
+                            <defs>
+                                <radialGradient id="ransomware-map-glow-west" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(210 176) rotate(90) scale(160 210)">
+                                    <stop stop-color="#22d3ee" stop-opacity="0.28"></stop>
+                                    <stop offset="1" stop-color="#22d3ee" stop-opacity="0"></stop>
+                                </radialGradient>
+                                <radialGradient id="ransomware-map-glow-east" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(904 156) rotate(90) scale(172 236)">
+                                    <stop stop-color="#38bdf8" stop-opacity="0.24"></stop>
+                                    <stop offset="1" stop-color="#38bdf8" stop-opacity="0"></stop>
+                                </radialGradient>
+                            </defs>
+
+                            <rect x="0" y="0" width="1080" height="560" rx="28" fill="#020617"></rect>
+                            <circle cx="210" cy="176" r="154" fill="url(#ransomware-map-glow-west)" opacity="{% if map_empty_state %}0.28{% else %}0.7{% endif %}" />
+                            <circle cx="904" cy="156" r="170" fill="url(#ransomware-map-glow-east)" opacity="{% if map_empty_state %}0.24{% else %}0.66{% endif %}" />
+                            <g fill="none" stroke="#0f172a" stroke-width="1">
+                                <path d="M88 84H1014" opacity="0.35"></path>
+                                <path d="M88 254H1014" opacity="0.18"></path>
+                                <path d="M88 424H1014" opacity="0.18"></path>
+                            </g>
+                            <g>
+                                {% for region in map_regions %}
+                                    <text x="{{ region.x }}" y="{{ region.y }}" fill="#334155" font-size="13" font-weight="700" letter-spacing="0.18em">{{ region.label|upper }}</text>
+                                {% endfor %}
+                            </g>
+                            <g>
+                                {% for tile in map_tiles %}
+                                    {% if tile.has_activity and tile.url %}
+                                        <a href="{{ tile.url }}" aria-label="{{ tile.tooltip }}">
+                                            <g>
+                                                <rect x="{{ tile.x }}" y="{{ tile.y }}" width="{{ tile.width }}" height="{{ tile.height }}" rx="14" fill="{{ tile.fill_color }}" fill-opacity="{% if map_empty_state %}0.42{% else %}0.94{% endif %}" stroke="{{ tile.stroke_color }}" stroke-width="{% if tile.is_selected %}2.3{% else %}1.35{% endif %}"></rect>
+                                                <text x="{{ tile.label_x }}" y="{{ tile.label_y }}" fill="{{ tile.text_color }}" font-size="11" font-weight="700">{{ tile.short_label }}</text>
+                                                <text x="{{ tile.count_x }}" y="{{ tile.count_y }}" fill="{{ tile.text_color }}" font-size="15" font-weight="800" text-anchor="end">{{ tile.record_count }}</text>
+                                                <circle cx="{{ tile.badge_x }}" cy="{{ tile.badge_y }}" r="3.25" fill="{{ tile.badge_color }}"></circle>
+                                            </g>
+                                        </a>
+                                    {% else %}
+                                        <g opacity="{% if map_empty_state %}0.38{% else %}1{% endif %}">
+                                            <rect x="{{ tile.x }}" y="{{ tile.y }}" width="{{ tile.width }}" height="{{ tile.height }}" rx="14" fill="{{ tile.fill_color }}" fill-opacity="0.92" stroke="{{ tile.stroke_color }}" stroke-width="1.2"></rect>
+                                            <text x="{{ tile.label_x }}" y="{{ tile.label_y }}" fill="{{ tile.text_color }}" font-size="11" font-weight="700">{{ tile.short_label }}</text>
+                                        </g>
+                                    {% endif %}
+                                {% endfor %}
+                            </g>
+                        </svg>
+                    </div>
+
+                    {% if selected_country and not selected_country_on_map %}
+                        <div class="mt-3 rounded-2xl border border-line/80 bg-slate-950/60 px-4 py-3 text-sm text-slate-300">
+                            {{ selected_country }} is active in the current victim dataset, but it sits outside this first SVG layout. Use the country list and latest victims panel to keep drilling down.
+                        </div>
+                    {% endif %}
+
+                    {% if unmapped_country_rows %}
+                        <div class="mt-3 rounded-2xl border border-line/80 bg-slate-950/55 p-4">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Outside Current Map Coverage</p>
+                                    <p class="mt-1 text-sm text-slate-300">These countries still count in the analytics even though they are not yet drawn in this first SVG layout.</p>
+                                </div>
+                                <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ unmapped_country_rows|length }} countries</span>
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                {% for row in unmapped_country_rows %}
+                                    <a href="{% url 'ransomware-map' %}?window={{ window }}{% if selected_group %}&group={{ selected_group|urlencode }}{% endif %}{% if not row.is_selected %}&country={{ row.country|urlencode }}{% endif %}"
+                                       class="rounded-full border border-line/80 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-200 transition hover:border-sky-400/40 hover:text-white">
+                                        {{ row.country }} · {{ row.record_count }}
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <aside class="order-3 space-y-4 xl:sticky xl:top-32">
+            <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Groups</p>
+                        <h2 class="mt-2 text-lg font-semibold text-white">{% if selected_country %}Groups linked to {{ selected_country }}{% else %}Most active ransomware groups{% endif %}</h2>
+                    </div>
+                    <span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_groups|length }} shown</span>
+                </div>
+                <div class="mt-4 space-y-2.5">
+                    {% for group in top_groups %}
+                        <a href="{{ group.url }}" class="block rounded-xl border border-line/80 bg-slate-950/40 p-3 transition hover:border-sky-400/30 hover:bg-slate-950/60">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium text-white">{{ group.group_name }}</p>
+                                    <p class="mt-1 text-[11px] text-slate-500">{{ group.record_count }} victims{% if group.country_count %} · {{ group.country_count }} countries{% endif %}</p>
+                                </div>
+                                <span class="text-[11px] text-slate-400">{{ group.latest_activity_at|naturaltime }}</span>
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                                {% if group.latest_victim_name %}
+                                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-200">{{ group.latest_victim_name }}</span>
+                                {% endif %}
+                                {% if group.latest_country %}
+                                    <span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">{{ group.latest_country }}</span>
+                                {% endif %}
+                            </div>
+                        </a>
+                    {% empty %}
+                        <p class="text-sm text-slate-400">No group activity matched the current ransomware filters.</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Countries</p>
+                        <h2 class="mt-2 text-lg font-semibold text-white">Most affected countries</h2>
+                    </div>
+                    <span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span>
+                </div>
+                <div class="mt-4 space-y-2.5">
+                    {% for row in top_countries %}
+                        <a href="{{ row.url }}" class="block rounded-xl border p-3 transition {% if row.is_selected %}border-emerald-500/35 bg-emerald-500/10{% else %}border-line/80 bg-slate-950/40 hover:border-sky-400/30 hover:bg-slate-950/60{% endif %}">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium text-white">{{ row.country }}</p>
+                                    <p class="mt-1 text-[11px] text-slate-500">{{ row.record_count }} victims · {{ row.group_count }} groups</p>
+                                </div>
+                                <span class="text-[11px] text-slate-400">{{ row.latest_activity_at|naturaltime }}</span>
+                            </div>
+                            <div class="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                                {% if row.latest_group_name %}
+                                    <span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">{{ row.latest_group_name }}</span>
+                                {% endif %}
+                                {% if row.latest_victim_name %}
+                                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-200">{{ row.latest_victim_name }}</span>
+                                {% endif %}
+                            </div>
+                        </a>
+                    {% empty %}
+                        <div class="rounded-xl border border-line/80 bg-slate-950/40 p-3 text-sm text-slate-400">
+                            Victims are present, but current records do not yet expose enough normalized country data to rank geography.
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </aside>
+    </div>
+</section>
+{% endblock %}

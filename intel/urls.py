@@ -7,6 +7,7 @@ urlpatterns = [
     path("advisories/", views.advisories_view, name="advisories"),
     path("research/", views.research_view, name="research"),
     path("sweden/", views.sweden_view, name="sweden"),
+    path("ransomware/map/", views.ransomware_map_view, name="ransomware-map"),
     path("feed-health/", views.feed_health_view, name="feed-health"),
     path("sources/", views.sources_view, name="sources"),
     path("dark/", views.dark_dashboard_view, name="dark-dashboard"),
