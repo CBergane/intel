@@ -92,27 +92,26 @@
         {% endif %}
     </div>
 
-    <div class="grid gap-4 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.7fr)_minmax(0,0.95fr)] xl:items-start">
+    <div class="grid gap-4 xl:grid-cols-[minmax(14.5rem,0.62fr)_minmax(0,2.3fr)_minmax(15rem,0.78fr)] xl:items-start xl:gap-5 2xl:grid-cols-[minmax(15.5rem,0.68fr)_minmax(0,2.55fr)_minmax(16rem,0.8fr)]">
         <aside class="order-2 space-y-4 xl:order-1 xl:sticky xl:top-32">
-            <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+            <div class="rounded-2xl border border-line bg-panel/70 p-3.5 shadow-glow xl:p-4">
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Latest Victims</p>
-                        <h2 class="mt-2 text-lg font-semibold text-white">Recent ransomware incidents</h2>
+                        <h2 class="mt-2 text-base font-semibold text-white xl:text-lg">Recent ransomware incidents</h2>
                     </div>
                     <span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ latest_victims|length }} shown</span>
                 </div>
-                <div class="mt-4 space-y-3" id="ransomware-latest-victims">
+                <div class="mt-3 space-y-2.5" id="ransomware-latest-victims">
                     {% for record in latest_victims %}
-                        <article class="rounded-xl border border-line/80 bg-slate-950/45 p-3">
+                        <article class="rounded-xl border border-line/80 bg-slate-950/40 p-2.5 xl:p-3">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <a href="{{ record.url }}" class="block truncate text-sm font-medium text-white transition hover:text-sky-200">{{ record.victim_name }}</a>
                                     <p class="mt-1 text-[11px] text-slate-500">{{ record.activity_at|naturaltime }}</p>
                                 </div>
-                                <span class="shrink-0 rounded-md border border-line/80 bg-slate-950/80 px-2 py-1 text-[11px] text-slate-300">{{ record.item.source.name }}</span>
                             </div>
-                            <div class="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                            <div class="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
                                 {% if record.group_name %}
                                     <a href="{{ record.group_url }}" class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200 transition hover:border-rose-400/40 hover:text-rose-100">{{ record.group_name }}</a>
                                 {% endif %}
@@ -123,7 +122,7 @@
                                 {% endif %}
                             </div>
                             {% if record.excerpt %}
-                                <p class="mt-3 text-xs leading-5 text-slate-400">{{ record.excerpt|truncatechars:135 }}</p>
+                                <p class="mt-2.5 truncate text-[11px] leading-5 text-slate-400">{{ record.excerpt|truncatechars:120 }}</p>
                             {% endif %}
                         </article>
                     {% empty %}
@@ -134,16 +133,18 @@
         </aside>
 
         <div class="order-1 xl:order-2">
-            <div class="rounded-[1.8rem] border border-line bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.13),_transparent_38%),radial-gradient(circle_at_80%_20%,_rgba(190,24,93,0.1),_transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.99))] p-3 shadow-glow sm:p-4 xl:p-5">
-                <div class="flex flex-col gap-3 border-b border-line/70 px-2 pb-3 sm:px-3 sm:pb-4">
+            <div class="rounded-[1.95rem] border border-line bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.13),_transparent_38%),radial-gradient(circle_at_80%_20%,_rgba(190,24,93,0.1),_transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.985),rgba(2,6,23,0.995))] p-2.5 shadow-glow sm:p-3 xl:p-3.5 2xl:p-4">
+                <div class="flex flex-col gap-3 border-b border-line/70 px-2.5 pb-3 sm:px-3 sm:pb-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Threat Surface</p>
-                            <h2 class="mt-2 text-xl font-semibold text-white sm:text-[1.45rem]">Ransomware victim geography</h2>
+                            <h2 class="mt-2 text-xl font-semibold text-white sm:text-[1.55rem] xl:text-[1.8rem]">Ransomware victim geography</h2>
                         </div>
                         <div class="flex flex-wrap gap-2 text-[11px]">
-                            <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">{{ country_rows|length }} plot-ready countries</span>
-                            <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">{{ summary.countryless_count }} pending country</span>
+                            <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">{{ country_rows|length }} active countries</span>
+                            {% if selected_country %}
+                                <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">{{ selected_country }}</span>
+                            {% endif %}
                         </div>
                     </div>
                     <p class="max-w-3xl text-sm leading-6 text-slate-300">
@@ -151,7 +152,7 @@
                     </p>
                 </div>
 
-                <div class="relative mt-3 overflow-hidden rounded-[1.6rem] border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.11),_transparent_48%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))] p-2.5 sm:p-3 xl:p-3.5">
+                <div class="relative mt-3 overflow-hidden rounded-[1.7rem] border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.11),_transparent_48%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(2,6,23,0.99))] p-1.5 sm:p-2 xl:p-2.5">
                     {% if map_empty_state %}
                         <div class="absolute inset-x-4 top-4 z-10 rounded-2xl border border-amber-500/25 bg-slate-950/88 p-4 backdrop-blur">
                             <p class="text-[11px] uppercase tracking-[0.2em] text-amber-300">Geography Limited</p>
@@ -160,18 +161,8 @@
                         </div>
                     {% endif %}
 
-                    <div class="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
-                        <div class="flex flex-wrap gap-2 text-[11px]">
-                            <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">click a country to focus victims</span>
-                            {% if selected_country %}
-                                <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">{{ selected_country }}</span>
-                            {% endif %}
-                        </div>
-                        <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">no fabricated attack paths</span>
-                    </div>
-
                     <div class="relative">
-                        <svg id="ransomware-map-surface" class="h-[22rem] w-full sm:h-[26rem] lg:h-[30rem] xl:h-[35rem]" viewBox="0 0 1080 560" role="img" aria-label="Ransomware victim country activity map" preserveAspectRatio="xMidYMid meet">
+                        <svg id="ransomware-map-surface" class="h-[24rem] w-full sm:h-[28rem] lg:h-[34rem] xl:h-[41rem] 2xl:h-[45rem]" viewBox="0 0 1080 560" role="img" aria-label="Ransomware victim country activity map" preserveAspectRatio="xMidYMid meet">
                             <defs>
                                 <radialGradient id="ransomware-map-glow-west" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(210 176) rotate(90) scale(160 210)">
                                     <stop stop-color="#22d3ee" stop-opacity="0.28"></stop>
@@ -201,16 +192,17 @@
                                     {% if tile.has_activity and tile.url %}
                                         <a href="{{ tile.url }}" aria-label="{{ tile.tooltip }}">
                                             <g>
-                                                <rect x="{{ tile.x }}" y="{{ tile.y }}" width="{{ tile.width }}" height="{{ tile.height }}" rx="14" fill="{{ tile.fill_color }}" fill-opacity="{% if map_empty_state %}0.42{% else %}0.94{% endif %}" stroke="{{ tile.stroke_color }}" stroke-width="{% if tile.is_selected %}2.3{% else %}1.35{% endif %}"></rect>
-                                                <text x="{{ tile.label_x }}" y="{{ tile.label_y }}" fill="{{ tile.text_color }}" font-size="11" font-weight="700">{{ tile.short_label }}</text>
-                                                <text x="{{ tile.count_x }}" y="{{ tile.count_y }}" fill="{{ tile.text_color }}" font-size="15" font-weight="800" text-anchor="end">{{ tile.record_count }}</text>
-                                                <circle cx="{{ tile.badge_x }}" cy="{{ tile.badge_y }}" r="3.25" fill="{{ tile.badge_color }}"></circle>
+                                                <rect x="{{ tile.x }}" y="{{ tile.y }}" width="{{ tile.width }}" height="{{ tile.height }}" rx="14" fill="none" stroke="{% if tile.is_selected %}#bbf7d0{% else %}{{ tile.stroke_color }}{% endif %}" stroke-opacity="{% if tile.is_selected %}0.45{% else %}0.26{% endif %}" stroke-width="{% if tile.is_selected %}5.2{% else %}2.8{% endif %}"></rect>
+                                                <rect x="{{ tile.x }}" y="{{ tile.y }}" width="{{ tile.width }}" height="{{ tile.height }}" rx="14" fill="{{ tile.fill_color }}" fill-opacity="{% if map_empty_state %}0.58{% else %}1{% endif %}" stroke="{% if tile.is_selected %}#d1fae5{% else %}{{ tile.stroke_color }}{% endif %}" stroke-width="{% if tile.is_selected %}2.8{% else %}1.8{% endif %}"></rect>
+                                                <text x="{{ tile.label_x }}" y="{{ tile.label_y }}" fill="{{ tile.text_color }}" font-size="12" font-weight="800">{{ tile.short_label }}</text>
+                                                <text x="{{ tile.count_x }}" y="{{ tile.count_y }}" fill="{{ tile.text_color }}" font-size="{% if tile.is_selected %}18{% else %}17{% endif %}" font-weight="900" text-anchor="end">{{ tile.record_count }}</text>
+                                                <circle cx="{{ tile.badge_x }}" cy="{{ tile.badge_y }}" r="{% if tile.is_selected %}3.9{% else %}3.4{% endif %}" fill="{{ tile.badge_color }}"></circle>
                                             </g>
                                         </a>
                                     {% else %}
-                                        <g opacity="{% if map_empty_state %}0.38{% else %}1{% endif %}">
-                                            <rect x="{{ tile.x }}" y="{{ tile.y }}" width="{{ tile.width }}" height="{{ tile.height }}" rx="14" fill="{{ tile.fill_color }}" fill-opacity="0.92" stroke="{{ tile.stroke_color }}" stroke-width="1.2"></rect>
-                                            <text x="{{ tile.label_x }}" y="{{ tile.label_y }}" fill="{{ tile.text_color }}" font-size="11" font-weight="700">{{ tile.short_label }}</text>
+                                        <g opacity="{% if map_empty_state %}0.26{% else %}0.9{% endif %}">
+                                            <rect x="{{ tile.x }}" y="{{ tile.y }}" width="{{ tile.width }}" height="{{ tile.height }}" rx="14" fill="{{ tile.fill_color }}" fill-opacity="0.92" stroke="{{ tile.stroke_color }}" stroke-width="1.1"></rect>
+                                            <text x="{{ tile.label_x }}" y="{{ tile.label_y }}" fill="{{ tile.text_color }}" font-size="10.5" font-weight="700">{{ tile.short_label }}</text>
                                         </g>
                                     {% endif %}
                                 {% endfor %}
@@ -248,17 +240,50 @@
         </div>
 
         <aside class="order-3 space-y-4 xl:sticky xl:top-32">
-            <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+            <div class="rounded-2xl border border-line bg-panel/72 p-3.5 shadow-glow xl:p-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Countries</p>
+                        <h2 class="mt-2 text-base font-semibold text-white xl:text-lg">Most affected countries</h2>
+                    </div>
+                    <span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span>
+                </div>
+                <div class="mt-3 space-y-2">
+                    {% for row in top_countries %}
+                        <a href="{{ row.url }}" class="block rounded-xl border p-3 transition {% if row.is_selected %}border-emerald-500/35 bg-emerald-500/10{% else %}border-line/80 bg-slate-950/40 hover:border-sky-400/30 hover:bg-slate-950/60{% endif %}">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-medium text-white">{{ row.country }}</p>
+                                    <p class="mt-1 text-[11px] text-slate-500">{{ row.group_count }} groups{% if row.latest_group_name %} · latest {{ row.latest_group_name }}{% endif %}</p>
+                                </div>
+                                <div class="shrink-0 text-right">
+                                    <p class="text-xl font-semibold {% if row.is_selected %}text-emerald-100{% else %}text-white{% endif %}">{{ row.record_count }}</p>
+                                    <p class="text-[10px] uppercase tracking-[0.18em] text-slate-500">victims</p>
+                                </div>
+                            </div>
+                            {% if row.latest_victim_name %}
+                                <p class="mt-2.5 truncate text-[11px] text-slate-300">{{ row.latest_victim_name }}</p>
+                            {% endif %}
+                        </a>
+                    {% empty %}
+                        <div class="rounded-xl border border-line/80 bg-slate-950/40 p-3 text-sm text-slate-400">
+                            Victims are present, but current records do not yet expose enough normalized country data to rank geography.
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-line bg-panel/66 p-3.5 shadow-glow xl:p-4">
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Groups</p>
-                        <h2 class="mt-2 text-lg font-semibold text-white">{% if selected_country %}Groups linked to {{ selected_country }}{% else %}Most active ransomware groups{% endif %}</h2>
+                        <h2 class="mt-2 text-base font-semibold text-white xl:text-lg">{% if selected_country %}Groups linked to {{ selected_country }}{% else %}Most active ransomware groups{% endif %}</h2>
                     </div>
                     <span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_groups|length }} shown</span>
                 </div>
-                <div class="mt-4 space-y-2.5">
+                <div class="mt-3 space-y-2">
                     {% for group in top_groups %}
-                        <a href="{{ group.url }}" class="block rounded-xl border border-line/80 bg-slate-950/40 p-3 transition hover:border-sky-400/30 hover:bg-slate-950/60">
+                        <a href="{{ group.url }}" class="block rounded-xl border border-line/80 bg-slate-950/35 p-3 transition hover:border-sky-400/30 hover:bg-slate-950/55">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <p class="truncate text-sm font-medium text-white">{{ group.group_name }}</p>
@@ -266,7 +291,7 @@
                                 </div>
                                 <span class="text-[11px] text-slate-400">{{ group.latest_activity_at|naturaltime }}</span>
                             </div>
-                            <div class="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+                            <div class="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
                                 {% if group.latest_victim_name %}
                                     <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-200">{{ group.latest_victim_name }}</span>
                                 {% endif %}
@@ -277,41 +302,6 @@
                         </a>
                     {% empty %}
                         <p class="text-sm text-slate-400">No group activity matched the current ransomware filters.</p>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Countries</p>
-                        <h2 class="mt-2 text-lg font-semibold text-white">Most affected countries</h2>
-                    </div>
-                    <span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span>
-                </div>
-                <div class="mt-4 space-y-2.5">
-                    {% for row in top_countries %}
-                        <a href="{{ row.url }}" class="block rounded-xl border p-3 transition {% if row.is_selected %}border-emerald-500/35 bg-emerald-500/10{% else %}border-line/80 bg-slate-950/40 hover:border-sky-400/30 hover:bg-slate-950/60{% endif %}">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-medium text-white">{{ row.country }}</p>
-                                    <p class="mt-1 text-[11px] text-slate-500">{{ row.record_count }} victims · {{ row.group_count }} groups</p>
-                                </div>
-                                <span class="text-[11px] text-slate-400">{{ row.latest_activity_at|naturaltime }}</span>
-                            </div>
-                            <div class="mt-3 flex flex-wrap gap-1.5 text-[11px]">
-                                {% if row.latest_group_name %}
-                                    <span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">{{ row.latest_group_name }}</span>
-                                {% endif %}
-                                {% if row.latest_victim_name %}
-                                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-200">{{ row.latest_victim_name }}</span>
-                                {% endif %}
-                            </div>
-                        </a>
-                    {% empty %}
-                        <div class="rounded-xl border border-line/80 bg-slate-950/40 p-3 text-sm text-slate-400">
-                            Victims are present, but current records do not yet expose enough normalized country data to rank geography.
-                        </div>
                     {% endfor %}
                 </div>
             </div>

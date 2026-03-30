@@ -74,10 +74,20 @@ class RansomwareMapViewTests(TestCase):
         response = self.client.get(RANSOMWARE_MAP_URL)
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["current_page"], "ransomware-map")
         self.assertContains(response, "Ransomware Incident Map")
         self.assertContains(response, 'id="ransomware-map-surface"')
         self.assertContains(response, "Nordic Mills")
         self.assertNotContains(response, "General bulletin")
+
+    def test_map_page_renders_main_navigation_entry_with_active_state(self):
+        self._create_victim(victim="Nordic Mills", group="Akira", country="Sweden")
+
+        response = self.client.get(RANSOMWARE_MAP_URL)
+
+        self.assertGreaterEqual(response.content.decode().count('href="/ransomware/map/"'), 2)
+        self.assertContains(response, "bg-rose-500/20 text-rose-100 ring-1 ring-rose-400/30")
+        self.assertContains(response, "bg-rose-500/10 text-rose-100")
 
     def test_window_filtering_changes_victim_scope(self):
         self._create_victim(victim="Fresh Victim", group="Akira", country="Sweden", hours_ago=6)
@@ -145,4 +155,5 @@ class RansomwareMapViewTests(TestCase):
 
         response = self.client.get(RANSOMWARE_MAP_URL)
 
+        self.assertContains(response, 'id="ransomware-map-surface"')
         self.assertContains(response, "Victim activity found, geography still sparse")
