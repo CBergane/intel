@@ -4,7 +4,63 @@
 {% block title %}Dark Threat Map | BorealSec Intel{% endblock %}
 
 {% block content %}
-<section class="space-y-4 sm:space-y-5">
+<style>
+    @keyframes dark-map-live-pulse-strong {
+        0% { opacity: 1; transform: scale(1); }
+        25% { opacity: 1; transform: scale(1.08); }
+        70% { opacity: 0.92; transform: scale(1.02); }
+        100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes dark-map-live-pulse-soft {
+        0% { opacity: 1; transform: scale(1); }
+        35% { opacity: 1; transform: scale(1.04); }
+        100% { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes dark-map-live-line {
+        0% { opacity: 0; stroke-dashoffset: 28; }
+        20% { opacity: 0.95; stroke-dashoffset: 0; }
+        100% { opacity: 0; stroke-dashoffset: -18; }
+    }
+
+    .dark-map-live-pulse-strong,
+    .dark-map-live-pulse-soft {
+        transform-box: fill-box;
+        transform-origin: center;
+    }
+
+    .dark-map-live-pulse-strong {
+        animation: dark-map-live-pulse-strong 1.8s ease-out;
+    }
+
+    .dark-map-live-pulse-soft {
+        animation: dark-map-live-pulse-soft 1.4s ease-out;
+    }
+
+    .dark-map-live-card-strong {
+        box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.28), 0 0 22px rgba(34, 211, 238, 0.14);
+    }
+
+    .dark-map-live-card-soft {
+        box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.2), 0 0 18px rgba(56, 189, 248, 0.08);
+    }
+
+    #dark-map-live-transient-layer path {
+        fill: none;
+        stroke-linecap: round;
+        stroke-dasharray: 10 8;
+        animation: dark-map-live-line 2.6s ease-out forwards;
+    }
+</style>
+
+<section id="dark-map-live-root"
+         class="space-y-4 sm:space-y-5"
+         data-poll-url="{{ live_poll_url }}"
+         data-cursor="{{ live_cursor }}"
+         data-poll-ms="25000"
+         data-selected-country-key="{{ selected_country_key }}"
+         data-group-first-mode="{% if group_first_mode %}true{% else %}false{% endif %}">
     <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
@@ -15,6 +71,7 @@
                 </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                <span id="dark-map-live-status" class="rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-[11px] uppercase tracking-[0.18em] text-cyan-200">Live polling every 25s</span>
                 <a href="{{ dashboard_url }}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Active Groups</a>
                 <a href="{{ recent_hits_url }}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}" class="rounded-lg border border-slate-600 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">Recent Hits</a>
                 {% if selected_country or selected_source or window != "7d" or match_filter != "all" %}
@@ -25,26 +82,26 @@
         <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div class="rounded-xl border border-sky-500/20 bg-slate-950/35 p-3">
                 <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Group / Context Intel</p>
-                <p class="mt-3 text-2xl font-semibold text-sky-200">{{ map_metrics.group_count }}</p>
+                <p id="dark-map-metric-groups" class="mt-3 text-2xl font-semibold text-sky-200">{{ map_metrics.group_count }}</p>
                 <p class="mt-1 text-[11px] text-slate-500">
                     Active groups in {{ window }}{% if group_first_mode %} · primary signal right now{% endif %}
                 </p>
             </div>
             <div class="rounded-xl border border-cyan-500/20 bg-slate-950/35 p-3">
                 <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Watch Matches</p>
-                <p class="mt-3 text-2xl font-semibold text-cyan-200">{{ map_metrics.watch_match_count }}</p>
+                <p id="dark-map-metric-watch" class="mt-3 text-2xl font-semibold text-cyan-200">{{ map_metrics.watch_match_count }}</p>
                 <p class="mt-1 text-[11px] text-slate-500">Operational records that matched current watches</p>
             </div>
             <div class="rounded-xl border border-emerald-500/20 bg-slate-950/35 p-3">
                 <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Incident / Country Intel</p>
-                <p class="mt-3 text-2xl font-semibold text-emerald-200">{{ map_metrics.country_count }}</p>
-                <p class="mt-1 text-[11px] text-slate-500">
+                <p id="dark-map-metric-countries" class="mt-3 text-2xl font-semibold text-emerald-200">{{ map_metrics.country_count }}</p>
+                <p id="dark-map-metric-country-detail" class="mt-1 text-[11px] text-slate-500">
                     {{ map_metrics.mapped_incident_count }} mapped incidents{% if map_metrics.countryless_incident_count %} · {{ map_metrics.countryless_incident_count }} not plot-ready{% endif %}
                 </p>
             </div>
             <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
                 <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Source Coverage</p>
-                <p class="mt-3 text-2xl font-semibold text-white">{{ map_metrics.source_count }}</p>
+                <p id="dark-map-metric-sources" class="mt-3 text-2xl font-semibold text-white">{{ map_metrics.source_count }}</p>
                 {% if selected_country %}
                     <p class="mt-1 text-[11px] text-slate-500">Drill-down: {{ selected_country }}</p>
                 {% else %}
@@ -115,11 +172,11 @@
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
                 <div class="mb-3 flex items-center justify-between gap-2">
                     <h2 class="text-sm font-semibold text-white sm:text-base">Incoming Activity</h2>
-                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ incoming_activity|length }} shown</span>
+                    <span id="dark-map-incoming-count" class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ incoming_activity|length }} shown</span>
                 </div>
-                <div class="space-y-3">
+                <div id="dark-map-incoming-list" class="space-y-3">
                     {% for hit in incoming_activity %}
-                        <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
+                        <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3" data-hit-id="{{ hit.id }}">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -164,28 +221,28 @@
                 <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                     <div class="rounded-xl border border-cyan-500/20 bg-slate-950/35 p-3">
                         <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Matched Records</p>
-                        <p class="mt-2 text-xl font-semibold text-cyan-200">{{ matched_summary.record_count }}</p>
+                        <p id="dark-map-matched-records" class="mt-2 text-xl font-semibold text-cyan-200">{{ matched_summary.record_count }}</p>
                     </div>
                     <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
                         <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Matched Incidents</p>
-                        <p class="mt-2 text-xl font-semibold text-white">{{ matched_summary.incident_count }}</p>
+                        <p id="dark-map-matched-incidents" class="mt-2 text-xl font-semibold text-white">{{ matched_summary.incident_count }}</p>
                     </div>
                     <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
                         <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Matched Groups</p>
-                        <p class="mt-2 text-xl font-semibold text-white">{{ matched_summary.group_count }}</p>
+                        <p id="dark-map-matched-groups" class="mt-2 text-xl font-semibold text-white">{{ matched_summary.group_count }}</p>
                     </div>
                     <div class="rounded-xl border border-line/80 bg-slate-950/35 p-3">
                         <p class="text-[11px] uppercase tracking-[0.18em] text-slate-500">Matched Sources</p>
-                        <p class="mt-2 text-xl font-semibold text-white">{{ matched_summary.source_count }}</p>
+                        <p id="dark-map-matched-sources" class="mt-2 text-xl font-semibold text-white">{{ matched_summary.source_count }}</p>
                     </div>
                 </div>
+                <div id="dark-map-matched-top-groups" class="mt-3 flex flex-wrap gap-1.5">
                 {% if matched_summary.top_groups %}
-                    <div class="mt-3 flex flex-wrap gap-1.5">
                         {% for name in matched_summary.top_groups %}
                             <span class="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200">{{ name }}</span>
                         {% endfor %}
-                    </div>
                 {% endif %}
+                </div>
             </div>
         </aside>
 
@@ -293,7 +350,7 @@
                             {% for region in map_region_labels %}
                                 <text x="{{ region.x }}" y="{{ region.y }}" fill="#3b556f" font-size="12" letter-spacing="3">{{ region.label|upper }}</text>
                             {% endfor %}
-                            <g fill="none">
+                            <g id="dark-map-connection-layer" fill="none">
                                 {% for connection in map_connections %}
                                     <path data-country-connection="{{ connection.country_key }}"
                                           d="{{ connection.path_d }}"
@@ -303,10 +360,10 @@
                                           {% if not connection.is_watch_match %}stroke-dasharray="5 5"{% endif %} />
                                 {% endfor %}
                             </g>
-                            <g opacity="{% if group_first_mode %}0.42{% else %}1{% endif %}">
+                            <g id="dark-map-country-layer" opacity="{% if group_first_mode %}0.42{% else %}1{% endif %}">
                                 {% for tile in map_tiles %}
                                     {% if tile.url %}<a href="{{ tile.url }}">{% endif %}
-                                    <g data-country-key="{{ tile.country_key }}" data-selected="{% if tile.is_selected %}true{% else %}false{% endif %}">
+                                    <g data-country-key="{{ tile.country_key }}" data-selected="{% if tile.is_selected %}true{% else %}false{% endif %}" data-tile-cx="{{ tile.center_x }}" data-tile-cy="{{ tile.center_y }}">
                                         <title>{{ tile.tooltip }}</title>
                                         {% if tile.is_selected %}
                                             <rect x="{{ tile.x|add:'-3' }}" y="{{ tile.y|add:'-3' }}" width="{{ tile.width|add:'6' }}" height="{{ tile.height|add:'6' }}" rx="13" fill="none" stroke="#67e8f9" stroke-width="2.5" opacity="0.9" />
@@ -323,14 +380,17 @@
                                     {% if tile.url %}</a>{% endif %}
                                 {% endfor %}
                             </g>
+                            <g id="dark-map-node-layer">
                             {% for node in group_nodes %}
-                                <g data-group-node="{{ node.group_name|lower }}">
+                                <g data-group-node="{{ node.group_key }}" data-node-x="{{ node.x }}" data-node-y="{{ node.y }}">
                                     <circle cx="{{ node.x }}" cy="{{ node.y }}" r="14" fill="#071827" stroke="{% if node.watch_match_count %}#22d3ee{% else %}#35526a{% endif %}" stroke-width="1.6" filter="url(#dark-map-node-glow)" />
                                     <circle cx="{{ node.x }}" cy="{{ node.y }}" r="4.5" fill="{% if node.watch_match_count %}#67e8f9{% else %}#94a3b8{% endif %}" />
                                     <text x="{{ node.label_x }}" y="{{ node.label_y }}" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="end">{{ node.group_name }}</text>
                                     <text x="{{ node.label_x }}" y="{{ node.meta_y }}" fill="#7dd3fc" font-size="10" text-anchor="end">{{ node.incident_count }} records · {{ node.source_count }} sources{% if node.watch_match_count %} · {{ node.watch_match_count }} matched{% endif %}</text>
                                 </g>
                             {% endfor %}
+                            </g>
+                            <g id="dark-map-live-transient-layer"></g>
                         </svg>
                     </div>
                     {% if map_empty_state and not group_first_mode %}
@@ -383,7 +443,7 @@
                         <span class="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-200">highlighting {{ selected_country }}</span>
                     {% endif %}
                 </div>
-                <div class="space-y-2.5">
+                <div id="dark-map-top-groups-list" class="space-y-2.5">
                     {% for group in top_groups %}
                         <div class="rounded-xl border p-3 {% if group.country_match %}border-emerald-500/35 bg-emerald-500/8{% else %}border-line/80 bg-slate-950/35{% endif %}">
                             <div class="flex items-start justify-between gap-3">
@@ -434,9 +494,9 @@
             <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow {% if group_first_mode %}opacity-80{% endif %}">
                 <div class="mb-3 flex items-center justify-between gap-2">
                     <h2 class="text-sm font-semibold text-white sm:text-base">Plot-Ready Countries</h2>
-                    <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span>
+                    <span id="dark-map-country-count" class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span>
                 </div>
-                <div class="space-y-2.5">
+                <div id="dark-map-top-countries-list" class="space-y-2.5">
                     {% for row in top_countries %}
                         <a href="{% url 'dark-map' %}?window={{ window }}{% if selected_source %}&source={{ selected_source|urlencode }}{% endif %}{% if match_filter != 'all' %}&match={{ match_filter }}{% endif %}&country={{ row.country|urlencode }}"
                            class="flex items-center justify-between gap-3 rounded-xl border p-3 {% if row.is_selected %}border-emerald-500/40 bg-emerald-500/10{% else %}border-line/80 bg-slate-950/35 hover:bg-slate-950/55{% endif %}">
@@ -455,4 +515,349 @@
         </aside>
     </div>
 </section>
+<script>
+(() => {
+    const root = document.getElementById("dark-map-live-root");
+    if (!root || !window.fetch) {
+        return;
+    }
+
+    const pollUrl = root.dataset.pollUrl;
+    const pollMs = Number(root.dataset.pollMs || 25000);
+    const defaultStatus = `Live polling every ${Math.round(pollMs / 1000)}s`;
+    let cursor = Number(root.dataset.cursor || 0);
+
+    const liveStatus = document.getElementById("dark-map-live-status");
+    const incomingCount = document.getElementById("dark-map-incoming-count");
+    const incomingList = document.getElementById("dark-map-incoming-list");
+    const metricGroups = document.getElementById("dark-map-metric-groups");
+    const metricWatch = document.getElementById("dark-map-metric-watch");
+    const metricCountries = document.getElementById("dark-map-metric-countries");
+    const metricCountryDetail = document.getElementById("dark-map-metric-country-detail");
+    const metricSources = document.getElementById("dark-map-metric-sources");
+    const matchedRecords = document.getElementById("dark-map-matched-records");
+    const matchedIncidents = document.getElementById("dark-map-matched-incidents");
+    const matchedGroups = document.getElementById("dark-map-matched-groups");
+    const matchedSources = document.getElementById("dark-map-matched-sources");
+    const matchedTopGroups = document.getElementById("dark-map-matched-top-groups");
+    const topGroupsList = document.getElementById("dark-map-top-groups-list");
+    const topCountriesList = document.getElementById("dark-map-top-countries-list");
+    const topCountryCount = document.getElementById("dark-map-country-count");
+    const connectionLayer = document.getElementById("dark-map-connection-layer");
+    const countryLayer = document.getElementById("dark-map-country-layer");
+    const nodeLayer = document.getElementById("dark-map-node-layer");
+    const transientLayer = document.getElementById("dark-map-live-transient-layer");
+    const mapSvg = document.getElementById("dark-threat-map");
+
+    const escapeHtml = (value) => String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const escapeAttr = (value) => escapeHtml(value);
+
+    const cssEscape = (value) => {
+        if (window.CSS && typeof window.CSS.escape === "function") {
+            return window.CSS.escape(String(value ?? ""));
+        }
+        return String(value ?? "").replace(/["\\]/g, "\\$&");
+    };
+
+    const relativeTime = (value) => {
+        if (!value) {
+            return "";
+        }
+        const timestamp = Date.parse(value);
+        if (Number.isNaN(timestamp)) {
+            return value;
+        }
+        const diffSeconds = Math.round((timestamp - Date.now()) / 1000);
+        const units = [
+            { unit: "day", seconds: 86400 },
+            { unit: "hour", seconds: 3600 },
+            { unit: "minute", seconds: 60 },
+            { unit: "second", seconds: 1 },
+        ];
+        const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+        for (const entry of units) {
+            if (Math.abs(diffSeconds) >= entry.seconds || entry.unit === "second") {
+                return formatter.format(Math.round(diffSeconds / entry.seconds), entry.unit);
+            }
+        }
+        return value;
+    };
+
+    const renderIncomingActivity = (items, emptyMessage) => {
+        if (!items.length) {
+            return `<p class="text-sm text-slate-400">${escapeHtml(emptyMessage || "No incoming activity in the selected window.")}</p>`;
+        }
+        return items.map((item) => `
+            <article class="rounded-xl border border-line/80 bg-slate-950/35 p-3" data-hit-id="${item.id}">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                            <span class="rounded-md border ${item.is_watch_match ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-200" : "border-line/80 bg-slate-900/70 text-slate-400"} px-2 py-1">
+                                ${item.is_watch_match ? "Watch Match" : "Context"}
+                            </span>
+                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">${escapeHtml(item.signal_label || item.record_type || "Record")}</span>
+                            ${item.group_name ? `<span class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200">${escapeHtml(item.group_name)}</span>` : ""}
+                            ${item.country ? `<span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">${escapeHtml(item.country)}</span>` : ""}
+                            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">${escapeHtml(item.source_name)}</span>
+                        </div>
+                        <p class="mt-2 text-sm font-medium text-white">${escapeHtml(item.signal_title || item.title)}</p>
+                        ${item.excerpt ? `<p class="mt-2 overflow-hidden break-words text-sm leading-6 text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">${escapeHtml(item.excerpt)}</p>` : ""}
+                    </div>
+                    <div class="text-right text-[11px] text-slate-500">
+                        <p title="${escapeAttr(item.detected_at)}">${escapeHtml(relativeTime(item.last_seen_at || item.detected_at))}</p>
+                        <a href="${escapeAttr(item.raw_url)}" class="mt-2 inline-flex rounded-md border border-slate-700 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-900/70">Raw</a>
+                    </div>
+                </div>
+            </article>
+        `).join("");
+    };
+
+    const renderMatchedTopGroups = (names) => {
+        if (!names.length) {
+            return "";
+        }
+        return names.map((name) => `
+            <span class="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-200">${escapeHtml(name)}</span>
+        `).join("");
+    };
+
+    const renderTopGroups = (groups, selectedCountryKey) => {
+        if (!groups.length) {
+            return '<p class="text-sm text-slate-400">No group activity in the selected window.</p>';
+        }
+        return groups.map((group) => `
+            <div class="rounded-xl border p-3 ${group.country_match ? "border-emerald-500/35 bg-emerald-500/8" : "border-line/80 bg-slate-950/35"}">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-white">${escapeHtml(group.group_name)}</p>
+                        <p class="mt-1 text-[11px] text-slate-500">${group.incident_count} records · ${group.source_count} sources${group.watch_match_count ? ` · ${group.watch_match_count} matched` : ""}</p>
+                    </div>
+                    <span class="text-[11px] text-slate-400">${escapeHtml(relativeTime(group.latest_activity_at))}</span>
+                </div>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    ${group.countries.map((country) => `
+                        <span class="rounded-md border ${selectedCountryKey && country.toLowerCase() === selectedCountryKey ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200" : "border-line/80 bg-slate-950/60 text-slate-300"} px-2 py-1 text-[11px]">${escapeHtml(country)}</span>
+                    `).join("")}
+                </div>
+            </div>
+        `).join("");
+    };
+
+    const renderTopCountries = (countries) => {
+        if (!countries.length) {
+            return '<p class="text-sm text-slate-400">No countries in the selected window.</p>';
+        }
+        return countries.map((row) => `
+            <a href="${escapeAttr(row.url)}" class="flex items-center justify-between gap-3 rounded-xl border p-3 ${row.is_selected ? "border-emerald-500/40 bg-emerald-500/10" : "border-line/80 bg-slate-950/35 hover:bg-slate-950/55"}">
+                <div class="min-w-0">
+                    <p class="truncate text-sm font-medium text-white">${escapeHtml(row.country)}</p>
+                    <p class="mt-1 text-[11px] text-slate-500">${row.record_count} records · ${row.group_count} groups${row.watch_match_count ? ` · ${row.watch_match_count} matched` : ""}</p>
+                </div>
+                <span class="text-sm font-semibold text-emerald-200">${row.incident_count}</span>
+            </a>
+        `).join("");
+    };
+
+    const renderConnections = (connections, groupFirstMode) => connections.map((connection) => `
+        <path data-country-connection="${escapeAttr(connection.country_key)}"
+              d="${escapeAttr(connection.path_d)}"
+              stroke="${connection.is_selected ? "#67e8f9" : (connection.is_watch_match ? "#22d3ee" : "#31506b")}"
+              stroke-width="${connection.is_selected ? "2.2" : "1.2"}"
+              stroke-opacity="${groupFirstMode ? "0.22" : "0.48"}"
+              ${connection.is_watch_match ? "" : 'stroke-dasharray="5 5"'} />
+    `).join("");
+
+    const renderCountryTiles = (tiles, groupFirstMode) => tiles.map((tile) => {
+        const inner = `
+            <g data-country-key="${escapeAttr(tile.country_key)}" data-selected="${tile.is_selected ? "true" : "false"}" data-tile-cx="${tile.center_x}" data-tile-cy="${tile.center_y}">
+                <title>${escapeHtml(tile.tooltip)}</title>
+                ${tile.is_selected ? `<rect x="${tile.x - 3}" y="${tile.y - 3}" width="${tile.width + 6}" height="${tile.height + 6}" rx="13" fill="none" stroke="#67e8f9" stroke-width="2.5" opacity="0.9" />` : ""}
+                <rect x="${tile.x}" y="${tile.y}" width="${tile.width}" height="${tile.height}" rx="10" fill="${tile.fill_color}" stroke="${tile.stroke_color}" stroke-width="${tile.is_selected ? "2.2" : "1.35"}" />
+                <text x="${tile.label_x}" y="${tile.label_y}" fill="${tile.text_color}" font-size="11" font-weight="700">${escapeHtml(tile.short_label)}</text>
+                ${tile.display_count ? `<text x="${tile.count_x}" y="${tile.count_y}" fill="${tile.text_color}" font-size="13" font-weight="700" text-anchor="end">${escapeHtml(tile.display_count)}</text>` : ""}
+                ${tile.watch_match_count ? `<circle cx="${tile.badge_x}" cy="${tile.badge_y}" r="4" fill="${tile.badge_color}" filter="url(#dark-map-node-glow)" />` : ""}
+            </g>
+        `;
+        return tile.url ? `<a href="${escapeAttr(tile.url)}">${inner}</a>` : inner;
+    }).join("");
+
+    const renderGroupNodes = (nodes) => nodes.map((node) => `
+        <g data-group-node="${escapeAttr(node.group_key)}" data-node-x="${node.x}" data-node-y="${node.y}">
+            <circle cx="${node.x}" cy="${node.y}" r="14" fill="#071827" stroke="${node.watch_match_count ? "#22d3ee" : "#35526a"}" stroke-width="1.6" filter="url(#dark-map-node-glow)" />
+            <circle cx="${node.x}" cy="${node.y}" r="4.5" fill="${node.watch_match_count ? "#67e8f9" : "#94a3b8"}" />
+            <text x="${node.label_x}" y="${node.label_y}" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="end">${escapeHtml(node.group_name)}</text>
+            <text x="${node.label_x}" y="${node.meta_y}" fill="#7dd3fc" font-size="10" text-anchor="end">${node.incident_count} records · ${node.source_count} sources${node.watch_match_count ? ` · ${node.watch_match_count} matched` : ""}</text>
+        </g>
+    `).join("");
+
+    const highlightActivityCards = (events) => {
+        events.forEach((event) => {
+            const card = incomingList?.querySelector(`[data-hit-id="${event.id}"]`);
+            if (!card) {
+                return;
+            }
+            const className = event.is_watch_match ? "dark-map-live-card-strong" : "dark-map-live-card-soft";
+            card.classList.remove("dark-map-live-card-strong", "dark-map-live-card-soft");
+            card.classList.add(className);
+            window.setTimeout(() => card.classList.remove(className), 2600);
+        });
+    };
+
+    const pulseElement = (selector, className) => {
+        const element = mapSvg?.querySelector(selector);
+        if (!element) {
+            return;
+        }
+        element.classList.remove("dark-map-live-pulse-strong", "dark-map-live-pulse-soft");
+        void element.getBoundingClientRect();
+        element.classList.add(className);
+        window.setTimeout(() => element.classList.remove(className), 1900);
+    };
+
+    const drawTransientLine = (event) => {
+        if (!transientLayer || !event.animate_connection || !event.country_key || !event.group_key) {
+            return;
+        }
+        const tile = mapSvg?.querySelector(`[data-country-key="${cssEscape(event.country_key)}"]`);
+        const node = mapSvg?.querySelector(`[data-group-node="${cssEscape(event.group_key)}"]`);
+        if (!tile || !node) {
+            return;
+        }
+        const x1 = Number(tile.getAttribute("data-tile-cx"));
+        const y1 = Number(tile.getAttribute("data-tile-cy"));
+        const x2 = Number(node.getAttribute("data-node-x")) - 34;
+        const y2 = Number(node.getAttribute("data-node-y"));
+        if ([x1, y1, x2, y2].some((value) => Number.isNaN(value))) {
+            return;
+        }
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute(
+            "d",
+            `M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${(x1 + 88).toFixed(1)} ${y1.toFixed(1)}, ${(x2 - 44).toFixed(1)} ${y2.toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}`
+        );
+        path.setAttribute("stroke", event.is_watch_match ? "#67e8f9" : "#38bdf8");
+        path.setAttribute("stroke-width", event.is_watch_match ? "2.2" : "1.5");
+        transientLayer.appendChild(path);
+        path.addEventListener("animationend", () => path.remove(), { once: true });
+    };
+
+    const animateEvents = (events) => {
+        highlightActivityCards(events);
+        events.forEach((event) => {
+            const pulseClass = event.is_watch_match ? "dark-map-live-pulse-strong" : "dark-map-live-pulse-soft";
+            if (event.animate_country && event.country_key) {
+                pulseElement(`[data-country-key="${cssEscape(event.country_key)}"]`, pulseClass);
+            }
+            if (event.animate_group && event.group_key) {
+                pulseElement(`[data-group-node="${cssEscape(event.group_key)}"]`, pulseClass);
+            }
+            drawTransientLine(event);
+        });
+    };
+
+    const updateSnapshot = (snapshot) => {
+        if (!snapshot) {
+            return;
+        }
+        root.dataset.groupFirstMode = snapshot.group_first_mode ? "true" : "false";
+        root.dataset.selectedCountryKey = snapshot.selected_country_key || "";
+
+        if (metricGroups) metricGroups.textContent = snapshot.map_metrics.group_count;
+        if (metricWatch) metricWatch.textContent = snapshot.map_metrics.watch_match_count;
+        if (metricCountries) metricCountries.textContent = snapshot.map_metrics.country_count;
+        if (metricSources) metricSources.textContent = snapshot.map_metrics.source_count;
+        if (metricCountryDetail) {
+            metricCountryDetail.textContent = `${snapshot.map_metrics.mapped_incident_count} mapped incidents${snapshot.map_metrics.countryless_incident_count ? ` · ${snapshot.map_metrics.countryless_incident_count} not plot-ready` : ""}`;
+        }
+        if (incomingCount) {
+            incomingCount.textContent = `${snapshot.incoming_activity.length} shown`;
+        }
+        if (incomingList) {
+            incomingList.innerHTML = renderIncomingActivity(snapshot.incoming_activity, "No incoming activity in the selected window.");
+        }
+        if (matchedRecords) matchedRecords.textContent = snapshot.matched_summary.record_count;
+        if (matchedIncidents) matchedIncidents.textContent = snapshot.matched_summary.incident_count;
+        if (matchedGroups) matchedGroups.textContent = snapshot.matched_summary.group_count;
+        if (matchedSources) matchedSources.textContent = snapshot.matched_summary.source_count;
+        if (matchedTopGroups) {
+            matchedTopGroups.innerHTML = renderMatchedTopGroups(snapshot.matched_summary.top_groups || []);
+        }
+        if (topGroupsList) {
+            topGroupsList.innerHTML = renderTopGroups(snapshot.top_groups || [], snapshot.selected_country_key || "");
+        }
+        if (topCountryCount) {
+            topCountryCount.textContent = `${(snapshot.top_countries || []).length} shown`;
+        }
+        if (topCountriesList) {
+            topCountriesList.innerHTML = renderTopCountries(snapshot.top_countries || []);
+        }
+        if (connectionLayer) {
+            connectionLayer.innerHTML = renderConnections(snapshot.map_connections || [], snapshot.group_first_mode);
+        }
+        if (countryLayer) {
+            countryLayer.setAttribute("opacity", snapshot.group_first_mode ? "0.42" : "1");
+            countryLayer.innerHTML = renderCountryTiles(snapshot.map_tiles || [], snapshot.group_first_mode);
+        }
+        if (nodeLayer) {
+            nodeLayer.innerHTML = renderGroupNodes(snapshot.group_nodes || []);
+        }
+    };
+
+    const setLiveStatus = (eventCount, hasError = false) => {
+        if (!liveStatus) {
+            return;
+        }
+        if (hasError) {
+            liveStatus.textContent = "Live polling delayed";
+            return;
+        }
+        liveStatus.textContent = eventCount ? `${eventCount} new signal${eventCount === 1 ? "" : "s"} observed` : defaultStatus;
+    };
+
+    const poll = async () => {
+        if (document.hidden) {
+            window.setTimeout(poll, pollMs);
+            return;
+        }
+        try {
+            const url = new URL(pollUrl, window.location.origin);
+            const params = new URLSearchParams(window.location.search);
+            params.set("cursor", String(cursor));
+            url.search = params.toString();
+            const response = await fetch(url.toString(), {
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+            });
+            if (!response.ok) {
+                throw new Error(`Polling failed with ${response.status}`);
+            }
+            const data = await response.json();
+            updateSnapshot(data.snapshot);
+            if (Array.isArray(data.events) && data.events.length) {
+                animateEvents(data.events);
+                setLiveStatus(data.events.length, false);
+            } else {
+                setLiveStatus(0, false);
+            }
+            if (Number.isFinite(Number(data.cursor))) {
+                cursor = Math.max(cursor, Number(data.cursor));
+                root.dataset.cursor = String(cursor);
+            }
+        } catch (error) {
+            setLiveStatus(0, true);
+        } finally {
+            window.setTimeout(poll, pollMs);
+        }
+    };
+
+    if (pollUrl) {
+        window.setTimeout(poll, pollMs);
+    }
+})();
+</script>
 {% endblock %}

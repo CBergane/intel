@@ -11,6 +11,7 @@ urlpatterns = [
     path("sources/", views.sources_view, name="sources"),
     path("dark/", views.dark_dashboard_view, name="dark-dashboard"),
     path("dark/map/", views.dark_map_view, name="dark-map"),
+    path("dark/map/live/", views.dark_map_live_view, name="dark-map-live"),
     path("dark/recent/", views.dark_recent_hits_view, name="dark-recent-hits"),
     path("about/", views.about_view, name="about"),
 ]

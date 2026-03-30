@@ -11,6 +11,7 @@ from intel.dark_models import DarkHit, DarkSource
 User = get_user_model()
 DARK_GROUPS_URL = reverse("dark-dashboard")
 DARK_MAP_URL = reverse("dark-map")
+DARK_MAP_LIVE_URL = reverse("dark-map-live")
 DARK_RECENT_URL = reverse("dark-recent-hits")
 
 
@@ -386,9 +387,21 @@ class DarkMapViewTests(TestCase):
         self.assertContains(response, 'data-group-node="akira"')
         self.assertContains(response, 'data-country-connection="sweden"')
         self.assertContains(response, "Quick Country Filter")
+        self.assertContains(response, 'data-poll-url="')
+        self.assertContains(response, "Live polling every 25s")
         self.assertNotContains(response, "overflow-x-auto")
         self.assertNotContains(response, "min-w-[68rem]")
         self.assertFalse(response.context["group_first_mode"])
+
+    def test_map_page_still_renders_without_js(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(DARK_MAP_URL)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Alpha Manufacturing")
+        self.assertContains(response, "Gamma Health")
+        self.assertContains(response, 'id="dark-threat-map"')
+        self.assertContains(response, 'id="dark-map-incoming-list"')
 
     def test_map_page_aggregates_countries_and_groups(self):
         self.client.force_login(self.superuser)
@@ -591,3 +604,95 @@ class DarkMapViewTests(TestCase):
 
         self.assertContains(response, f"{DARK_RECENT_URL}?window=24h&source={self.source_b.slug}")
         self.assertContains(response, f"{DARK_MAP_URL}?window=24h&source={self.source_b.slug}")
+
+    def test_map_live_endpoint_returns_expected_shape(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(DARK_MAP_LIVE_URL)
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("cursor", payload)
+        self.assertIn("events", payload)
+        self.assertIn("snapshot", payload)
+        self.assertTrue(payload["events"])
+        event = payload["events"][0]
+        self.assertEqual(
+            sorted(event.keys()),
+            sorted(
+                [
+                    "animate_connection",
+                    "animate_country",
+                    "animate_group",
+                    "country",
+                    "country_key",
+                    "detected_at",
+                    "excerpt",
+                    "group_key",
+                    "group_name",
+                    "id",
+                    "is_watch_match",
+                    "last_seen_at",
+                    "raw_url",
+                    "record_type",
+                    "signal_label",
+                    "signal_title",
+                    "source_name",
+                    "title",
+                ]
+            ),
+        )
+        self.assertIn("map_metrics", payload["snapshot"])
+        self.assertIn("incoming_activity", payload["snapshot"])
+        self.assertIn("top_groups", payload["snapshot"])
+        self.assertIn("top_countries", payload["snapshot"])
+        self.assertIn("map_tiles", payload["snapshot"])
+
+    def test_map_live_endpoint_filters_new_events_by_cursor_and_window(self):
+        self.client.force_login(self.superuser)
+        initial_cursor = DarkHit.objects.order_by("-id").values_list("id", flat=True).first()
+        _make_hit(
+            self.source_a,
+            title="Live Sweden Incident",
+            group_name="Akira",
+            victim_name="Live Sweden Incident",
+            country="Sweden",
+            record_type="incident",
+        )
+
+        response = self.client.get(DARK_MAP_LIVE_URL, {"window": "24h", "cursor": initial_cursor})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual([event["title"] for event in payload["events"]], ["Live Sweden Incident"])
+        self.assertNotIn("Legacy Finland", [event["title"] for event in payload["events"]])
+        top_countries = [row["country"] for row in payload["snapshot"]["top_countries"]]
+        self.assertNotIn("Finland", top_countries)
+
+    def test_map_live_endpoint_does_not_fake_country_animation_for_countryless_records(self):
+        countryless_source = _make_source(slug="map-live-countryless", name="Map Live Countryless")
+        countryless_hit = _make_hit(
+            countryless_source,
+            title="Countryless Live Incident",
+            group_name="Akira",
+            victim_name="Countryless Live Incident",
+            country="",
+            record_type="incident",
+        )
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(
+            DARK_MAP_LIVE_URL,
+            {"source": countryless_source.slug, "cursor": countryless_hit.id - 1},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload["events"]), 1)
+        event = payload["events"][0]
+        self.assertEqual(event["title"], "Countryless Live Incident")
+        self.assertTrue(event["animate_group"])
+        self.assertFalse(event["animate_country"])
+        self.assertFalse(event["animate_connection"])
+        self.assertEqual(event["country"], "")
+        self.assertEqual(event["country_key"], "")

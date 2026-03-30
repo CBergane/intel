@@ -14,6 +14,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.core.paginator import Paginator
 from django.db.models import Count, Max, Q
 from django.db.models.functions import Coalesce
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -673,6 +674,10 @@ DARK_MAP_TILE_LAYOUT = (
 DARK_MAP_LAYOUT_KEYS = {tile["key"] for tile in DARK_MAP_TILE_LAYOUT}
 
 
+def _dark_map_group_key(group_name: str) -> str:
+    return slugify((group_name or "").strip())
+
+
 def _dark_filtered_hits_queryset(request):
     query = (request.GET.get("q") or "").strip()
     selected_source = (request.GET.get("source") or "").strip()
@@ -958,6 +963,8 @@ def _dark_map_tiles(country_rows, *, selected_country: str, window: str, selecte
                 "y": tile["y"],
                 "width": width,
                 "height": height,
+                "center_x": tile["x"] + (width / 2),
+                "center_y": tile["y"] + (height / 2),
                 "label_x": tile["x"] + 8,
                 "label_y": tile["y"] + 15,
                 "count_x": tile["x"] + width - 10,
@@ -1207,7 +1214,7 @@ def _dark_map_source_rows(hits):
     return rows
 
 
-def _dark_map_incoming_activity(hits, *, selected_country: str = ""):
+def _dark_map_signal_hits(hits, *, selected_country: str = ""):
     selected_country_key = _normalized_country_key(selected_country)
     group_country_keys = {}
     for hit in hits:
@@ -1240,6 +1247,7 @@ def _dark_map_incoming_activity(hits, *, selected_country: str = ""):
         hit.map_country = country_display
         hit.map_country_code = country_code
         hit.signal_group_name = group_name
+        hit.signal_group_key = _dark_map_group_key(group_name)
         hit.signal_title = hit.victim_name or hit.title
         if hit.record_type == "incident":
             hit.signal_label = "Incident"
@@ -1248,6 +1256,11 @@ def _dark_map_incoming_activity(hits, *, selected_country: str = ""):
         else:
             hit.signal_label = "Context"
         rows.append(hit)
+    return rows
+
+
+def _dark_map_incoming_activity(hits, *, selected_country: str = ""):
+    rows = _dark_map_signal_hits(hits, selected_country=selected_country)
     return rows[:8]
 
 
@@ -1286,6 +1299,7 @@ def _dark_map_overlay(top_groups, map_tiles, *, selected_country: str = ""):
         group_nodes.append(
             {
                 "group_name": row["group_name"],
+                "group_key": _dark_map_group_key(row["group_name"]),
                 "watch_match_count": row["watch_match_count"],
                 "incident_count": row["incident_count"],
                 "source_count": row["source_count"],
@@ -1312,6 +1326,7 @@ def _dark_map_overlay(top_groups, map_tiles, *, selected_country: str = ""):
             map_connections.append(
                 {
                     "group_name": row["group_name"],
+                    "group_key": _dark_map_group_key(row["group_name"]),
                     "country": country,
                     "country_key": country_key,
                     "path_d": path_d,
@@ -1320,6 +1335,176 @@ def _dark_map_overlay(top_groups, map_tiles, *, selected_country: str = ""):
                 }
             )
     return group_nodes, map_connections
+
+
+def _dark_map_selected_source_name(selected_source: str) -> str:
+    if not selected_source:
+        return ""
+    return (
+        DarkSource.objects.filter(slug=selected_source)
+        .values_list("name", flat=True)
+        .first()
+        or selected_source
+    )
+
+
+def _dark_map_selected_country(request, country_rows):
+    selected_country = ""
+    requested_country = (request.GET.get("country") or "").strip()
+    if not requested_country:
+        return ""
+    requested_country_key = _normalized_country_key(requested_country)
+    for row in country_rows:
+        if row["country_key"] == requested_country_key:
+            selected_country = row["country"]
+            break
+    if selected_country:
+        return selected_country
+    normalized_country, _country_code = normalize_dark_country(requested_country)
+    return normalized_country or requested_country
+
+
+def _dark_map_build_state(request, *, selected_hits, filter_context):
+    country_rows = _dark_country_activity_rows(selected_hits)
+    selected_source_name = _dark_map_selected_source_name(filter_context["selected_source"])
+    selected_country = _dark_map_selected_country(request, country_rows)
+    selected_country_key = _normalized_country_key(selected_country)
+    for row in country_rows:
+        row["is_selected"] = row["country_key"] == selected_country_key
+
+    map_tiles, unmapped_country_rows = _dark_map_tiles(
+        country_rows,
+        selected_country=selected_country,
+        window=filter_context["window"],
+        selected_source=filter_context["selected_source"],
+        match_filter=filter_context["match_filter"],
+    )
+    map_empty_state = _dark_map_empty_state(
+        selected_hits,
+        country_rows,
+        selected_source_name=selected_source_name,
+    )
+    top_countries = country_rows[:8]
+    group_rows = _dark_map_group_rows(selected_hits, selected_country=selected_country)
+    top_groups = group_rows[:8]
+    coverage_source_rows = _dark_map_source_rows(selected_hits)[:6]
+    signal_hits = _dark_map_signal_hits(
+        selected_hits,
+        selected_country=selected_country,
+    )
+    incoming_activity = signal_hits[:8]
+    matched_summary = _dark_map_match_summary(selected_hits, group_rows)
+
+    incident_count = len([hit for hit in selected_hits if hit.record_type == "incident"])
+    mapped_incident_count = sum(row["incident_count"] for row in country_rows)
+    group_first_mode = not country_rows and bool(group_rows)
+    group_nodes, map_connections = _dark_map_overlay(
+        top_groups,
+        map_tiles,
+        selected_country=selected_country,
+    )
+
+    map_metrics = {
+        "country_count": len(country_rows),
+        "group_count": len(group_rows),
+        "incident_count": incident_count,
+        "mapped_incident_count": mapped_incident_count,
+        "countryless_incident_count": max(incident_count - mapped_incident_count, 0),
+        "watch_match_count": len([hit for hit in selected_hits if hit.is_watch_match]),
+        "source_count": len({hit.dark_source_id for hit in selected_hits}),
+    }
+    return {
+        "country_rows": country_rows,
+        "map_tiles": map_tiles,
+        "unmapped_country_rows": unmapped_country_rows,
+        "map_empty_state": map_empty_state,
+        "top_countries": top_countries,
+        "top_groups": top_groups,
+        "coverage_source_rows": coverage_source_rows,
+        "signal_hits": signal_hits,
+        "incoming_activity": incoming_activity,
+        "matched_summary": matched_summary,
+        "group_nodes": group_nodes,
+        "map_connections": map_connections,
+        "selected_country": selected_country,
+        "selected_country_key": selected_country_key,
+        "selected_country_on_map": any(tile["is_selected"] for tile in map_tiles),
+        "selected_source_name": selected_source_name,
+        "group_first_mode": group_first_mode,
+        "map_metrics": map_metrics,
+        "live_cursor": max((hit.id for hit in selected_hits), default=0),
+    }
+
+
+def _serialize_dark_map_signal_hit(hit, *, filter_context):
+    signal_title = getattr(hit, "signal_title", "") or hit.victim_name or hit.title
+    signal_group_name = getattr(hit, "signal_group_name", "") or resolve_group_name(
+        record_type=hit.record_type,
+        group_name=hit.group_name,
+        title=hit.title,
+        victim_name=hit.victim_name,
+    )
+    signal_group_key = getattr(hit, "signal_group_key", "") or _dark_map_group_key(signal_group_name)
+    map_country = getattr(hit, "map_country", "") or normalize_dark_country(hit.country)[0]
+    map_country_key = _normalized_country_key(map_country)
+    raw_params = {"window": filter_context["window"], "q": signal_title}
+    if filter_context["selected_source"]:
+        raw_params["source"] = filter_context["selected_source"]
+    if filter_context["match_filter"] != "all":
+        raw_params["match"] = filter_context["match_filter"]
+    return {
+        "id": hit.id,
+        "title": hit.title,
+        "signal_title": signal_title,
+        "signal_label": getattr(hit, "signal_label", "") or hit.record_type.title() or "Record",
+        "record_type": hit.record_type,
+        "group_name": signal_group_name,
+        "group_key": signal_group_key,
+        "country": map_country,
+        "country_key": map_country_key,
+        "is_watch_match": hit.is_watch_match,
+        "detected_at": hit.detected_at.isoformat(),
+        "last_seen_at": (hit.last_seen_at or hit.detected_at).isoformat(),
+        "source_name": hit.dark_source.name,
+        "excerpt": hit.excerpt or "",
+        "raw_url": f"{reverse('dark-recent-hits')}?{urlencode(raw_params)}",
+        "animate_group": bool(signal_group_key),
+        "animate_country": bool(map_country_key),
+        "animate_connection": bool(signal_group_key and map_country_key),
+    }
+
+
+def _serialize_dark_map_group_row(row):
+    return {
+        "group_name": row["group_name"],
+        "group_key": _dark_map_group_key(row["group_name"]),
+        "incident_count": row["incident_count"],
+        "source_count": row["source_count"],
+        "watch_match_count": row["watch_match_count"],
+        "latest_activity_at": row["latest_activity_at"].isoformat(),
+        "latest_victim_name": row.get("latest_victim_name", ""),
+        "latest_country": row.get("latest_country", ""),
+        "countries": row.get("countries", []),
+        "country_match": row.get("country_match", False),
+    }
+
+
+def _serialize_dark_map_country_row(row, *, filter_context):
+    return {
+        "country": row["country"],
+        "country_key": row["country_key"],
+        "record_count": row["record_count"],
+        "incident_count": row["incident_count"],
+        "group_count": row["group_count"],
+        "watch_match_count": row["watch_match_count"],
+        "is_selected": row["is_selected"],
+        "url": _dark_map_country_url(
+            window=filter_context["window"],
+            selected_source=filter_context["selected_source"],
+            match_filter=filter_context["match_filter"],
+            country=row["country"],
+        ),
+    }
 
 
 @superuser_required
@@ -1358,72 +1543,12 @@ def dark_dashboard_view(request):
 def dark_map_view(request):
     _, hits, filter_context = _dark_filtered_hits_queryset(request)
     selected_hits = list(hits)
-    country_rows = _dark_country_activity_rows(selected_hits)
-    selected_source_name = ""
-    if filter_context["selected_source"]:
-        selected_source_name = (
-            DarkSource.objects.filter(slug=filter_context["selected_source"])
-            .values_list("name", flat=True)
-            .first()
-            or filter_context["selected_source"]
-        )
-
-    selected_country = ""
-    requested_country = (request.GET.get("country") or "").strip()
-    if requested_country:
-        requested_country_key = _normalized_country_key(requested_country)
-        for row in country_rows:
-            if row["country_key"] == requested_country_key:
-                selected_country = row["country"]
-                break
-        if not selected_country:
-            normalized_country, _country_code = normalize_dark_country(requested_country)
-            selected_country = normalized_country or requested_country
-
-    selected_country_key = _normalized_country_key(selected_country)
-    for row in country_rows:
-        row["is_selected"] = row["country_key"] == selected_country_key
-
-    map_tiles, unmapped_country_rows = _dark_map_tiles(
-        country_rows,
-        selected_country=selected_country,
-        window=filter_context["window"],
-        selected_source=filter_context["selected_source"],
-        match_filter=filter_context["match_filter"],
+    state = _dark_map_build_state(
+        request,
+        selected_hits=selected_hits,
+        filter_context=filter_context,
     )
-    map_empty_state = _dark_map_empty_state(
-        selected_hits,
-        country_rows,
-        selected_source_name=selected_source_name,
-    )
-    top_countries = country_rows[:8]
-    group_rows = _dark_map_group_rows(selected_hits, selected_country=selected_country)
-    top_groups = group_rows[:8]
-    coverage_source_rows = _dark_map_source_rows(selected_hits)[:6]
-    incoming_activity = _dark_map_incoming_activity(
-        selected_hits,
-        selected_country=selected_country,
-    )
-    matched_summary = _dark_map_match_summary(selected_hits, group_rows)
-
-    incident_count = len([hit for hit in selected_hits if hit.record_type == "incident"])
-    mapped_incident_count = sum(row["incident_count"] for row in country_rows)
-    group_first_mode = not country_rows and bool(group_rows)
-    group_nodes, map_connections = _dark_map_overlay(
-        top_groups,
-        map_tiles,
-        selected_country=selected_country,
-    )
-
-    map_metrics = {
-        "country_count": len(country_rows),
-        "group_count": len(group_rows),
-        "incident_count": incident_count,
-        "mapped_incident_count": mapped_incident_count,
-        "countryless_incident_count": max(incident_count - mapped_incident_count, 0),
-        "watch_match_count": len([hit for hit in selected_hits if hit.is_watch_match]),
-        "source_count": len({hit.dark_source_id for hit in selected_hits}),
-    }
+    template_state = {key: value for key, value in state.items() if key != "signal_hits"}
 
     return render(
         request,
@@ -1431,31 +1556,65 @@ def dark_map_view(request):
         {
             "page_title": "Dark Intel Threat Map",
             "current_page": "dark",
-            "country_rows": country_rows,
-            "map_tiles": map_tiles,
             "map_region_labels": DARK_MAP_REGION_LABELS,
-            "map_empty_state": map_empty_state,
-            "unmapped_country_rows": unmapped_country_rows,
-            "top_countries": top_countries,
-            "top_groups": top_groups,
-            "coverage_source_rows": coverage_source_rows,
-            "incoming_activity": incoming_activity,
-            "matched_summary": matched_summary,
-            "group_nodes": group_nodes,
-            "map_connections": map_connections,
-            "selected_country": selected_country,
-            "selected_country_key": selected_country_key,
-            "selected_country_on_map": any(tile["is_selected"] for tile in map_tiles),
-            "selected_source_name": selected_source_name,
-            "group_first_mode": group_first_mode,
-            "map_metrics": map_metrics,
             "dashboard_url": reverse("dark-dashboard"),
             "recent_hits_url": reverse("dark-recent-hits"),
+            "live_poll_url": reverse("dark-map-live"),
             "window_options": DARK_WINDOW_OPTIONS,
             **_dark_source_health_context(),
             **filter_context,
+            **template_state,
         },
     )
+
+
+@superuser_required
+def dark_map_live_view(request):
+    cursor_raw = (request.GET.get("cursor") or "").strip()
+    try:
+        cursor = max(int(cursor_raw), 0)
+    except (TypeError, ValueError):
+        cursor = 0
+
+    _, hits, filter_context = _dark_filtered_hits_queryset(request)
+    selected_hits = list(hits)
+    state = _dark_map_build_state(
+        request,
+        selected_hits=selected_hits,
+        filter_context=filter_context,
+    )
+    new_events = [
+        _serialize_dark_map_signal_hit(hit, filter_context=filter_context)
+        for hit in state["signal_hits"]
+        if hit.id > cursor
+    ][:12]
+    payload = {
+        "cursor": state["live_cursor"],
+        "events": new_events,
+        "snapshot": {
+            "map_metrics": state["map_metrics"],
+            "matched_summary": state["matched_summary"],
+            "incoming_activity": [
+                _serialize_dark_map_signal_hit(hit, filter_context=filter_context)
+                for hit in state["incoming_activity"]
+            ],
+            "top_groups": [
+                _serialize_dark_map_group_row(row)
+                for row in state["top_groups"]
+            ],
+            "top_countries": [
+                _serialize_dark_map_country_row(row, filter_context=filter_context)
+                for row in state["top_countries"]
+            ],
+            "map_tiles": state["map_tiles"],
+            "group_nodes": state["group_nodes"],
+            "map_connections": state["map_connections"],
+            "group_first_mode": state["group_first_mode"],
+            "selected_country": state["selected_country"],
+            "selected_country_key": state["selected_country_key"],
+        },
+    }
+    return JsonResponse(payload)
 
 
 @superuser_required
