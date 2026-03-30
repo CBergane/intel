@@ -27,6 +27,15 @@ def _make_dark_hit(
     title="Ransomware target found",
     excerpt="Some excerpt text",
     record_type="",
+    matched_keywords=None,
+    matched_regex=None,
+    is_watch_match=True,
+    victim_name="",
+    group_name="",
+    country="",
+    industry="",
+    website_url="",
+    last_activity_text="",
 ):
     import hashlib
     content_hash = hashlib.md5(f"{source.slug}{title}".encode()).hexdigest()
@@ -36,8 +45,16 @@ def _make_dark_hit(
         excerpt=excerpt,
         url=source.url,
         content_hash=content_hash,
-        matched_keywords=["ransomware", "credentials"],
+        matched_keywords=matched_keywords if matched_keywords is not None else ["ransomware", "credentials"],
+        matched_regex=matched_regex if matched_regex is not None else [],
+        is_watch_match=is_watch_match,
         record_type=record_type,
+        victim_name=victim_name,
+        group_name=group_name,
+        country=country,
+        industry=industry,
+        website_url=website_url,
+        last_activity_text=last_activity_text,
     )
 
 
@@ -80,7 +97,17 @@ class DarkHitAlertTests(TestCase):
     @override_settings(DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token")
     def test_incident_dark_hit_sends_correct_payload(self):
         source = _make_dark_source()
-        hit = _make_dark_hit(source, title="Breach data found", record_type="incident")
+        hit = _make_dark_hit(
+            source,
+            title="Breach data found",
+            excerpt="Akira targeted the Swedish victim portal.",
+            record_type="incident",
+            matched_keywords=["akira", "swedish"],
+            matched_regex=[r"victim"],
+            victim_name="Nordic Victim",
+            group_name="Akira",
+            country="Sweden",
+        )
         with patch("intel.notifications.requests.post") as mock_post:
             send_dark_hit_alert(hit)
             mock_post.assert_called_once()
@@ -88,11 +115,33 @@ class DarkHitAlertTests(TestCase):
             sent_json = call_kwargs.kwargs.get("json") or call_kwargs.args[1]
             embed = sent_json["embeds"][0]
             self.assertEqual(embed["title"], "Breach data found")
+            self.assertIn(
+                {"name": "Regex matched", "value": r"victim", "inline": True},
+                embed["fields"],
+            )
+            self.assertIn(
+                {"name": "Matched in", "value": "victim, group, details", "inline": True},
+                embed["fields"],
+            )
 
     @override_settings(DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token")
     def test_group_dark_hit_does_not_send_alert(self):
         source = _make_dark_source()
         hit = _make_dark_hit(source, title="Black Basta", record_type="group")
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_dark_hit_alert(hit)
+            mock_post.assert_not_called()
+
+    @override_settings(DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token")
+    def test_unmatched_incident_dark_hit_does_not_send_alert(self):
+        source = _make_dark_source()
+        hit = _make_dark_hit(
+            source,
+            title="Context only",
+            record_type="incident",
+            matched_keywords=[],
+            is_watch_match=False,
+        )
         with patch("intel.notifications.requests.post") as mock_post:
             send_dark_hit_alert(hit)
             mock_post.assert_not_called()

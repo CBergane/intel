@@ -579,6 +579,121 @@ class DarkIngestionTests(TestCase):
         self.assertTrue(hit.is_watch_match)
         mock_post.assert_called_once()
 
+    @override_settings(
+        DARK_FETCH_RETRIES=1,
+        DARK_MAX_BYTES=5000,
+        DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
+    )
+    def test_same_live_updates_record_does_not_realert_on_unchanged_reingest(self):
+        self.source.watch_keywords = "alphacorp"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        first_markup = """
+        <html><title>Live Updates</title><body>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <p>17 minutes ago</p>
+                <p>Threat Group: Akira</p>
+                <p>Country: Sweden</p>
+                <p>Victim disclosure updated.</p>
+            </div>
+        </body></html>
+        """
+        second_markup = """
+        <html><title>Live Updates</title><body>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <p>1 hour ago</p>
+                <p>Threat Group: Akira</p>
+                <p>Country: Sweden</p>
+                <p>Victim disclosure updated.</p>
+            </div>
+        </body></html>
+        """
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            self._ingest_markup(first_markup)
+            self._ingest_markup(second_markup)
+
+        self.assertEqual(DarkHit.objects.filter(dark_source=self.source).count(), 1)
+        latest_run = DarkFetchRun.objects.filter(dark_source=self.source).latest("id")
+        self.assertEqual(latest_run.hits_new, 0)
+        self.assertEqual(latest_run.hits_updated, 1)
+        mock_post.assert_called_once()
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_structured_matching_ignores_page_level_keyword_bleed(self):
+        self.source.watch_keywords = "breach"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        markup = """
+        <html><title>Live Updates</title><body>
+            <section class="hero">
+                Breach command center feed with breach coverage and breach statistics.
+            </section>
+            <div class="incident-card">
+                <h2>Beta Retail</h2>
+                <p>Threat Group: Play</p>
+                <p>Country: Norway</p>
+                <p>Industry: Retail</p>
+                <p>Disclosure page updated for operator review.</p>
+            </div>
+        </body></html>
+        """
+
+        self._ingest_markup(markup)
+
+        hit = DarkHit.objects.get(dark_source=self.source, title="Beta Retail")
+        self.assertFalse(hit.is_watch_match)
+        self.assertEqual(hit.matched_keywords, [])
+        self.assertEqual(hit.matched_regex, [])
+
+    @override_settings(
+        DARK_FETCH_RETRIES=1,
+        DARK_MAX_BYTES=5000,
+        DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
+    )
+    def test_changed_watch_matched_record_still_alerts_when_meaningful_fields_change(self):
+        self.source.watch_keywords = "alphacorp"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        first_markup = """
+        <html><title>Live Updates</title><body>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <p>Threat Group: Akira</p>
+                <p>Country: Sweden</p>
+                <p>Victim disclosure updated.</p>
+            </div>
+        </body></html>
+        """
+        second_markup = """
+        <html><title>Live Updates</title><body>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <p>Threat Group: Akira</p>
+                <p>Country: Sweden</p>
+                <p>Website: https://alphacorp.example</p>
+                <p>Victim disclosure updated.</p>
+            </div>
+        </body></html>
+        """
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            self._ingest_markup(first_markup)
+            self._ingest_markup(second_markup)
+
+        hit = DarkHit.objects.get(dark_source=self.source, title="AlphaCorp")
+        self.assertEqual(DarkHit.objects.filter(dark_source=self.source).count(), 1)
+        self.assertEqual(hit.website_url, "https://alphacorp.example")
+        self.assertEqual(mock_post.call_count, 2)
+
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_ransomdb_live_updates_cards_extract_normalized_incidents_only(self):
         self.source.watch_keywords = "living in green, fruktimporten"

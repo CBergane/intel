@@ -10,16 +10,46 @@ from django.db.models import Q
 from django.utils import timezone
 
 from intel.dark_utils import (
+    build_record_identity_hash,
     build_content_hash,
+    evaluate_record_watch_matches,
     extract_links,
-    matched_keywords,
-    matched_regex,
     resolve_group_name,
     summarize_profile_content,
 )
 from intel.models import DarkDocument, DarkFetchRun, DarkHit, DarkSnapshot, DarkSource
 from intel.notifications import send_dark_hit_alert
 from intel.utils import canonicalize_url, sanitize_summary
+
+
+ALERT_RELEVANT_HIT_FIELDS = (
+    "record_type",
+    "group_name",
+    "victim_name",
+    "country",
+    "industry",
+    "website_url",
+    "victim_count",
+    "title",
+    "url",
+)
+
+
+def _should_alert_on_dark_hit_update(
+    hit,
+    *,
+    record_values: dict,
+    keyword_matches: list[str],
+    regex_matches: list[str],
+    is_watch_match: bool,
+) -> bool:
+    if not is_watch_match:
+        return False
+    if not hit.is_watch_match:
+        return True
+    if hit.matched_keywords != keyword_matches or hit.matched_regex != regex_matches:
+        return True
+    return any(getattr(hit, field_name) != record_values[field_name] for field_name in ALERT_RELEVANT_HIT_FIELDS)
 
 
 class Command(BaseCommand):
@@ -232,71 +262,134 @@ class Command(BaseCommand):
                 DarkSource.ExtractorProfile.GROUP_CARDS,
                 DarkSource.ExtractorProfile.TABLE_ROWS,
             }
-            for record in records:
-                match_text = f"{record.title}\n{record.text}"
-                keyword_matches = matched_keywords(match_text, source.watch_keywords)
-                regex_matches = matched_regex(match_text, source.watch_regex)
-                is_watch_match = bool(keyword_matches or regex_matches)
-                if not is_watch_match and not store_structured_records:
+            existing_hits = list(
+                DarkHit.objects.select_for_update()
+                .filter(dark_source=source, dark_document=document)
+                .order_by("id")
+            )
+            hits_by_hash = {hit.content_hash: hit for hit in existing_hits}
+            structured_hits_by_identity = {}
+            fallback_hit_url = final_url or doc_url
+            for existing_hit in existing_hits:
+                if existing_hit.record_type not in {"incident", "group", "table_row"}:
                     continue
+                identity_hash = build_record_identity_hash(
+                    record_type=existing_hit.record_type,
+                    title=existing_hit.title,
+                    victim_name=existing_hit.victim_name,
+                    group_name=existing_hit.group_name,
+                    url=existing_hit.url,
+                    fallback_url=fallback_hit_url,
+                )
+                structured_hits_by_identity.setdefault(identity_hash, existing_hit)
+
+            for record in records:
                 normalized_group_name = resolve_group_name(
                     record_type=record.record_type,
                     group_name=record.group_name,
                     title=record.title,
                     victim_name=record.victim_name,
                 )
-
-                hit_hash = build_content_hash(
-                    url=record.url or final_url or doc_url,
+                match_result = evaluate_record_watch_matches(
+                    raw_keywords=source.watch_keywords,
+                    raw_regex=source.watch_regex,
                     title=record.title,
                     text=record.text,
+                    excerpt=record.excerpt,
+                    victim_name=record.victim_name,
+                    group_name=normalized_group_name,
+                    country=record.country,
+                    industry=record.industry,
+                    website_url=record.website_url,
+                    last_activity_text=record.last_activity_text,
                 )
-                hit, hit_created = DarkHit.objects.select_for_update().get_or_create(
-                    dark_source=source,
-                    dark_document=document,
-                    content_hash=hit_hash,
-                    defaults={
-                        "matched_keywords": keyword_matches,
-                        "matched_regex": regex_matches,
-                        "is_watch_match": is_watch_match,
-                        "record_type": record.record_type,
-                        "group_name": normalized_group_name,
-                        "victim_name": record.victim_name,
-                        "country": record.country,
-                        "industry": record.industry,
-                        "website_url": record.website_url,
-                        "victim_count": record.victim_count,
-                        "last_activity_text": record.last_activity_text,
-                        "title": record.title,
-                        "excerpt": sanitize_summary(record.excerpt),
-                        "url": record.url or final_url or doc_url,
-                        "raw": record.raw,
-                        "last_seen_at": now,
-                    },
-                )
-                if hit_created:
+                keyword_matches = match_result.keywords
+                regex_matches = match_result.regex
+                is_watch_match = bool(keyword_matches or regex_matches)
+                if not is_watch_match and not store_structured_records:
+                    continue
+                record_values = {
+                    "matched_keywords": keyword_matches,
+                    "matched_regex": regex_matches,
+                    "is_watch_match": is_watch_match,
+                    "record_type": record.record_type,
+                    "group_name": normalized_group_name,
+                    "victim_name": record.victim_name,
+                    "country": record.country,
+                    "industry": record.industry,
+                    "website_url": record.website_url,
+                    "victim_count": record.victim_count,
+                    "last_activity_text": record.last_activity_text,
+                    "title": record.title,
+                    "excerpt": sanitize_summary(record.excerpt),
+                    "url": record.url or fallback_hit_url,
+                    "raw": record.raw,
+                }
+                if store_structured_records:
+                    hit_hash = build_record_identity_hash(
+                        record_type=record.record_type,
+                        title=record.title,
+                        victim_name=record.victim_name,
+                        group_name=normalized_group_name,
+                        url=record_values["url"],
+                        fallback_url=fallback_hit_url,
+                    )
+                    hit = structured_hits_by_identity.get(hit_hash)
+                else:
+                    hit_hash = build_content_hash(
+                        url=record_values["url"],
+                        title=record.title,
+                        text=record.text,
+                    )
+                    hit = hits_by_hash.get(hit_hash)
+
+                if hit is None:
+                    hit = DarkHit.objects.create(
+                        dark_source=source,
+                        dark_document=document,
+                        content_hash=hit_hash,
+                        last_seen_at=now,
+                        **record_values,
+                    )
+                    hits_by_hash[hit_hash] = hit
+                    if store_structured_records:
+                        structured_hits_by_identity[hit_hash] = hit
                     if is_watch_match:
-                        send_dark_hit_alert(hit)
+                        send_dark_hit_alert(hit, matched_fields=match_result.fields)
                     hits_new += 1
                     continue
+
+                alert_on_update = _should_alert_on_dark_hit_update(
+                    hit,
+                    record_values=record_values,
+                    keyword_matches=keyword_matches,
+                    regex_matches=regex_matches,
+                    is_watch_match=is_watch_match,
+                )
 
                 hit.matched_keywords = keyword_matches
                 hit.matched_regex = regex_matches
                 hit.is_watch_match = is_watch_match
-                hit.record_type = record.record_type
-                hit.group_name = normalized_group_name
-                hit.victim_name = record.victim_name
-                hit.country = record.country
-                hit.industry = record.industry
-                hit.website_url = record.website_url
-                hit.victim_count = record.victim_count
-                hit.last_activity_text = record.last_activity_text
-                hit.title = record.title
-                hit.excerpt = sanitize_summary(record.excerpt)
-                hit.url = record.url or final_url or doc_url
-                hit.raw = record.raw
+                hit.record_type = record_values["record_type"]
+                hit.group_name = record_values["group_name"]
+                hit.victim_name = record_values["victim_name"]
+                hit.country = record_values["country"]
+                hit.industry = record_values["industry"]
+                hit.website_url = record_values["website_url"]
+                hit.victim_count = record_values["victim_count"]
+                hit.last_activity_text = record_values["last_activity_text"]
+                hit.title = record_values["title"]
+                hit.excerpt = record_values["excerpt"]
+                hit.url = record_values["url"]
+                hit.raw = record_values["raw"]
+                hit.content_hash = hit_hash
                 hit.last_seen_at = now
                 hit.save()
+                hits_by_hash[hit_hash] = hit
+                if store_structured_records:
+                    structured_hits_by_identity[hit_hash] = hit
+                if alert_on_update:
+                    send_dark_hit_alert(hit, matched_fields=match_result.fields)
                 hits_updated += 1
             return hits_new, hits_updated
 

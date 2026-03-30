@@ -241,6 +241,13 @@ class ExtractedRecord:
     last_activity_text: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class WatchMatchResult:
+    keywords: list[str]
+    regex: list[str]
+    fields: list[str]
+
+
 def _strip_markup_noise(markup: str) -> str:
     cleaned = COMMENT_RE.sub(" ", markup or "")
     cleaned = NOISE_BLOCK_RE.sub(" ", cleaned)
@@ -358,8 +365,138 @@ def matched_regex(text: str, raw_regex: str) -> list[str]:
     return matches
 
 
+def _record_match_field_pairs(
+    *,
+    title: str = "",
+    text: str = "",
+    excerpt: str = "",
+    victim_name: str = "",
+    group_name: str = "",
+    country: str = "",
+    industry: str = "",
+    website_url: str = "",
+    last_activity_text: str = "",
+) -> list[tuple[str, str]]:
+    fields = []
+    normalized_title = normalize_text(title)
+    normalized_victim = normalize_text(victim_name)
+    normalized_group = normalize_text(group_name)
+    normalized_country = normalize_text(country)
+    normalized_industry = normalize_text(industry)
+    normalized_website = normalize_text(website_url)
+    normalized_last_activity = normalize_text(last_activity_text)
+    normalized_details = normalize_text(_strip_title_from_text(text or excerpt, normalized_title))
+
+    if normalized_title:
+        fields.append(("title", normalized_title))
+    if normalized_victim and normalized_victim.lower() != normalized_title.lower():
+        fields.append(("victim_name", normalized_victim))
+    if normalized_group:
+        fields.append(("group_name", normalized_group))
+    if normalized_country:
+        fields.append(("country", normalized_country))
+    if normalized_industry:
+        fields.append(("industry", normalized_industry))
+    if normalized_website:
+        fields.append(("website_url", normalized_website))
+    if normalized_last_activity:
+        fields.append(("last_activity_text", normalized_last_activity))
+    if normalized_details:
+        fields.append(("details", normalized_details))
+    return fields
+
+
+def evaluate_record_watch_matches(
+    *,
+    raw_keywords: str = "",
+    raw_regex: str = "",
+    title: str = "",
+    text: str = "",
+    excerpt: str = "",
+    victim_name: str = "",
+    group_name: str = "",
+    country: str = "",
+    industry: str = "",
+    website_url: str = "",
+    last_activity_text: str = "",
+) -> WatchMatchResult:
+    keywords = parse_watch_keywords(raw_keywords)
+    regex_patterns = parse_watch_regex(raw_regex)
+    field_pairs = _record_match_field_pairs(
+        title=title,
+        text=text,
+        excerpt=excerpt,
+        victim_name=victim_name,
+        group_name=group_name,
+        country=country,
+        industry=industry,
+        website_url=website_url,
+        last_activity_text=last_activity_text,
+    )
+
+    field_matches = []
+    for field_name, value in field_pairs:
+        lowered = value.lower()
+        keyword_matches = [keyword for keyword in keywords if keyword in lowered]
+        regex_matches = []
+        for pattern in regex_patterns:
+            try:
+                if re.search(pattern, value, flags=re.IGNORECASE):
+                    regex_matches.append(pattern)
+            except re.error:
+                continue
+        field_matches.append((field_name, keyword_matches, regex_matches))
+
+    matched_keywords_list = [
+        keyword
+        for keyword in keywords
+        if any(keyword in keyword_matches for _field_name, keyword_matches, _regex_matches in field_matches)
+    ]
+    matched_regex_list = [
+        pattern
+        for pattern in regex_patterns
+        if any(pattern in regex_matches for _field_name, _keyword_matches, regex_matches in field_matches)
+    ]
+    matched_fields = [
+        field_name
+        for field_name, keyword_matches, regex_matches in field_matches
+        if keyword_matches or regex_matches
+    ]
+    return WatchMatchResult(
+        keywords=matched_keywords_list,
+        regex=matched_regex_list,
+        fields=matched_fields,
+    )
+
+
 def build_content_hash(*, url: str, title: str, text: str) -> str:
     payload = "\n".join([url or "", title or "", normalize_text(text)])
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def build_record_identity_hash(
+    *,
+    record_type: str = "",
+    title: str = "",
+    victim_name: str = "",
+    group_name: str = "",
+    url: str = "",
+    fallback_url: str = "",
+) -> str:
+    stable_name = normalize_text(victim_name or group_name or title).lower()
+    stable_url = normalize_text(url)
+    fallback = normalize_text(fallback_url)
+    if stable_url and fallback and stable_url.lower() == fallback.lower():
+        stable_url = ""
+    payload = "\n".join(
+        part
+        for part in (
+            normalize_text(record_type).lower() or "page",
+            stable_name,
+            stable_url.lower(),
+        )
+        if part
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

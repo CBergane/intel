@@ -7,20 +7,53 @@ from typing import TYPE_CHECKING
 import requests
 from django.conf import settings
 
+from intel.dark_utils import evaluate_record_watch_matches
+
 if TYPE_CHECKING:
     from intel.models import DarkHit, Item
 
 logger = logging.getLogger(__name__)
 
+MATCH_FIELD_LABELS = {
+    "title": "title",
+    "victim_name": "victim",
+    "group_name": "group",
+    "country": "country",
+    "industry": "industry",
+    "website_url": "website",
+    "last_activity_text": "last activity",
+    "details": "details",
+}
+
 
 def should_send_dark_hit_alert(hit: DarkHit) -> bool:
+    if not hit.is_watch_match:
+        return False
     record_type = (hit.record_type or "").strip().lower()
     if record_type in {"group", "table_row"}:
         return False
     return True
 
 
-def send_dark_hit_alert(hit: DarkHit) -> None:
+def _matched_dark_hit_fields(hit: DarkHit, matched_fields: list[str] | None) -> list[str]:
+    if matched_fields is not None:
+        return matched_fields
+    match_result = evaluate_record_watch_matches(
+        raw_keywords=", ".join(hit.matched_keywords or []),
+        raw_regex="\n".join(hit.matched_regex or []),
+        title=hit.title,
+        excerpt=hit.excerpt,
+        victim_name=hit.victim_name,
+        group_name=hit.group_name,
+        country=hit.country,
+        industry=hit.industry,
+        website_url=hit.website_url,
+        last_activity_text=hit.last_activity_text,
+    )
+    return match_result.fields
+
+
+def send_dark_hit_alert(hit: DarkHit, *, matched_fields: list[str] | None = None) -> None:
     webhook = getattr(settings, "DARK_DISCORD_WEBHOOK", "")
     if not webhook:
         logger.debug("DARK_DISCORD_WEBHOOK not configured, skipping dark hit alert.")
@@ -38,6 +71,17 @@ def send_dark_hit_alert(hit: DarkHit) -> None:
     else:
         keywords_str = str(keywords) if keywords else "(none)"
 
+    regex_matches = hit.matched_regex or []
+    if isinstance(regex_matches, list):
+        regex_str = ", ".join(str(pattern) for pattern in regex_matches) if regex_matches else "(none)"
+    else:
+        regex_str = str(regex_matches) if regex_matches else "(none)"
+    matched_field_labels = [
+        MATCH_FIELD_LABELS.get(field_name, field_name.replace("_", " "))
+        for field_name in _matched_dark_hit_fields(hit, matched_fields)
+    ]
+    matched_fields_str = ", ".join(matched_field_labels) if matched_field_labels else "(unknown)"
+
     payload = {
         "embeds": [
             {
@@ -53,6 +97,16 @@ def send_dark_hit_alert(hit: DarkHit) -> None:
                     {
                         "name": "Keywords matched",
                         "value": keywords_str,
+                        "inline": True,
+                    },
+                    {
+                        "name": "Regex matched",
+                        "value": regex_str,
+                        "inline": True,
+                    },
+                    {
+                        "name": "Matched in",
+                        "value": matched_fields_str,
                         "inline": True,
                     },
                     {
