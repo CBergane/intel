@@ -103,8 +103,11 @@
                 <div class="relative mt-2 overflow-hidden rounded-[1.65rem] border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.16),_transparent_46%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.99))]">
                     <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(14,165,233,0.08),_transparent_52%),linear-gradient(180deg,rgba(6,12,24,0.14),rgba(2,6,23,0.2))]"></div>
                     <div class="relative flex flex-wrap items-center justify-between gap-2 border-b border-line/70 px-3 py-3 sm:px-4 xl:px-5">
-                        <div class="flex flex-wrap gap-2 text-[11px]"><span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-100">Interactive world map</span><span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">Animated activity markers</span></div>
-                        <div class="text-[11px] text-slate-400">{% if map_marker_data %}{{ map_marker_data|length }} plotted countries{% else %}Basemap live, waiting on plot-ready geography{% endif %}</div>
+                        <div class="flex flex-wrap gap-2 text-[11px]">
+                            <span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-100">MapLibre threat map</span>
+                            <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">Local style, PMTiles-ready</span>
+                        </div>
+                        <div class="text-[11px] text-slate-400">{% if map_marker_data %}{{ map_marker_data|length }} plotted countries{% else %}Basemap ready, waiting on plot-ready geography{% endif %}</div>
                     </div>
                     <div class="relative px-2 pb-2 pt-2 sm:px-3 sm:pb-3 xl:px-4 xl:pb-4">
                         {% if map_empty_state %}
@@ -114,9 +117,13 @@
                                 <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{{ map_empty_state.message }}</p>
                             </div>
                         {% endif %}
-                        <div id="ransomware-map-chart" data-has-map-data="{% if map_marker_data %}true{% else %}false{% endif %}" data-map-url="{% static 'intel/maps/ransomware_world.geojson' %}" class="h-[24rem] w-full sm:h-[30rem] lg:h-[38rem] xl:h-[44rem] 2xl:h-[48rem]" aria-label="Interactive ransomware incident world map"></div>
-                        <div id="ransomware-map-fallback" class="hidden absolute inset-x-6 bottom-6 rounded-2xl border border-line/80 bg-slate-950/88 p-4 text-sm text-slate-300 backdrop-blur">Interactive world map unavailable. Use the country and incident panels to keep drilling down.</div>
-                        <noscript><div class="mt-3 rounded-2xl border border-line/80 bg-slate-950/88 p-4 text-sm text-slate-300">JavaScript is required for the interactive world map. The victims, country, and group panels remain available below.</div></noscript>
+                        <div id="ransomware-map-view"
+                             data-has-map-data="{% if map_marker_data %}true{% else %}false{% endif %}"
+                             data-style-url="{% static 'intel/maps/ransomware_map_style.json' %}"
+                             class="h-[24rem] w-full overflow-hidden rounded-[1.2rem] sm:h-[30rem] lg:h-[38rem] xl:h-[44rem] 2xl:h-[48rem]"
+                             aria-label="Interactive ransomware incident world map"></div>
+                        <div id="ransomware-map-fallback" class="hidden absolute inset-x-6 bottom-6 rounded-2xl border border-line/80 bg-slate-950/88 p-4 text-sm text-slate-300 backdrop-blur">Map surface unavailable. Use the country and incident panels to keep drilling down.</div>
+                        <noscript><div class="mt-3 rounded-2xl border border-line/80 bg-slate-950/88 p-4 text-sm text-slate-300">JavaScript is required for the interactive ransomware map. The victims, country, and group panels remain available below.</div></noscript>
                     </div>
                 </div>
                 {% if selected_country and not selected_country_on_map %}
@@ -125,7 +132,7 @@
                 {% if unmapped_country_rows %}
                     <div class="mt-3 rounded-2xl border border-line/80 bg-slate-950/55 p-4">
                         <div class="flex flex-wrap items-center justify-between gap-2">
-                            <div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Not Yet Plotted</p><p class="mt-1 text-sm text-slate-300">These countries still count in the analytics even though this first ECharts map layer does not place them yet.</p></div>
+                            <div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Not Yet Plotted</p><p class="mt-1 text-sm text-slate-300">These countries still count in the analytics even though the current basemap view does not place them yet.</p></div>
                             <span class="rounded-md border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ unmapped_country_rows|length }} countries</span>
                         </div>
                         <div class="mt-3 flex flex-wrap gap-2">
@@ -171,157 +178,185 @@
 </section>
 
 {{ map_marker_data|json_script:"ransomware-map-marker-data" }}
-{{ selected_country|default:""|json_script:"ransomware-map-selected-country" }}
 
-<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+    #ransomware-map-view .maplibregl-canvas {
+        filter: saturate(0.85) contrast(1.04) brightness(0.88);
+    }
+    #ransomware-map-view .maplibregl-ctrl-group,
+    #ransomware-map-view .maplibregl-ctrl.maplibregl-ctrl-attrib {
+        border: 1px solid rgba(51, 65, 85, 0.8);
+        background: rgba(2, 6, 23, 0.84);
+        box-shadow: 0 14px 40px rgba(2, 6, 23, 0.35);
+    }
+    #ransomware-map-view .maplibregl-ctrl button {
+        background-color: transparent;
+    }
+    #ransomware-map-view .maplibregl-ctrl button .maplibregl-ctrl-icon {
+        filter: brightness(0) invert(1);
+        opacity: 0.88;
+    }
+    #ransomware-map-view .maplibregl-ctrl-attrib,
+    #ransomware-map-view .maplibregl-ctrl-attrib a {
+        color: rgb(148 163 184 / 0.88);
+    }
+    .ransomware-map-marker {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--marker-size);
+        height: var(--marker-size);
+        padding: 0;
+        border: 0;
+        border-radius: 9999px;
+        background: transparent;
+        cursor: pointer;
+    }
+    .ransomware-map-marker__halo {
+        position: absolute;
+        inset: calc(var(--marker-size) * -0.2);
+        border-radius: 9999px;
+        background: radial-gradient(circle, rgb(56 189 248 / 0.34) 0%, rgb(56 189 248 / 0.12) 45%, transparent 72%);
+        animation: ransomware-map-pulse 3.8s ease-out infinite;
+    }
+    .ransomware-map-marker__core {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        border-radius: 9999px;
+        border: 1.5px solid rgba(248, 250, 252, 0.88);
+        box-shadow: 0 16px 40px rgba(2, 6, 23, 0.55);
+        color: #f8fafc;
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 1;
+    }
+    .ransomware-map-marker--level-1 .ransomware-map-marker__core { background: linear-gradient(180deg, #38bdf8, #0ea5e9); }
+    .ransomware-map-marker--level-2 .ransomware-map-marker__core { background: linear-gradient(180deg, #22d3ee, #0891b2); }
+    .ransomware-map-marker--level-3 .ransomware-map-marker__core { background: linear-gradient(180deg, #fb923c, #ea580c); }
+    .ransomware-map-marker--level-4 .ransomware-map-marker__core { background: linear-gradient(180deg, #fb7185, #e11d48); }
+    .ransomware-map-marker--selected .ransomware-map-marker__halo {
+        background: radial-gradient(circle, rgb(52 211 153 / 0.42) 0%, rgb(16 185 129 / 0.16) 46%, transparent 72%);
+        animation-duration: 2.8s;
+    }
+    .ransomware-map-marker--selected .ransomware-map-marker__core {
+        border-color: rgba(209, 250, 229, 0.94);
+        background: linear-gradient(180deg, #34d399, #0f766e);
+    }
+    .ransomware-map-marker--quiet .ransomware-map-marker__halo {
+        animation-duration: 5s;
+        opacity: 0.6;
+    }
+    @keyframes ransomware-map-pulse {
+        0% { transform: scale(0.9); opacity: 0.7; }
+        70% { transform: scale(1.45); opacity: 0; }
+        100% { transform: scale(1.45); opacity: 0; }
+    }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/pmtiles@3.2.1/dist/pmtiles.js"></script>
 <script>
 (() => {
-    const chartEl = document.getElementById("ransomware-map-chart");
-    if (!chartEl) return;
+    const mapEl = document.getElementById("ransomware-map-view");
+    if (!mapEl) return;
 
     const fallbackEl = document.getElementById("ransomware-map-fallback");
     const markerDataEl = document.getElementById("ransomware-map-marker-data");
-    const selectedCountryEl = document.getElementById("ransomware-map-selected-country");
-    const mapUrl = chartEl.dataset.mapUrl;
+    const styleUrl = mapEl.dataset.styleUrl;
     const showFallback = (message) => {
         if (!fallbackEl) return;
         fallbackEl.textContent = message;
         fallbackEl.classList.remove("hidden");
     };
+    const hideFallback = () => {
+        if (!fallbackEl) return;
+        fallbackEl.classList.add("hidden");
+    };
 
-    if (!window.echarts || !markerDataEl || !selectedCountryEl || !mapUrl) {
-        showFallback("Interactive world map unavailable. Use the country and incident panels to keep drilling down.");
+    if (!window.maplibregl || !markerDataEl || !styleUrl) {
+        showFallback("Interactive map engine unavailable. Use the country and incident panels to keep drilling down.");
         return;
     }
 
     const markerData = JSON.parse(markerDataEl.textContent);
-    const selectedCountry = JSON.parse(selectedCountryEl.textContent || "\"\"");
-    const maxValue = Math.max(...markerData.map((point) => point.record_count || 0), 1);
-    const labelThreshold = Math.max(2, Math.ceil(maxValue * 0.45));
-    const pulseData = markerData.slice().sort((a, b) => (b.record_count || 0) - (a.record_count || 0)).slice(0, 12);
+    if (window.pmtiles && maplibregl.addProtocol) {
+        const protocol = new pmtiles.Protocol();
+        maplibregl.addProtocol("pmtiles", protocol.tile);
+    }
 
-    const markerColor = (level, selected) => {
-        if (selected) return "#34d399";
-        return {1: "#38bdf8", 2: "#22d3ee", 3: "#fb923c", 4: "#f43f5e"}[level] || "#38bdf8";
-    };
-
-    const chart = echarts.init(chartEl);
-    chart.showLoading("default", {
-        text: "Loading world map",
-        color: "#38bdf8",
-        textColor: "#cbd5e1",
-        maskColor: "rgba(2, 6, 23, 0.18)",
+    const selectedMarker = markerData.find((point) => point.is_selected);
+    const defaultCenter = selectedMarker ? [selectedMarker.value[0], selectedMarker.value[1]] : [12, 20];
+    const defaultZoom = selectedMarker ? 3.15 : (window.innerWidth < 640 ? 0.9 : 1.45);
+    const map = new maplibregl.Map({
+        container: mapEl,
+        style: styleUrl,
+        center: defaultCenter,
+        zoom: defaultZoom,
+        attributionControl: false,
+        dragRotate: false,
+        touchPitch: false,
+        renderWorldCopies: false,
     });
 
-    const renderMap = (mapGeometry) => {
-        echarts.registerMap("ransomware-world", mapGeometry);
-        chart.hideLoading();
-        chart.setOption({
-            backgroundColor: "transparent",
-            animationDuration: 700,
-            tooltip: {
-                trigger: "item",
-                backgroundColor: "rgba(2,6,23,0.94)",
-                borderColor: "rgba(56,189,248,0.26)",
-                borderWidth: 1,
-                padding: [10, 12],
-                textStyle: {color: "#e2e8f0", fontSize: 12},
-                formatter(params) {
-                    const data = params.data || {};
-                    const label = data.display_name || data.name || params.name;
-                    const count = data.record_count || data.value || 0;
-                    const parts = [
-                        `<div style="font-weight:700;color:#fff">${label}</div>`,
-                        `<div style="margin-top:4px;color:#cbd5e1">${count} victim${count === 1 ? "" : "s"} in scope</div>`,
-                    ];
-                    if (data.latest_group_name) parts.push(`<div style="margin-top:4px;color:#fda4af">Latest group: ${data.latest_group_name}</div>`);
-                    if (data.latest_victim_name) parts.push(`<div style="margin-top:2px;color:#93c5fd">Latest victim: ${data.latest_victim_name}</div>`);
-                    return parts.join("");
-                },
-            },
-            geo: {
-                map: "ransomware-world",
-                roam: false,
-                silent: true,
-                left: 6,
-                right: 6,
-                top: 14,
-                bottom: 10,
-                zoom: window.innerWidth < 640 ? 0.92 : window.innerWidth < 1280 ? 1.02 : 1.14,
-                itemStyle: {areaColor: "#081320", borderColor: "rgba(71,85,105,0.62)", borderWidth: 0.9},
-                emphasis: {itemStyle: {areaColor: "#10263a", borderColor: "rgba(103,232,249,0.78)"}, label: {show: false}},
-                select: {disabled: true},
-            },
-            series: [
-                {
-                    type: "scatter",
-                    coordinateSystem: "geo",
-                    zlevel: 3,
-                    data: markerData,
-                    symbol: "circle",
-                    symbolSize(value, params) { return params.data.symbol_size; },
-                    label: {
-                        show: true,
-                        formatter(params) {
-                            const data = params.data || {};
-                            return data.is_selected || (data.record_count || 0) >= labelThreshold ? String(data.record_count || "") : "";
-                        },
-                        position: "inside",
-                        color: "#f8fafc",
-                        fontWeight: 800,
-                        fontSize: 11,
-                    },
-                    itemStyle: {
-                        color(params) { return markerColor(params.data.intensity_level, params.data.is_selected); },
-                        borderColor: "#f8fafc",
-                        borderWidth: 1.4,
-                        shadowBlur: 20,
-                        shadowColor: "rgba(56,189,248,0.3)",
-                    },
-                },
-                {
-                    type: "effectScatter",
-                    coordinateSystem: "geo",
-                    zlevel: 4,
-                    data: pulseData,
-                    symbolSize(value, params) {
-                        const baseSize = params.data.symbol_size || 18;
-                        return params.data.is_selected ? baseSize + 8 : Math.max(baseSize - 2, 16);
-                    },
-                    rippleEffect: {scale: 4.6, brushType: "stroke", period: selectedCountry ? 3.6 : 4.8},
-                    itemStyle: {
-                        color(params) { return markerColor(params.data.intensity_level, params.data.is_selected); },
-                        shadowBlur: 28,
-                        shadowColor: "rgba(56,189,248,0.38)",
-                    },
-                    tooltip: {show: false},
-                },
-            ],
-        });
+    map.addControl(new maplibregl.AttributionControl({compact: true}), "bottom-right");
+    map.addControl(new maplibregl.NavigationControl({showCompass: false}), "top-right");
+
+    let ready = false;
+    const failTimer = window.setTimeout(() => {
+        if (ready) return;
+        showFallback("Map basemap did not initialize. Use the country and incident panels to keep drilling down.");
+    }, 9000);
+
+    const markerTitle = (point) => {
+        const parts = [`${point.name}: ${point.record_count} victim${point.record_count === 1 ? "" : "s"}`];
+        if (point.latest_group_name) parts.push(`Latest group: ${point.latest_group_name}`);
+        if (point.latest_victim_name) parts.push(`Latest victim: ${point.latest_victim_name}`);
+        return parts.join(" | ");
     };
 
-    fetch(mapUrl, {credentials: "same-origin"})
-        .then((response) => {
-            if (!response.ok) throw new Error(`map-${response.status}`);
-            return response.json();
-        })
-        .then((mapGeometry) => {
-            renderMap(mapGeometry);
-        })
-        .catch(() => {
-            chart.hideLoading();
-            showFallback("Local world map asset failed to load. Use the country and incident panels to keep drilling down.");
+    const addMarker = (point) => {
+        const markerEl = document.createElement("button");
+        markerEl.type = "button";
+        markerEl.className = `ransomware-map-marker ransomware-map-marker--level-${point.intensity_level}${point.is_selected ? " ransomware-map-marker--selected" : ""}${point.intensity_level <= 1 ? " ransomware-map-marker--quiet" : ""}`;
+        markerEl.style.setProperty("--marker-size", `${point.symbol_size + 6}px`);
+        markerEl.title = markerTitle(point);
+        markerEl.setAttribute("aria-label", markerTitle(point));
+        markerEl.innerHTML = '<span class="ransomware-map-marker__halo"></span><span class="ransomware-map-marker__core"></span>';
+        markerEl.querySelector(".ransomware-map-marker__core").textContent = String(point.record_count);
+        markerEl.addEventListener("click", () => {
+            if (point.url) window.location.assign(point.url);
         });
+        return new maplibregl.Marker({element: markerEl, anchor: "center"}).setLngLat([point.value[0], point.value[1]]).addTo(map);
+    };
 
-    chart.on("click", (params) => {
-        const data = params.data || {};
-        if (data.url) window.location.assign(data.url);
+    map.once("load", () => {
+        ready = true;
+        window.clearTimeout(failTimer);
+        hideFallback();
+
+        markerData.forEach((point) => addMarker(point));
+
+        if (!selectedMarker && markerData.length > 1) {
+            const bounds = new maplibregl.LngLatBounds();
+            markerData.forEach((point) => bounds.extend([point.value[0], point.value[1]]));
+            map.fitBounds(bounds, {
+                padding: {top: 72, right: 72, bottom: 72, left: 72},
+                maxZoom: 2.4,
+                duration: 0,
+            });
+        }
     });
 
-    let resizeTimer;
-    window.addEventListener("resize", () => {
-        window.clearTimeout(resizeTimer);
-        resizeTimer = window.setTimeout(() => chart.resize(), 100);
+    map.on("error", () => {
+        if (ready) return;
+        window.clearTimeout(failTimer);
+        showFallback("Map basemap failed to load. Use the country and incident panels to keep drilling down.");
     });
 })();
 </script>

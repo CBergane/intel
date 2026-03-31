@@ -60,7 +60,7 @@ class RansomwareMapViewTests(TestCase):
             },
         )
 
-    def test_map_page_renders_with_local_map_asset(self):
+    def test_map_page_renders_with_maplibre_surface(self):
         self._create_victim(victim="Nordic Mills", group="Akira", country="Sweden")
         Item.objects.create(
             source=self.other_source,
@@ -76,11 +76,14 @@ class RansomwareMapViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["current_page"], "ransomware-map")
         self.assertContains(response, "Ransomware Incident Map")
-        self.assertContains(response, 'id="ransomware-map-chart"')
-        self.assertContains(response, 'data-map-url="/static/intel/maps/ransomware_world.geojson"')
-        self.assertContains(response, "cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js")
-        self.assertNotContains(response, "cdn.jsdelivr.net/npm/echarts@5/map/js/world.js")
-        self.assertContains(response, "Local world map asset failed to load")
+        self.assertContains(response, 'id="ransomware-map-view"')
+        self.assertContains(response, 'data-style-url="/static/intel/maps/ransomware_map_style.json"')
+        self.assertContains(response, "unpkg.com/maplibre-gl")
+        self.assertContains(response, "unpkg.com/pmtiles")
+        self.assertNotContains(response, "cdn.jsdelivr.net/npm/echarts")
+        self.assertContains(response, "Map surface unavailable")
+        self.assertContains(response, "Most affected countries")
+        self.assertContains(response, "Most active ransomware groups")
         self.assertContains(response, "Nordic Mills")
         self.assertNotContains(response, "General bulletin")
 
@@ -185,8 +188,8 @@ class RansomwareMapViewTests(TestCase):
 
         response = self.client.get(RANSOMWARE_MAP_URL)
 
-        self.assertContains(response, 'id="ransomware-map-chart"')
-        self.assertContains(response, 'data-map-url="/static/intel/maps/ransomware_world.geojson"')
+        self.assertContains(response, 'id="ransomware-map-view"')
+        self.assertContains(response, 'data-style-url="/static/intel/maps/ransomware_map_style.json"')
         self.assertEqual(response.context["map_country_data"], [])
         self.assertEqual(response.context["map_marker_data"], [])
         self.assertContains(response, "Victim activity found, geography still sparse")
