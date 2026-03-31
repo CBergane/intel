@@ -60,7 +60,7 @@ class RansomwareMapViewTests(TestCase):
             },
         )
 
-    def test_map_page_renders_with_svg_surface(self):
+    def test_map_page_renders_with_echarts_surface(self):
         self._create_victim(victim="Nordic Mills", group="Akira", country="Sweden")
         Item.objects.create(
             source=self.other_source,
@@ -76,9 +76,10 @@ class RansomwareMapViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["current_page"], "ransomware-map")
         self.assertContains(response, "Ransomware Incident Map")
-        self.assertContains(response, 'id="ransomware-map-surface"')
-        self.assertContains(response, 'id="ransomware-country-markers"')
-        self.assertContains(response, "NORTH AMERICA")
+        self.assertContains(response, 'id="ransomware-map-chart"')
+        self.assertContains(response, 'id="ransomware-map-country-data"')
+        self.assertContains(response, "cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js")
+        self.assertNotContains(response, 'id="ransomware-map-surface"')
         self.assertContains(response, "Nordic Mills")
         self.assertNotContains(response, "General bulletin")
 
@@ -146,8 +147,19 @@ class RansomwareMapViewTests(TestCase):
         response = self.client.get(RANSOMWARE_MAP_URL, {"country": "Sverige"})
 
         self.assertEqual(response.context["selected_country"], "Sweden")
-        self.assertContains(response, 'data-country-key="sweden"')
-        self.assertContains(response, 'data-country-state="selected"')
+        self.assertTrue(response.context["selected_country_on_map"])
+        self.assertTrue(
+            any(
+                item["country_key"] == "sweden" and item["is_selected"]
+                for item in response.context["map_country_data"]
+            )
+        )
+        self.assertTrue(
+            any(
+                item["country_key"] == "sweden" and item["is_selected"]
+                for item in response.context["map_marker_data"]
+            )
+        )
         self.assertTrue(all(record["country"] == "Sweden" for record in response.context["latest_victims"]))
         self.assertEqual(
             {row["group_name"] for row in response.context["top_groups"]},
@@ -159,13 +171,20 @@ class RansomwareMapViewTests(TestCase):
 
         response = self.client.get(RANSOMWARE_MAP_URL)
 
-        self.assertContains(response, 'data-country-key="united states"')
-        self.assertContains(response, 'data-country-state="active"')
+        self.assertTrue(
+            any(item["country_key"] == "united states" for item in response.context["map_marker_data"])
+        )
+        self.assertEqual(
+            response.context["map_country_data"][0]["name"],
+            "United States of America",
+        )
 
     def test_map_explains_when_victims_have_no_plot_ready_country(self):
         self._create_victim(victim="Countryless Victim", group="Akira", hours_ago=2)
 
         response = self.client.get(RANSOMWARE_MAP_URL)
 
-        self.assertContains(response, 'id="ransomware-map-surface"')
+        self.assertContains(response, 'id="ransomware-map-chart"')
+        self.assertEqual(response.context["map_country_data"], [])
+        self.assertEqual(response.context["map_marker_data"], [])
         self.assertContains(response, "Victim activity found, geography still sparse")

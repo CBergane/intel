@@ -621,6 +621,52 @@ RANSOMWARE_MAP_WINDOW_RANGES = {
 }
 RANSOMWARE_MAP_WINDOW_OPTIONS = [("24h", "24h"), ("7d", "7d"), ("30d", "30d")]
 RANSOMWARE_MAP_ADAPTER_KEY = "ransomware_live_victims"
+RANSOMWARE_ECHARTS_MAP_NAMES = {
+    "United States": "United States of America",
+    "Czechia": "Czech Republic",
+}
+RANSOMWARE_MAP_COORDINATES = {
+    "Canada": (-106.0, 56.0),
+    "United States": (-98.0, 38.0),
+    "Mexico": (-102.0, 23.0),
+    "Brazil": (-52.0, -10.0),
+    "Argentina": (-64.0, -34.0),
+    "Iceland": (-19.0, 65.0),
+    "Ireland": (-8.0, 53.0),
+    "United Kingdom": (-2.0, 54.0),
+    "Portugal": (-8.0, 39.5),
+    "Spain": (-3.5, 40.3),
+    "France": (2.2, 46.2),
+    "Belgium": (4.7, 50.8),
+    "Netherlands": (5.3, 52.2),
+    "Switzerland": (8.2, 46.8),
+    "Germany": (10.4, 51.2),
+    "Denmark": (9.5, 56.1),
+    "Norway": (8.5, 61.5),
+    "Sweden": (15.0, 62.0),
+    "Finland": (26.0, 64.0),
+    "Estonia": (25.0, 58.7),
+    "Latvia": (24.6, 56.9),
+    "Lithuania": (23.9, 55.3),
+    "Poland": (19.1, 52.1),
+    "Czechia": (15.5, 49.8),
+    "Austria": (14.2, 47.5),
+    "Italy": (12.8, 42.8),
+    "Romania": (24.9, 45.9),
+    "Ukraine": (31.2, 49.0),
+    "Greece": (22.0, 39.0),
+    "Turkey": (35.0, 39.0),
+    "Israel": (35.0, 31.0),
+    "Saudi Arabia": (45.0, 24.0),
+    "United Arab Emirates": (54.3, 24.4),
+    "South Africa": (24.0, -29.0),
+    "India": (78.0, 22.0),
+    "China": (103.0, 35.0),
+    "South Korea": (127.8, 36.3),
+    "Japan": (138.0, 37.0),
+    "Australia": (134.0, -25.0),
+    "New Zealand": (172.0, -41.0),
+}
 
 
 def _ransomware_group_name(item) -> str:
@@ -768,72 +814,57 @@ def _ransomware_map_url(*, window: str, selected_group: str = "", country: str =
     return f"{reverse('ransomware-map')}?{urlencode(params)}"
 
 
-def _ransomware_map_tiles(country_rows, *, selected_country: str, window: str, selected_group: str):
-    row_by_layout_key = {}
+def _ransomware_map_data(country_rows, *, selected_country: str, window: str, selected_group: str):
     unmapped_rows = []
+    country_data = []
+    marker_data = []
+    max_record_count = max((row["record_count"] for row in country_rows), default=0)
+    selected_country_key = _normalized_country_key(selected_country)
+
     for row in country_rows:
-        if row["country_key"] not in DARK_MAP_LAYOUT_KEYS:
+        row["url"] = _ransomware_map_url(
+            window=window,
+            selected_group=selected_group,
+            country="" if row["country_key"] == selected_country_key else row["country"],
+        )
+        coordinates = RANSOMWARE_MAP_COORDINATES.get(row["country"])
+        if coordinates is None:
             unmapped_rows.append(row)
             continue
-        row_by_layout_key[row["country_key"]] = row
 
-    max_record_count = max((row["record_count"] for row in country_rows), default=0)
-    width = DARK_MAP_TILE_SIZE["width"]
-    height = DARK_MAP_TILE_SIZE["height"]
-    selected_country_key = _normalized_country_key(selected_country)
-    tiles = []
-    for tile in DARK_MAP_TILE_LAYOUT:
-        row = row_by_layout_key.get(tile["key"])
-        has_activity = row is not None
-        is_selected = has_activity and row["country_key"] == selected_country_key
+        map_name = RANSOMWARE_ECHARTS_MAP_NAMES.get(row["country"], row["country"])
         intensity_level = _dark_map_intensity_level(
-            row["record_count"] if row else 0,
+            row["record_count"],
             max_record_count,
         )
-        palette = _dark_map_tile_palette(
-            intensity_level=intensity_level,
-            is_selected=is_selected,
-            has_activity=has_activity,
-        )
-        tiles.append(
+        marker_size = {1: 18, 2: 23, 3: 28, 4: 34}[intensity_level]
+        if row["country_key"] == selected_country_key:
+            marker_size += 4
+
+        country_data.append(
             {
-                "country_key": tile["key"],
-                "label": tile["label"],
-                "short_label": tile["short_label"],
-                "x": tile["x"],
-                "y": tile["y"],
-                "width": width,
-                "height": height,
-                "center_x": tile["x"] + (width / 2),
-                "center_y": tile["y"] + (height / 2),
-                "label_x": tile["x"] + 8,
-                "label_y": tile["y"] + 15,
-                "count_x": tile["x"] + width - 10,
-                "count_y": tile["y"] + 26,
-                "badge_x": tile["x"] + width - 8,
-                "badge_y": tile["y"] + 9,
-                "has_activity": has_activity,
-                "is_selected": is_selected,
-                "fill_color": palette["fill"],
-                "stroke_color": palette["stroke"],
-                "text_color": palette["text"],
-                "badge_color": palette["badge"],
-                "record_count": row["record_count"] if row else 0,
-                "country": row["country"] if row else tile["label"],
-                "url": (
-                    _ransomware_map_url(
-                        window=window,
-                        selected_group=selected_group,
-                        country="" if is_selected else row["country"],
-                    )
-                    if has_activity
-                    else ""
-                ),
-                "tooltip": (
-                    f"{row['country']}: {row['record_count']} victims across {row['group_count']} groups"
-                    if row
-                    else f"{tile['label']}: no victim activity in current filters"
-                ),
+                "name": map_name,
+                "display_name": row["country"],
+                "value": row["record_count"],
+                "country_key": row["country_key"],
+                "url": row["url"],
+                "is_selected": row["country_key"] == selected_country_key,
+                "intensity_level": intensity_level,
+            }
+        )
+        marker_data.append(
+            {
+                "name": row["country"],
+                "country_key": row["country_key"],
+                "value": [coordinates[0], coordinates[1], row["record_count"]],
+                "record_count": row["record_count"],
+                "group_count": row["group_count"],
+                "latest_group_name": row["latest_group_name"],
+                "latest_victim_name": row["latest_victim_name"],
+                "url": row["url"],
+                "is_selected": row["country_key"] == selected_country_key,
+                "symbol_size": marker_size,
+                "intensity_level": intensity_level,
             }
         )
 
@@ -845,7 +876,7 @@ def _ransomware_map_tiles(country_rows, *, selected_country: str, window: str, s
         ),
         reverse=True,
     )
-    return tiles, unmapped_rows
+    return country_data, marker_data, unmapped_rows
 
 
 def _ransomware_map_empty_state(records, country_rows):
@@ -925,7 +956,7 @@ def ransomware_map_view(request):
     top_groups = _ransomware_group_rows(focused_records)[:8]
     top_countries = country_rows[:8]
     latest_victims = focused_records[:10]
-    map_tiles, unmapped_country_rows = _ransomware_map_tiles(
+    map_country_data, map_marker_data, unmapped_country_rows = _ransomware_map_data(
         country_rows,
         selected_country=selected_country,
         window=window,
@@ -986,10 +1017,13 @@ def ransomware_map_view(request):
             "top_groups": top_groups,
             "top_countries": top_countries,
             "country_rows": country_rows,
-            "map_tiles": map_tiles,
+            "map_country_data": map_country_data,
+            "map_marker_data": map_marker_data,
             "unmapped_country_rows": unmapped_country_rows,
             "map_empty_state": map_empty_state,
-            "selected_country_on_map": any(tile["is_selected"] for tile in map_tiles),
+            "selected_country_on_map": any(
+                point["is_selected"] for point in map_country_data
+            ),
             "reset_url": reverse("ransomware-map"),
             "clear_country_url": _ransomware_map_url(
                 window=window,
