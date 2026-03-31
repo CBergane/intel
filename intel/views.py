@@ -814,6 +814,15 @@ def _ransomware_map_url(*, window: str, selected_group: str = "", country: str =
     return f"{reverse('ransomware-map')}?{urlencode(params)}"
 
 
+def _ransomware_map_live_url(*, window: str, selected_group: str = "", country: str = "") -> str:
+    params = {"window": window}
+    if selected_group:
+        params["group"] = selected_group
+    if country:
+        params["country"] = country
+    return f"{reverse('ransomware-map-live')}?{urlencode(params)}"
+
+
 def _ransomware_map_data(country_rows, *, selected_country: str, window: str, selected_group: str):
     unmapped_rows = []
     country_data = []
@@ -897,10 +906,71 @@ def _ransomware_map_empty_state(records, country_rows):
     }
 
 
-def ransomware_map_view(request):
-    window = (request.GET.get("window") or "7d").strip()
+def _validated_ransomware_window(raw_window: str) -> str:
+    window = (raw_window or "7d").strip()
     if window not in RANSOMWARE_MAP_WINDOW_RANGES:
         window = "7d"
+    return window
+
+
+def _serialize_ransomware_live_record(record):
+    return {
+        "id": record["id"],
+        "victim_name": record["victim_name"],
+        "group_name": record["group_name"],
+        "country": record["country"],
+        "country_key": record["country_key"],
+        "url": record["url"],
+        "group_url": record.get("group_url", ""),
+        "country_url": record.get("country_url", ""),
+        "excerpt": record["excerpt"],
+        "activity_at": record["activity_at"].isoformat() if record["activity_at"] else "",
+    }
+
+
+def _serialize_ransomware_country_row(row):
+    return {
+        "country": row["country"],
+        "country_key": row["country_key"],
+        "record_count": row["record_count"],
+        "group_count": row["group_count"],
+        "latest_group_name": row["latest_group_name"],
+        "latest_victim_name": row["latest_victim_name"],
+        "url": row["url"],
+        "is_selected": row["is_selected"],
+    }
+
+
+def _serialize_ransomware_group_row(row):
+    return {
+        "group_name": row["group_name"],
+        "group_key": row["group_key"],
+        "record_count": row["record_count"],
+        "country_count": row["country_count"],
+        "latest_victim_name": row["latest_victim_name"],
+        "latest_country": row["latest_country"],
+        "latest_activity_at": row["latest_activity_at"].isoformat()
+        if row["latest_activity_at"]
+        else "",
+        "url": row["url"],
+    }
+
+
+def _serialize_ransomware_live_event(record):
+    return {
+        "id": record["id"],
+        "victim": record["victim_name"],
+        "group": record["group_name"],
+        "group_key": record["group_key"],
+        "country": record["country"],
+        "country_key": record["country_key"],
+        "url": record["url"],
+        "activity_at": record["activity_at"].isoformat() if record["activity_at"] else "",
+    }
+
+
+def _build_ransomware_map_state(*, window: str, selected_group: str = "", requested_country: str = ""):
+    window = _validated_ransomware_window(window)
     since = timezone.now() - RANSOMWARE_MAP_WINDOW_RANGES[window]
 
     window_items = list(
@@ -917,7 +987,7 @@ def ransomware_map_view(request):
         {"slug": row["group_key"], "name": row["group_name"], "count": row["record_count"]}
         for row in all_group_rows
     ]
-    selected_group = (request.GET.get("group") or "").strip()
+    selected_group = (selected_group or "").strip()
     valid_group_slugs = {row["slug"] for row in group_options}
     if selected_group not in valid_group_slugs:
         selected_group = ""
@@ -932,7 +1002,7 @@ def ransomware_map_view(request):
 
     country_rows = _ransomware_country_rows(group_records)
     selected_country = ""
-    requested_country = (request.GET.get("country") or "").strip()
+    requested_country = (requested_country or "").strip()
     if requested_country:
         requested_country_key = _normalized_country_key(requested_country)
         for row in country_rows:
@@ -999,38 +1069,96 @@ def ransomware_map_view(request):
         "countryless_count": max(len(group_records) - sum(row["record_count"] for row in country_rows), 0),
     }
 
+    return {
+        "window": window,
+        "selected_group": selected_group,
+        "selected_group_name": selected_group_name,
+        "group_options": group_options,
+        "selected_country": selected_country,
+        "selected_country_key": selected_country_key,
+        "summary": summary,
+        "latest_victims": latest_victims,
+        "top_groups": top_groups,
+        "top_countries": top_countries,
+        "country_rows": country_rows,
+        "map_country_data": map_country_data,
+        "map_marker_data": map_marker_data,
+        "unmapped_country_rows": unmapped_country_rows,
+        "map_empty_state": map_empty_state,
+        "selected_country_on_map": any(point["is_selected"] for point in map_country_data),
+        "clear_country_url": _ransomware_map_url(
+            window=window,
+            selected_group=selected_group,
+        ),
+        "live_poll_url": _ransomware_map_live_url(
+            window=window,
+            selected_group=selected_group,
+            country=selected_country,
+        ),
+        "live_cursor": max((record["id"] for record in focused_records), default=0),
+        "focused_records": focused_records,
+    }
+
+
+def ransomware_map_view(request):
+    state = _build_ransomware_map_state(
+        window=request.GET.get("window") or "7d",
+        selected_group=request.GET.get("group") or "",
+        requested_country=request.GET.get("country") or "",
+    )
+
     return render(
         request,
         "intel/ransomware_map.html",
         {
             "page_title": "Ransomware Incident Map",
             "current_page": "ransomware-map",
-            "window": window,
             "window_options": RANSOMWARE_MAP_WINDOW_OPTIONS,
-            "selected_group": selected_group,
-            "selected_group_name": selected_group_name,
-            "group_options": group_options,
-            "selected_country": selected_country,
-            "selected_country_key": selected_country_key,
-            "summary": summary,
-            "latest_victims": latest_victims,
-            "top_groups": top_groups,
-            "top_countries": top_countries,
-            "country_rows": country_rows,
-            "map_country_data": map_country_data,
-            "map_marker_data": map_marker_data,
-            "unmapped_country_rows": unmapped_country_rows,
-            "map_empty_state": map_empty_state,
-            "selected_country_on_map": any(
-                point["is_selected"] for point in map_country_data
-            ),
             "reset_url": reverse("ransomware-map"),
-            "clear_country_url": _ransomware_map_url(
-                window=window,
-                selected_group=selected_group,
-            ),
+            **{key: value for key, value in state.items() if key != "focused_records"},
         },
     )
+
+
+def ransomware_map_live_view(request):
+    cursor_raw = (request.GET.get("cursor") or "").strip()
+    try:
+        cursor = max(int(cursor_raw), 0)
+    except (TypeError, ValueError):
+        cursor = 0
+
+    state = _build_ransomware_map_state(
+        window=request.GET.get("window") or "7d",
+        selected_group=request.GET.get("group") or "",
+        requested_country=request.GET.get("country") or "",
+    )
+    new_events = [
+        _serialize_ransomware_live_event(record)
+        for record in state["focused_records"]
+        if record["id"] > cursor
+    ][:12]
+    payload = {
+        "cursor": state["live_cursor"],
+        "events": new_events,
+        "snapshot": {
+            "summary": state["summary"],
+            "latest_victims": [
+                _serialize_ransomware_live_record(record)
+                for record in state["latest_victims"]
+            ],
+            "top_countries": [
+                _serialize_ransomware_country_row(row)
+                for row in state["top_countries"]
+            ],
+            "top_groups": [
+                _serialize_ransomware_group_row(row)
+                for row in state["top_groups"]
+            ],
+            "map_marker_data": state["map_marker_data"],
+            "selected_country": state["selected_country"],
+        },
+    }
+    return JsonResponse(payload)
 
 
 DARK_WINDOW_RANGES = {

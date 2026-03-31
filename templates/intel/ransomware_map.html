@@ -4,7 +4,7 @@
 {% block title %}{{ page_title }} | BorealSec Intel{% endblock %}
 
 {% block content %}
-<section class="space-y-5 xl:space-y-6">
+<section id="ransomware-map-page" data-live-url="{{ live_poll_url }}" data-live-cursor="{{ live_cursor }}" data-live-interval="25000" class="space-y-5 xl:space-y-6">
     <div class="rounded-2xl border border-line bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.13),_transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-4 shadow-glow sm:p-5 xl:p-6">
         <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div class="max-w-3xl">
@@ -23,10 +23,10 @@
     </div>
 
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow"><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Victims In Scope</p><p class="mt-3 text-3xl font-semibold text-white">{{ summary.victim_count }}</p><p class="mt-2 text-xs text-slate-400">Visible after the current window, group, and country filters.</p></div>
-        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow"><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Plot-Ready Countries</p><p class="mt-3 text-3xl font-semibold text-emerald-200">{{ summary.country_count }}</p><p class="mt-2 text-xs text-slate-400">Countries with enough normalized geography to light up the map.</p></div>
-        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow"><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Active Groups</p><p class="mt-3 text-3xl font-semibold text-rose-200">{{ summary.group_count }}</p><p class="mt-2 text-xs text-slate-400">Groups visible in the current ransomware victim dataset.</p></div>
-        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow"><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Country Pending</p><p class="mt-3 text-3xl font-semibold text-amber-200">{{ summary.countryless_count }}</p><p class="mt-2 text-xs text-slate-400">Victims that remain visible even though they cannot be plotted yet.</p></div>
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow"><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Victims In Scope</p><p id="ransomware-summary-victim-count" class="mt-3 text-3xl font-semibold text-white">{{ summary.victim_count }}</p><p class="mt-2 text-xs text-slate-400">Visible after the current window, group, and country filters.</p></div>
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow"><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Plot-Ready Countries</p><p id="ransomware-summary-country-count" class="mt-3 text-3xl font-semibold text-emerald-200">{{ summary.country_count }}</p><p class="mt-2 text-xs text-slate-400">Countries with enough normalized geography to light up the map.</p></div>
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow"><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Active Groups</p><p id="ransomware-summary-group-count" class="mt-3 text-3xl font-semibold text-rose-200">{{ summary.group_count }}</p><p class="mt-2 text-xs text-slate-400">Groups visible in the current ransomware victim dataset.</p></div>
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow"><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Country Pending</p><p id="ransomware-summary-countryless-count" class="mt-3 text-3xl font-semibold text-amber-200">{{ summary.countryless_count }}</p><p class="mt-2 text-xs text-slate-400">Victims that remain visible even though they cannot be plotted yet.</p></div>
     </div>
 
     <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
@@ -71,7 +71,7 @@
             <div class="rounded-2xl border border-line bg-panel/70 p-3.5 shadow-glow xl:p-4">
                 <div class="flex items-start justify-between gap-3">
                     <div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Latest Victims</p><h2 class="mt-2 text-base font-semibold text-white xl:text-lg">Recent ransomware incidents</h2></div>
-                    <span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ latest_victims|length }} shown</span>
+                    <span id="ransomware-latest-victims-count" class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ latest_victims|length }} shown</span>
                 </div>
                 <div class="mt-3 space-y-2.5" id="ransomware-latest-victims">
                     {% for record in latest_victims %}
@@ -96,7 +96,7 @@
                 <div class="border-b border-line/70 px-3 py-3 sm:px-4 xl:px-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Threat Surface</p><h2 class="mt-2 text-xl font-semibold text-white sm:text-[1.55rem] xl:text-[1.9rem]">Ransomware victim geography</h2></div>
-                        <div class="flex flex-wrap gap-2 text-[11px]"><span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">{{ country_rows|length }} active countries</span>{% if selected_country %}<span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">{{ selected_country }}</span>{% endif %}</div>
+                        <div class="flex flex-wrap gap-2 text-[11px]"><span id="ransomware-active-countries-count" class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">{{ country_rows|length }} active countries</span>{% if selected_country %}<span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">{{ selected_country }}</span>{% endif %}<span id="ransomware-live-status" class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-100">Live</span></div>
                     </div>
                     <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-300">The map follows the current ransomware.live victim dataset. Clicking an active country drills into that geography without inventing attack paths the source does not actually provide.</p>
                 </div>
@@ -107,7 +107,7 @@
                             <span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-100">MapLibre threat map</span>
                             <span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">Local style, PMTiles-ready</span>
                         </div>
-                        <div class="text-[11px] text-slate-400">{% if map_marker_data %}{{ map_marker_data|length }} plotted countries{% else %}Basemap ready, waiting on plot-ready geography{% endif %}</div>
+                        <div class="text-[11px] text-slate-400"><span id="ransomware-plotted-countries-count">{% if map_marker_data %}{{ map_marker_data|length }} plotted countries{% else %}Basemap ready, waiting on plot-ready geography{% endif %}</span></div>
                     </div>
                     <div class="relative px-2 pb-2 pt-2 sm:px-3 sm:pb-3 xl:px-4 xl:pb-4">
                         {% if map_empty_state %}
@@ -147,8 +147,8 @@
 
         <aside class="order-3 space-y-4 xl:sticky xl:top-32">
             <div class="rounded-2xl border border-line bg-panel/72 p-3.5 shadow-glow xl:p-4">
-                <div class="flex items-start justify-between gap-3"><div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Countries</p><h2 class="mt-2 text-base font-semibold text-white xl:text-lg">Most affected countries</h2></div><span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span></div>
-                <div class="mt-3 space-y-2">
+                <div class="flex items-start justify-between gap-3"><div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Countries</p><h2 class="mt-2 text-base font-semibold text-white xl:text-lg">Most affected countries</h2></div><span id="ransomware-top-countries-count" class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span></div>
+                <div id="ransomware-top-countries" class="mt-3 space-y-2">
                     {% for row in top_countries %}
                         <a href="{{ row.url }}" class="block rounded-xl border p-3 transition {% if row.is_selected %}border-emerald-500/35 bg-emerald-500/10{% else %}border-line/80 bg-slate-950/40 hover:border-sky-400/30 hover:bg-slate-950/60{% endif %}">
                             <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="truncate text-sm font-medium text-white">{{ row.country }}</p><p class="mt-1 text-[11px] text-slate-500">{{ row.group_count }} groups{% if row.latest_group_name %} · latest {{ row.latest_group_name }}{% endif %}</p></div><div class="shrink-0 text-right"><p class="text-xl font-semibold {% if row.is_selected %}text-emerald-100{% else %}text-white{% endif %}">{{ row.record_count }}</p><p class="text-[10px] uppercase tracking-[0.18em] text-slate-500">victims</p></div></div>
@@ -161,8 +161,8 @@
             </div>
 
             <div class="rounded-2xl border border-line bg-panel/66 p-3.5 shadow-glow xl:p-4">
-                <div class="flex items-start justify-between gap-3"><div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Groups</p><h2 class="mt-2 text-base font-semibold text-white xl:text-lg">{% if selected_country %}Groups linked to {{ selected_country }}{% else %}Most active ransomware groups{% endif %}</h2></div><span class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_groups|length }} shown</span></div>
-                <div class="mt-3 space-y-2">
+                <div class="flex items-start justify-between gap-3"><div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Groups</p><h2 class="mt-2 text-base font-semibold text-white xl:text-lg">{% if selected_country %}Groups linked to {{ selected_country }}{% else %}Most active ransomware groups{% endif %}</h2></div><span id="ransomware-top-groups-count" class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_groups|length }} shown</span></div>
+                <div id="ransomware-top-groups" class="mt-3 space-y-2">
                     {% for group in top_groups %}
                         <a href="{{ group.url }}" class="block rounded-xl border border-line/80 bg-slate-950/35 p-3 transition hover:border-sky-400/30 hover:bg-slate-950/55">
                             <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="truncate text-sm font-medium text-white">{{ group.group_name }}</p><p class="mt-1 text-[11px] text-slate-500">{{ group.record_count }} victims{% if group.country_count %} · {{ group.country_count }} countries{% endif %}</p></div><span class="text-[11px] text-slate-400">{{ group.latest_activity_at|naturaltime }}</span></div>
@@ -252,10 +252,40 @@
         animation-duration: 5s;
         opacity: 0.6;
     }
+    .ransomware-map-marker--live .ransomware-map-marker__halo {
+        animation-duration: 1.2s;
+        background: radial-gradient(circle, rgb(251 191 36 / 0.46) 0%, rgb(249 115 22 / 0.2) 44%, transparent 72%);
+    }
+    .ransomware-map-marker--live .ransomware-map-marker__core {
+        box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.18), 0 18px 42px rgba(251, 146, 60, 0.38);
+    }
+    .ransomware-live-row--new {
+        animation: ransomware-live-row-flash 2.2s ease-out 1;
+    }
+    .ransomware-live-row--bump {
+        animation: ransomware-live-row-bump 1.5s ease-out 1;
+    }
+    .ransomware-live-metric--changed {
+        animation: ransomware-live-metric-flash 1.4s ease-out 1;
+    }
     @keyframes ransomware-map-pulse {
         0% { transform: scale(0.9); opacity: 0.7; }
         70% { transform: scale(1.45); opacity: 0; }
         100% { transform: scale(1.45); opacity: 0; }
+    }
+    @keyframes ransomware-live-row-flash {
+        0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.2); background: rgba(8, 47, 73, 0.82); }
+        100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); background: rgba(2, 6, 23, 0.4); }
+    }
+    @keyframes ransomware-live-row-bump {
+        0% { transform: translateY(0); }
+        30% { transform: translateY(-2px); }
+        100% { transform: translateY(0); }
+    }
+    @keyframes ransomware-live-metric-flash {
+        0% { opacity: 0.72; transform: scale(0.97); }
+        45% { opacity: 1; transform: scale(1.03); }
+        100% { opacity: 1; transform: scale(1); }
     }
 </style>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
@@ -263,12 +293,25 @@
 <script src="https://unpkg.com/pmtiles@3.2.1/dist/pmtiles.js"></script>
 <script>
 (() => {
+    const pageEl = document.getElementById("ransomware-map-page");
     const mapEl = document.getElementById("ransomware-map-view");
-    if (!mapEl) return;
+    if (!pageEl) return;
 
     const fallbackEl = document.getElementById("ransomware-map-fallback");
     const markerDataEl = document.getElementById("ransomware-map-marker-data");
-    const styleUrl = mapEl.dataset.styleUrl;
+    const latestVictimsEl = document.getElementById("ransomware-latest-victims");
+    const topCountriesEl = document.getElementById("ransomware-top-countries");
+    const topGroupsEl = document.getElementById("ransomware-top-groups");
+    const styleUrl = mapEl ? mapEl.dataset.styleUrl : "";
+    const liveUrl = pageEl.dataset.liveUrl || "";
+    const pollInterval = Math.max(parseInt(pageEl.dataset.liveInterval || "25000", 10) || 25000, 10000);
+    let currentCursor = Math.max(parseInt(pageEl.dataset.liveCursor || "0", 10) || 0, 0);
+    let map = null;
+    let mapReady = false;
+    let markerInstances = [];
+    let pollTimer = null;
+    let pollInFlight = false;
+
     const showFallback = (message) => {
         if (!fallbackEl) return;
         fallbackEl.textContent = message;
@@ -278,52 +321,139 @@
         if (!fallbackEl) return;
         fallbackEl.classList.add("hidden");
     };
+    const pulseClass = (element, className) => {
+        if (!element) return;
+        element.classList.remove(className);
+        void element.offsetWidth;
+        element.classList.add(className);
+    };
+    const escapeHtml = (value) =>
+        String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/\"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    const relativeTimeLabel = (isoValue) => {
+        if (!isoValue) return "";
+        const date = new Date(isoValue);
+        if (Number.isNaN(date.getTime())) return "";
+        const diffSeconds = Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
+        if (diffSeconds < 45) return "just now";
+        if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
+        if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
+        return `${Math.floor(diffSeconds / 86400)}d ago`;
+    };
+    const setText = (id, nextValue) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const textValue = String(nextValue);
+        if (el.textContent.trim() !== textValue) {
+            el.textContent = textValue;
+            pulseClass(el, "ransomware-live-metric--changed");
+        }
+    };
+    const setStatus = (label, tone) => {
+        const el = document.getElementById("ransomware-live-status");
+        if (!el) return;
+        el.textContent = label;
+        el.classList.remove("text-sky-100", "text-amber-100", "text-rose-100", "bg-sky-500/10", "bg-amber-500/10", "bg-rose-500/10", "border-sky-500/20", "border-amber-500/25", "border-rose-500/25");
+        if (tone === "warn") {
+            el.classList.add("text-amber-100", "bg-amber-500/10", "border-amber-500/25");
+        } else if (tone === "error") {
+            el.classList.add("text-rose-100", "bg-rose-500/10", "border-rose-500/25");
+        } else {
+            el.classList.add("text-sky-100", "bg-sky-500/10", "border-sky-500/20");
+        }
+    };
+    const emptyCard = (message) =>
+        `<p class="text-sm text-slate-400">${escapeHtml(message)}</p>`;
+    const renderLatestVictims = (records, newIds = new Set()) => {
+        if (!latestVictimsEl) return;
+        setText("ransomware-latest-victims-count", `${records.length} shown`);
+        if (!records.length) {
+            latestVictimsEl.innerHTML = emptyCard("No ransomware victims matched the current window and filters.");
+            return;
+        }
+        latestVictimsEl.innerHTML = records.map((record) => `
+            <article class="rounded-xl border border-line/80 bg-slate-950/40 p-2.5 xl:p-3${newIds.has(record.id) ? " ransomware-live-row--new" : ""}">
+                <a href="${escapeHtml(record.url)}" class="block truncate text-sm font-medium text-white transition hover:text-sky-200">${escapeHtml(record.victim_name)}</a>
+                <p class="mt-1 text-[11px] text-slate-500">${escapeHtml(relativeTimeLabel(record.activity_at))}</p>
+                <div class="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
+                    ${record.group_name ? `<a href="${escapeHtml(record.group_url)}" class="rounded-md border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-200 transition hover:border-rose-400/40 hover:text-rose-100">${escapeHtml(record.group_name)}</a>` : ""}
+                    ${record.country ? `<a href="${escapeHtml(record.country_url)}" class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200 transition hover:border-emerald-400/40 hover:text-emerald-100">${escapeHtml(record.country)}</a>` : `<span class="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-amber-200">Country pending</span>`}
+                </div>
+                ${record.excerpt ? `<p class="mt-2.5 truncate text-[11px] leading-5 text-slate-400">${escapeHtml(record.excerpt)}</p>` : ""}
+            </article>
+        `).join("");
+    };
+    const renderTopCountries = (rows, pulseCountries = new Set()) => {
+        if (!topCountriesEl) return;
+        setText("ransomware-top-countries-count", `${rows.length} shown`);
+        if (!rows.length) {
+            topCountriesEl.innerHTML = '<div class="rounded-xl border border-line/80 bg-slate-950/40 p-3 text-sm text-slate-400">Victims are present, but current records do not yet expose enough normalized country data to rank geography.</div>';
+            return;
+        }
+        topCountriesEl.innerHTML = rows.map((row) => `
+            <a href="${escapeHtml(row.url)}" class="block rounded-xl border p-3 transition ${row.is_selected ? "border-emerald-500/35 bg-emerald-500/10" : "border-line/80 bg-slate-950/40 hover:border-sky-400/30 hover:bg-slate-950/60"}${pulseCountries.has(row.country_key) ? " ransomware-live-row--bump" : ""}">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-white">${escapeHtml(row.country)}</p>
+                        <p class="mt-1 text-[11px] text-slate-500">${escapeHtml(String(row.group_count))} groups${row.latest_group_name ? ` · latest ${escapeHtml(row.latest_group_name)}` : ""}</p>
+                    </div>
+                    <div class="shrink-0 text-right">
+                        <p class="text-xl font-semibold ${row.is_selected ? "text-emerald-100" : "text-white"}">${escapeHtml(String(row.record_count))}</p>
+                        <p class="text-[10px] uppercase tracking-[0.18em] text-slate-500">victims</p>
+                    </div>
+                </div>
+                ${row.latest_victim_name ? `<p class="mt-2.5 truncate text-[11px] text-slate-300">${escapeHtml(row.latest_victim_name)}</p>` : ""}
+            </a>
+        `).join("");
+    };
+    const renderTopGroups = (rows, pulseGroups = new Set()) => {
+        if (!topGroupsEl) return;
+        setText("ransomware-top-groups-count", `${rows.length} shown`);
+        if (!rows.length) {
+            topGroupsEl.innerHTML = emptyCard("No group activity matched the current ransomware filters.");
+            return;
+        }
+        topGroupsEl.innerHTML = rows.map((row) => `
+            <a href="${escapeHtml(row.url)}" class="block rounded-xl border border-line/80 bg-slate-950/35 p-3 transition hover:border-sky-400/30 hover:bg-slate-950/55${pulseGroups.has(row.group_key) ? " ransomware-live-row--bump" : ""}">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-white">${escapeHtml(row.group_name)}</p>
+                        <p class="mt-1 text-[11px] text-slate-500">${escapeHtml(String(row.record_count))} victims${row.country_count ? ` · ${escapeHtml(String(row.country_count))} countries` : ""}</p>
+                    </div>
+                    <span class="text-[11px] text-slate-400">${escapeHtml(relativeTimeLabel(row.latest_activity_at))}</span>
+                </div>
+                <div class="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
+                    ${row.latest_victim_name ? `<span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-200">${escapeHtml(row.latest_victim_name)}</span>` : ""}
+                    ${row.latest_country ? `<span class="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-emerald-200">${escapeHtml(row.latest_country)}</span>` : ""}
+                </div>
+            </a>
+        `).join("");
+    };
 
-    if (!window.maplibregl || !markerDataEl || !styleUrl) {
-        showFallback("Interactive map engine unavailable. Use the country and incident panels to keep drilling down.");
+    if (!markerDataEl) {
+        showFallback("Live ransomware data unavailable. Use the country and incident panels to keep drilling down.");
         return;
     }
 
     const markerData = JSON.parse(markerDataEl.textContent);
-    if (window.pmtiles && maplibregl.addProtocol) {
-        const protocol = new pmtiles.Protocol();
-        maplibregl.addProtocol("pmtiles", protocol.tile);
-    }
-
-    const selectedMarker = markerData.find((point) => point.is_selected);
-    const defaultCenter = selectedMarker ? [selectedMarker.value[0], selectedMarker.value[1]] : [12, 20];
-    const defaultZoom = selectedMarker ? 3.15 : (window.innerWidth < 640 ? 0.9 : 1.45);
-    const map = new maplibregl.Map({
-        container: mapEl,
-        style: styleUrl,
-        center: defaultCenter,
-        zoom: defaultZoom,
-        attributionControl: false,
-        dragRotate: false,
-        touchPitch: false,
-        renderWorldCopies: false,
-    });
-
-    map.addControl(new maplibregl.AttributionControl({compact: true}), "bottom-right");
-    map.addControl(new maplibregl.NavigationControl({showCompass: false}), "top-right");
-
-    let ready = false;
-    const failTimer = window.setTimeout(() => {
-        if (ready) return;
-        showFallback("Map basemap did not initialize. Use the country and incident panels to keep drilling down.");
-    }, 9000);
-
     const markerTitle = (point) => {
         const parts = [`${point.name}: ${point.record_count} victim${point.record_count === 1 ? "" : "s"}`];
         if (point.latest_group_name) parts.push(`Latest group: ${point.latest_group_name}`);
         if (point.latest_victim_name) parts.push(`Latest victim: ${point.latest_victim_name}`);
         return parts.join(" | ");
     };
-
-    const addMarker = (point) => {
+    const clearMarkers = () => {
+        markerInstances.forEach((instance) => instance.remove());
+        markerInstances = [];
+    };
+    const addMarker = (point, pulseLive = false) => {
         const markerEl = document.createElement("button");
         markerEl.type = "button";
-        markerEl.className = `ransomware-map-marker ransomware-map-marker--level-${point.intensity_level}${point.is_selected ? " ransomware-map-marker--selected" : ""}${point.intensity_level <= 1 ? " ransomware-map-marker--quiet" : ""}`;
+        markerEl.className = `ransomware-map-marker ransomware-map-marker--level-${point.intensity_level}${point.is_selected ? " ransomware-map-marker--selected" : ""}${point.intensity_level <= 1 ? " ransomware-map-marker--quiet" : ""}${pulseLive ? " ransomware-map-marker--live" : ""}`;
         markerEl.style.setProperty("--marker-size", `${point.symbol_size + 6}px`);
         markerEl.title = markerTitle(point);
         markerEl.setAttribute("aria-label", markerTitle(point));
@@ -332,31 +462,122 @@
         markerEl.addEventListener("click", () => {
             if (point.url) window.location.assign(point.url);
         });
-        return new maplibregl.Marker({element: markerEl, anchor: "center"}).setLngLat([point.value[0], point.value[1]]).addTo(map);
+        const marker = new maplibregl.Marker({element: markerEl, anchor: "center"})
+            .setLngLat([point.value[0], point.value[1]])
+            .addTo(map);
+        markerInstances.push(marker);
     };
-
-    map.once("load", () => {
-        ready = true;
-        window.clearTimeout(failTimer);
-        hideFallback();
-
-        markerData.forEach((point) => addMarker(point));
-
-        if (!selectedMarker && markerData.length > 1) {
+    const renderMapMarkers = (points, liveCountryKeys = new Set(), fitBounds = false) => {
+        if (!map || !mapReady) return;
+        clearMarkers();
+        points.forEach((point) => addMarker(point, liveCountryKeys.has(point.country_key)));
+        if (fitBounds && points.length > 1) {
             const bounds = new maplibregl.LngLatBounds();
-            markerData.forEach((point) => bounds.extend([point.value[0], point.value[1]]));
+            points.forEach((point) => bounds.extend([point.value[0], point.value[1]]));
             map.fitBounds(bounds, {
                 padding: {top: 72, right: 72, bottom: 72, left: 72},
                 maxZoom: 2.4,
                 duration: 0,
             });
         }
-    });
+    };
+    const applySnapshot = (snapshot, newIds = new Set(), newCountryKeys = new Set(), newGroupKeys = new Set()) => {
+        if (!snapshot) return;
+        renderLatestVictims(snapshot.latest_victims || [], newIds);
+        renderTopCountries(snapshot.top_countries || [], newCountryKeys);
+        renderTopGroups(snapshot.top_groups || [], newGroupKeys);
+        setText("ransomware-summary-victim-count", snapshot.summary.victim_count);
+        setText("ransomware-summary-country-count", snapshot.summary.country_count);
+        setText("ransomware-summary-group-count", snapshot.summary.group_count);
+        setText("ransomware-summary-countryless-count", snapshot.summary.countryless_count);
+        setText("ransomware-active-countries-count", `${snapshot.summary.country_count} active countries`);
+        setText(
+            "ransomware-plotted-countries-count",
+            snapshot.map_marker_data.length
+                ? `${snapshot.map_marker_data.length} plotted countries`
+                : "Basemap ready, waiting on plot-ready geography"
+        );
+        renderMapMarkers(snapshot.map_marker_data || [], newCountryKeys, false);
+    };
+    const startPolling = () => {
+        if (!liveUrl || pollTimer) return;
+        pollTimer = window.setInterval(() => {
+            if (pollInFlight) return;
+            pollInFlight = true;
+            setStatus("Syncing", "warn");
+            const separator = liveUrl.includes("?") ? "&" : "?";
+            fetch(`${liveUrl}${separator}cursor=${encodeURIComponent(currentCursor)}`, {
+                headers: { "Accept": "application/json" },
+            })
+                .then((response) => {
+                    if (!response.ok) throw new Error(`live-${response.status}`);
+                    return response.json();
+                })
+                .then((payload) => {
+                    const newIds = new Set((payload.events || []).map((event) => event.id));
+                    const newCountryKeys = new Set((payload.events || []).map((event) => event.country_key).filter(Boolean));
+                    const newGroupKeys = new Set((payload.events || []).map((event) => event.group_key).filter(Boolean));
+                    currentCursor = Math.max(currentCursor, Number(payload.cursor) || 0);
+                    pageEl.dataset.liveCursor = String(currentCursor);
+                    applySnapshot(payload.snapshot || {}, newIds, newCountryKeys, newGroupKeys);
+                    setStatus(newIds.size ? `${newIds.size} new` : "Live", "ok");
+                })
+                .catch(() => {
+                    setStatus("Retrying", "error");
+                })
+                .finally(() => {
+                    pollInFlight = false;
+                });
+        }, pollInterval);
+    };
 
-    map.on("error", () => {
-        if (ready) return;
-        window.clearTimeout(failTimer);
-        showFallback("Map basemap failed to load. Use the country and incident panels to keep drilling down.");
+    if (window.maplibregl && mapEl && styleUrl) {
+        if (window.pmtiles && maplibregl.addProtocol) {
+            const protocol = new pmtiles.Protocol();
+            maplibregl.addProtocol("pmtiles", protocol.tile);
+        }
+        const selectedMarker = markerData.find((point) => point.is_selected);
+        const defaultCenter = selectedMarker ? [selectedMarker.value[0], selectedMarker.value[1]] : [12, 20];
+        const defaultZoom = selectedMarker ? 3.15 : (window.innerWidth < 640 ? 0.9 : 1.45);
+        map = new maplibregl.Map({
+            container: mapEl,
+            style: styleUrl,
+            center: defaultCenter,
+            zoom: defaultZoom,
+            attributionControl: false,
+            dragRotate: false,
+            touchPitch: false,
+            renderWorldCopies: false,
+        });
+
+        map.addControl(new maplibregl.AttributionControl({compact: true}), "bottom-right");
+        map.addControl(new maplibregl.NavigationControl({showCompass: false}), "top-right");
+
+        const failTimer = window.setTimeout(() => {
+            if (mapReady) return;
+            showFallback("Map basemap did not initialize. Use the country and incident panels to keep drilling down.");
+        }, 9000);
+
+        map.once("load", () => {
+            mapReady = true;
+            window.clearTimeout(failTimer);
+            hideFallback();
+            renderMapMarkers(markerData, new Set(), !selectedMarker && markerData.length > 1);
+        });
+
+        map.on("error", () => {
+            if (mapReady) return;
+            window.clearTimeout(failTimer);
+            showFallback("Map basemap failed to load. Use the country and incident panels to keep drilling down.");
+        });
+    } else if (mapEl) {
+        showFallback("Interactive map engine unavailable. Use the country and incident panels to keep drilling down.");
+    }
+
+    startPolling();
+    window.addEventListener("beforeunload", () => {
+        if (pollTimer) window.clearInterval(pollTimer);
+        clearMarkers();
     });
 })();
 </script>
