@@ -987,7 +987,6 @@ def ransomware_map_view(request):
             "top_countries": top_countries,
             "country_rows": country_rows,
             "map_tiles": map_tiles,
-            "map_regions": DARK_MAP_REGION_LABELS,
             "unmapped_country_rows": unmapped_country_rows,
             "map_empty_state": map_empty_state,
             "selected_country_on_map": any(tile["is_selected"] for tile in map_tiles),
