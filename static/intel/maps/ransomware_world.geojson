@@ -1,0 +1,83 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "North America" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-168, 15], [-168, 72], [-145, 72], [-128, 79], [-96, 83], [-56, 76],
+          [-50, 60], [-65, 50], [-80, 25], [-97, 15], [-125, 9], [-150, 12], [-168, 15]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Greenland" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-54, 60], [-46, 83], [-19, 77], [-29, 60], [-54, 60]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "South America" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-82, 12], [-74, 10], [-60, 6], [-48, -4], [-42, -20],
+          [-48, -39], [-58, -55], [-70, -54], [-77, -40], [-80, -8], [-82, 12]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Europe" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-12, 35], [-10, 46], [0, 58], [17, 70], [34, 69],
+          [42, 60], [31, 50], [24, 45], [18, 39], [5, 35], [-12, 35]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Africa" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-17, 35], [7, 37], [22, 33], [35, 25], [42, 12],
+          [50, -5], [43, -26], [28, -35], [14, -35], [2, -30],
+          [-10, -10], [-17, 10], [-17, 35]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Asia" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [26, 5], [38, 34], [55, 45], [79, 58], [110, 70],
+          [150, 68], [178, 59], [171, 40], [145, 20], [120, 5],
+          [91, 8], [65, 15], [45, 5], [26, 5]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Oceania" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [110, -10], [116, -21], [129, -29], [141, -39], [155, -42],
+          [168, -45], [178, -37], [170, -16], [151, -10], [128, -10], [110, -10]
+        ]]
+      }
+    }
+  ]
+}
