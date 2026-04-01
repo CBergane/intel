@@ -223,7 +223,7 @@ class DashboardViewTests(TestCase):
         response = self.client.get("/")
 
         self.assertContains(response, 'data-card-layout="front-page"')
-        self.assertContains(response, 'lg:items-stretch')
+        self.assertContains(response, 'lg:grid-cols-3')
         self.assertContains(
             response,
             'data-card-layout="front-page" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 flex flex-col xl:p-5"',
@@ -266,3 +266,52 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, "All active items")
         self.assertContains(response, "Fresh active exploitation report")
         self.assertContains(response, 'xl:grid-cols-3', html=False)
+
+    def test_lower_preview_sections_render_two_compact_items_per_section(self):
+        advisories_feed = self._create_feed(
+            source_name="Advisory Desk",
+            source_slug="advisory-desk",
+            section=Feed.Section.ADVISORIES,
+        )
+        research_feed = self._create_feed(
+            source_name="Research Desk",
+            source_slug="research-desk",
+            section=Feed.Section.RESEARCH,
+        )
+        sweden_feed = self._create_feed(
+            source_name="Sweden Desk",
+            source_slug="sweden-desk",
+            section=Feed.Section.SWEDEN,
+        )
+
+        for idx in range(3):
+            self._create_item(
+                feed=advisories_feed,
+                title=f"Advisory Preview {idx}",
+                summary="Routine advisory preview",
+                age_hours=idx,
+            )
+            self._create_item(
+                feed=research_feed,
+                title=f"Research Preview {idx}",
+                summary="Routine research preview",
+                age_hours=idx,
+            )
+            self._create_item(
+                feed=sweden_feed,
+                title=f"Sweden Preview {idx}",
+                summary="Routine Sweden preview",
+                age_hours=idx,
+            )
+
+        response = self.client.get("/")
+
+        self.assertContains(response, "Advisory Preview 0")
+        self.assertContains(response, "Advisory Preview 1")
+        self.assertNotContains(response, "Advisory Preview 2")
+        self.assertContains(response, "Research Preview 0")
+        self.assertContains(response, "Research Preview 1")
+        self.assertNotContains(response, "Research Preview 2")
+        self.assertContains(response, "Sweden Preview 0")
+        self.assertContains(response, "Sweden Preview 1")
+        self.assertNotContains(response, "Sweden Preview 2")
