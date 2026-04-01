@@ -315,3 +315,9 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, "Sweden Preview 0")
         self.assertContains(response, "Sweden Preview 1")
         self.assertNotContains(response, "Sweden Preview 2")
+        self.assertContains(response, 'data-card-layout="dashboard-preview"')
+        self.assertContains(
+            response,
+            'data-card-layout="dashboard-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/60 px-3 py-3 md:min-h-[11.5rem]"',
+            html=False,
+        )
