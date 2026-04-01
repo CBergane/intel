@@ -7,7 +7,13 @@ from django.utils import timezone
 
 from intel.dark_models import DarkHit, DarkSource
 from intel.models import Feed, Item, Source
-from intel.notifications import send_dark_hit_alert, send_high_epss_alert
+from intel.notifications import (
+    build_dark_hit_alert_fingerprint,
+    dark_hit_alert_reason,
+    send_dark_hit_alert,
+    send_high_epss_alert,
+    should_emit_dark_hit_alert,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +115,7 @@ class DarkHitAlertTests(TestCase):
             country="Sweden",
         )
         with patch("intel.notifications.requests.post") as mock_post:
-            send_dark_hit_alert(hit)
+            send_dark_hit_alert(hit, why_alerted="new finding")
             mock_post.assert_called_once()
             call_kwargs = mock_post.call_args
             sent_json = call_kwargs.kwargs.get("json") or call_kwargs.args[1]
@@ -121,6 +127,10 @@ class DarkHitAlertTests(TestCase):
             )
             self.assertIn(
                 {"name": "Matched in", "value": "victim, group, details", "inline": True},
+                embed["fields"],
+            )
+            self.assertIn(
+                {"name": "Why alerted", "value": "new finding", "inline": True},
                 embed["fields"],
             )
 
@@ -168,6 +178,60 @@ class DarkHitAlertTests(TestCase):
             sent_json = call_kwargs.kwargs.get("json") or call_kwargs.args[1]
             payload_str = json.dumps(sent_json)
             self.assertNotIn(".onion", payload_str)
+
+    def test_identical_recent_dark_hit_fingerprint_is_suppressed(self):
+        source = _make_dark_source()
+        hit = _make_dark_hit(source, record_type="incident")
+        fingerprint = build_dark_hit_alert_fingerprint(
+            record_type="incident",
+            title=hit.title,
+            excerpt=hit.excerpt,
+            url=hit.url,
+            matched_keywords=hit.matched_keywords,
+            matched_regex=hit.matched_regex,
+        )
+        hit.last_alerted_at = timezone.now()
+        hit.last_alert_fingerprint = fingerprint
+        hit.save(update_fields=["last_alerted_at", "last_alert_fingerprint"])
+
+        self.assertFalse(
+            should_emit_dark_hit_alert(
+                is_watch_match=True,
+                record_type="incident",
+                current_alert_fingerprint=fingerprint,
+                previous_alert_hit=hit,
+            )
+        )
+
+    def test_dark_hit_alert_reason_prefers_specific_keyword_change_reason(self):
+        source = _make_dark_source()
+        previous_hit = _make_dark_hit(
+            source,
+            record_type="incident",
+            matched_keywords=["akira"],
+            group_name="Akira",
+            country="Sweden",
+        )
+        previous_hit.last_alerted_at = timezone.now()
+        previous_hit.save(update_fields=["last_alerted_at"])
+
+        reason = dark_hit_alert_reason(
+            previous_hit,
+            record_values={
+                "group_name": "Akira",
+                "country": "Sweden",
+                "industry": "",
+                "url": previous_hit.url,
+                "victim_name": previous_hit.victim_name,
+                "title": previous_hit.title,
+                "website_url": previous_hit.website_url,
+                "excerpt": previous_hit.excerpt,
+            },
+            keyword_matches=["akira", "sweden"],
+            regex_matches=[],
+        )
+
+        self.assertEqual(reason, "Sweden keyword match")
 
 
 # ---------------------------------------------------------------------------

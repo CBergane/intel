@@ -6,8 +6,13 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from intel.dark_utils import extract_links
+from intel.notifications import (
+    build_dark_hit_alert_fingerprint,
+    build_dark_hit_alert_identity,
+)
 from intel.models import DarkDocument, DarkFetchRun, DarkHit, DarkSource, OpsJob
 
 
@@ -623,6 +628,89 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(latest_run.hits_updated, 1)
         mock_post.assert_called_once()
 
+    @override_settings(
+        DARK_FETCH_RETRIES=1,
+        DARK_MAX_BYTES=5000,
+        DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
+    )
+    def test_equivalent_new_dark_hit_row_is_suppressed_by_alert_identity(self):
+        self.source.watch_keywords = "alphacorp"
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(
+            update_fields=["watch_keywords", "extractor_profile", "updated_at"]
+        )
+        previous_document = DarkDocument.objects.create(
+            dark_source=self.source,
+            url="https://gamma.example.com/older-page",
+            canonical_url="https://gamma.example.com/older-page",
+            title="Old listing",
+            excerpt="AlphaCorp listing",
+            content_hash="doc-hash-old",
+        )
+        previous_hit = DarkHit.objects.create(
+            dark_source=self.source,
+            dark_document=previous_document,
+            title="AlphaCorp",
+            excerpt="Threat Group: Akira Country: Sweden Victim disclosure updated.",
+            url=self.source.url,
+            content_hash="old-hit-hash",
+            matched_keywords=["alphacorp"],
+            matched_regex=[],
+            is_watch_match=True,
+            record_type="incident",
+            victim_name="AlphaCorp",
+            group_name="Akira",
+            country="Sweden",
+        )
+        previous_hit.alert_identity_hash = build_dark_hit_alert_identity(
+            source_id=self.source.id,
+            record_type="incident",
+            title="AlphaCorp",
+            victim_name="AlphaCorp",
+            group_name="Akira",
+            url=self.source.url,
+        )
+        previous_hit.last_alert_fingerprint = build_dark_hit_alert_fingerprint(
+            record_type="incident",
+            title="AlphaCorp",
+            excerpt="Threat Group: Akira Country: Sweden Victim disclosure updated.",
+            victim_name="AlphaCorp",
+            group_name="Akira",
+            country="Sweden",
+            url=self.source.url,
+            matched_keywords=["alphacorp"],
+            matched_regex=[],
+        )
+        previous_hit.last_alerted_at = timezone.now()
+        previous_hit.save(
+            update_fields=[
+                "alert_identity_hash",
+                "last_alert_fingerprint",
+                "last_alerted_at",
+            ]
+        )
+
+        markup = """
+        <html><title>Live Updates</title><body>
+            <div class="incident-card">
+                <h2>AlphaCorp</h2>
+                <p>Threat Group: Akira</p>
+                <p>Country: Sweden</p>
+                <p>Victim disclosure updated.</p>
+            </div>
+        </body></html>
+        """
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            self._ingest_markup(markup)
+
+        latest_hit = DarkHit.objects.filter(dark_source=self.source).latest("id")
+        self.assertEqual(DarkHit.objects.filter(dark_source=self.source).count(), 2)
+        self.assertEqual(latest_hit.title, "AlphaCorp")
+        self.assertEqual(latest_hit.last_alerted_at, previous_hit.last_alerted_at)
+        self.assertEqual(latest_hit.last_alert_fingerprint, previous_hit.last_alert_fingerprint)
+        mock_post.assert_not_called()
+
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_structured_matching_ignores_page_level_keyword_bleed(self):
         self.source.watch_keywords = "breach"
@@ -693,6 +781,11 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(DarkHit.objects.filter(dark_source=self.source).count(), 1)
         self.assertEqual(hit.website_url, "https://alphacorp.example")
         self.assertEqual(mock_post.call_count, 2)
+        second_payload = mock_post.call_args.kwargs["json"]
+        self.assertIn(
+            {"name": "Why alerted", "value": "website changed", "inline": True},
+            second_payload["embeds"][0]["fields"],
+        )
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_ransomdb_live_updates_cards_extract_normalized_incidents_only(self):

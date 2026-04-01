@@ -18,38 +18,31 @@ from intel.dark_utils import (
     summarize_profile_content,
 )
 from intel.models import DarkDocument, DarkFetchRun, DarkHit, DarkSnapshot, DarkSource
-from intel.notifications import send_dark_hit_alert
+from intel.notifications import (
+    build_dark_hit_alert_fingerprint,
+    build_dark_hit_alert_identity,
+    dark_hit_alert_reason,
+    send_dark_hit_alert,
+    should_emit_dark_hit_alert,
+)
 from intel.utils import canonicalize_url, sanitize_summary
 
 
-ALERT_RELEVANT_HIT_FIELDS = (
-    "record_type",
-    "group_name",
-    "victim_name",
-    "country",
-    "industry",
-    "website_url",
-    "victim_count",
-    "title",
-    "url",
-)
-
-
-def _should_alert_on_dark_hit_update(
-    hit,
-    *,
-    record_values: dict,
-    keyword_matches: list[str],
-    regex_matches: list[str],
-    is_watch_match: bool,
-) -> bool:
-    if not is_watch_match:
-        return False
-    if not hit.is_watch_match:
-        return True
-    if hit.matched_keywords != keyword_matches or hit.matched_regex != regex_matches:
-        return True
-    return any(getattr(hit, field_name) != record_values[field_name] for field_name in ALERT_RELEVANT_HIT_FIELDS)
+def _latest_alerted_dark_hit(*, source, hit, alert_identity_hash: str):
+    if (
+        hit is not None
+        and hit.last_alerted_at is not None
+        and hit.last_alert_fingerprint
+    ):
+        return hit
+    queryset = DarkHit.objects.filter(
+        dark_source=source,
+        alert_identity_hash=alert_identity_hash,
+        last_alerted_at__isnull=False,
+    )
+    if hit is not None and hit.pk:
+        queryset = queryset.exclude(pk=hit.pk)
+    return queryset.order_by("-last_alerted_at", "-id").first()
 
 
 class Command(BaseCommand):
@@ -325,6 +318,27 @@ class Command(BaseCommand):
                     "url": record.url or fallback_hit_url,
                     "raw": record.raw,
                 }
+                alert_identity_hash = build_dark_hit_alert_identity(
+                    source_id=source.id,
+                    record_type=record.record_type,
+                    title=record.title,
+                    victim_name=record.victim_name,
+                    group_name=normalized_group_name,
+                    url=record_values["url"],
+                )
+                alert_fingerprint = build_dark_hit_alert_fingerprint(
+                    record_type=record.record_type,
+                    title=record.title,
+                    excerpt=record_values["excerpt"],
+                    victim_name=record.victim_name,
+                    group_name=normalized_group_name,
+                    country=record.country,
+                    industry=record.industry,
+                    website_url=record.website_url,
+                    url=record_values["url"],
+                    matched_keywords=keyword_matches,
+                    matched_regex=regex_matches,
+                )
                 if store_structured_records:
                     hit_hash = build_record_identity_hash(
                         record_type=record.record_type,
@@ -344,32 +358,75 @@ class Command(BaseCommand):
                     hit = hits_by_hash.get(hit_hash)
 
                 if hit is None:
+                    previous_alert_hit = _latest_alerted_dark_hit(
+                        source=source,
+                        hit=None,
+                        alert_identity_hash=alert_identity_hash,
+                    )
                     hit = DarkHit.objects.create(
                         dark_source=source,
                         dark_document=document,
                         content_hash=hit_hash,
+                        alert_identity_hash=alert_identity_hash,
                         last_seen_at=now,
                         **record_values,
                     )
                     hits_by_hash[hit_hash] = hit
                     if store_structured_records:
                         structured_hits_by_identity[hit_hash] = hit
-                    if is_watch_match:
-                        send_dark_hit_alert(hit, matched_fields=match_result.fields)
+                    if should_emit_dark_hit_alert(
+                        is_watch_match=is_watch_match,
+                        record_type=record.record_type,
+                        current_alert_fingerprint=alert_fingerprint,
+                        previous_alert_hit=previous_alert_hit,
+                    ):
+                        alert_reason = dark_hit_alert_reason(
+                            previous_alert_hit,
+                            record_values=record_values,
+                            keyword_matches=keyword_matches,
+                            regex_matches=regex_matches,
+                        )
+                        send_dark_hit_alert(
+                            hit,
+                            matched_fields=match_result.fields,
+                            why_alerted=alert_reason,
+                        )
+                        hit.last_alerted_at = now
+                        hit.last_alert_fingerprint = alert_fingerprint
+                        hit.save(update_fields=["last_alerted_at", "last_alert_fingerprint"])
+                    elif (
+                        previous_alert_hit is not None
+                        and previous_alert_hit.last_alert_fingerprint == alert_fingerprint
+                    ):
+                        hit.last_alerted_at = previous_alert_hit.last_alerted_at
+                        hit.last_alert_fingerprint = previous_alert_hit.last_alert_fingerprint
+                        hit.save(update_fields=["last_alerted_at", "last_alert_fingerprint"])
                     hits_new += 1
                     continue
 
-                alert_on_update = _should_alert_on_dark_hit_update(
-                    hit,
-                    record_values=record_values,
-                    keyword_matches=keyword_matches,
-                    regex_matches=regex_matches,
-                    is_watch_match=is_watch_match,
+                previous_alert_hit = _latest_alerted_dark_hit(
+                    source=source,
+                    hit=hit,
+                    alert_identity_hash=alert_identity_hash,
                 )
+                alert_reason = None
+                if should_emit_dark_hit_alert(
+                    is_watch_match=is_watch_match,
+                    record_type=record.record_type,
+                    current_alert_fingerprint=alert_fingerprint,
+                    previous_alert_hit=previous_alert_hit,
+                ):
+                    alert_reason = dark_hit_alert_reason(
+                        previous_alert_hit,
+                        record_values=record_values,
+                        keyword_matches=keyword_matches,
+                        regex_matches=regex_matches,
+                    )
 
                 hit.matched_keywords = keyword_matches
                 hit.matched_regex = regex_matches
                 hit.is_watch_match = is_watch_match
+                hit.alert_identity_hash = alert_identity_hash
                 hit.record_type = record_values["record_type"]
                 hit.group_name = record_values["group_name"]
                 hit.victim_name = record_values["victim_name"]
@@ -388,8 +445,26 @@ class Command(BaseCommand):
                 hits_by_hash[hit_hash] = hit
                 if store_structured_records:
                     structured_hits_by_identity[hit_hash] = hit
-                if alert_on_update:
-                    send_dark_hit_alert(hit, matched_fields=match_result.fields)
+                if alert_reason:
+                    send_dark_hit_alert(
+                        hit,
+                        matched_fields=match_result.fields,
+                        why_alerted=alert_reason,
+                    )
+                    hit.last_alerted_at = now
+                    hit.last_alert_fingerprint = alert_fingerprint
+                    hit.save(update_fields=["last_alerted_at", "last_alert_fingerprint"])
+                elif (
+                    previous_alert_hit is not None
+                    and previous_alert_hit.last_alert_fingerprint == alert_fingerprint
+                    and (
+                        hit.last_alerted_at != previous_alert_hit.last_alerted_at
+                        or hit.last_alert_fingerprint != previous_alert_hit.last_alert_fingerprint
+                    )
+                ):
+                    hit.last_alerted_at = previous_alert_hit.last_alerted_at
+                    hit.last_alert_fingerprint = previous_alert_hit.last_alert_fingerprint
+                    hit.save(update_fields=["last_alerted_at", "last_alert_fingerprint"])
                 hits_updated += 1
             return hits_new, hits_updated
 
