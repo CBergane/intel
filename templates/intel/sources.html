@@ -1,91 +1,183 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Sources | BorealSec Intel{% endblock %}
+{% block title %}{{ page_title }} | BorealSec Intel{% endblock %}
 
 {% block content %}
 <section class="space-y-5">
-    <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-        <h1 class="text-xl font-semibold text-white">Sources</h1>
-        <p class="mt-1 text-sm text-slate-400">Operational analytics per source with activity and feed health.</p>
+    <div class="rounded-2xl border border-line bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.13),_transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-4 shadow-glow sm:p-5 xl:p-6">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div class="max-w-3xl">
+                <div class="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-sky-300/80">
+                    <span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1">Browse Layer</span>
+                    <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-slate-300">Section → Source → Recent Items</span>
+                </div>
+                <h1 class="mt-3 text-xl font-semibold text-white sm:text-2xl xl:text-[2rem]">{{ page_title }}</h1>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Structured browsing view for recent intel. Content is grouped by section first, then by source, so it is easy to see what changed and jump into the deeper section/source views.</p>
+            </div>
+            <a href="/" class="shrink-0 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800">Back to Now</a>
+        </div>
     </div>
 
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {% for card in source_cards %}
-            <article class="min-w-0 overflow-hidden rounded-2xl border border-line bg-panel/80 p-4 shadow-glow">
-                <div class="flex items-start justify-between gap-3">
-                    <h2 class="min-w-0 break-words text-lg font-medium text-white">{{ card.source.name }}</h2>
-                    {% if card.status == "OK" %}
-                        <span class="shrink-0 rounded bg-emerald-500/20 px-2 py-1 text-xs font-medium text-emerald-300">OK</span>
-                    {% elif card.status == "Degraded" %}
-                        <span class="shrink-0 rounded bg-amber-500/20 px-2 py-1 text-xs font-medium text-amber-300">Degraded</span>
-                    {% elif card.status == "Down" %}
-                        <span class="shrink-0 rounded bg-rose-500/20 px-2 py-1 text-xs font-medium text-rose-300">Down</span>
-                    {% else %}
-                        <span class="shrink-0 rounded bg-slate-700 px-2 py-1 text-xs font-medium text-slate-200">Never</span>
-                    {% endif %}
+    <div class="grid gap-3 sm:grid-cols-3">
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Sections</p>
+            <p class="mt-3 text-3xl font-semibold text-white">{{ section_count }}</p>
+            <p class="mt-2 text-xs text-slate-400">Sections with browseable source coverage.</p>
+        </div>
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Active Source Lanes</p>
+            <p class="mt-3 text-3xl font-semibold text-sky-200">{{ active_sources_7d_count }}</p>
+            <p class="mt-2 text-xs text-slate-400">Section/source combinations with activity in the last 7 days.</p>
+        </div>
+        <div class="rounded-2xl border border-line bg-panel/75 p-4 shadow-glow">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Recent Updates</p>
+            <p class="mt-3 text-3xl font-semibold text-emerald-200">{{ items_7d_count }}</p>
+            <p class="mt-2 text-xs text-slate-400">Items seen across all browse sections in the last 7 days.</p>
+        </div>
+    </div>
+
+    <div class="space-y-5">
+        {% for section in section_groups %}
+            <article class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-3">
+                            {% if section.key == "active" %}
+                                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-200">
+                                    <svg viewBox="0 0 20 20" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                        <path d="M10 2v4m0 8v4M2 10h4m8 0h4M5 5l2.5 2.5m5 5L15 15m0-10-2.5 2.5m-5 5L5 15" stroke-linecap="round" />
+                                        <circle cx="10" cy="10" r="2.5" />
+                                    </svg>
+                                </span>
+                            {% elif section.key == "research" %}
+                                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-200">
+                                    <svg viewBox="0 0 20 20" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                        <path d="M6 3h8M8 3v4l-4.5 6.8A2 2 0 0 0 5.2 17h9.6a2 2 0 0 0 1.7-3.2L12 7V3" stroke-linecap="round" stroke-linejoin="round" />
+                                        <path d="M7 12h6" stroke-linecap="round" />
+                                    </svg>
+                                </span>
+                            {% elif section.key == "sweden" %}
+                                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
+                                    <svg viewBox="0 0 20 20" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                        <path d="M10 17s5-4.1 5-8.2A5 5 0 1 0 5 8.8C5 12.9 10 17 10 17Z" stroke-linejoin="round" />
+                                        <circle cx="10" cy="8" r="1.8" />
+                                    </svg>
+                                </span>
+                            {% else %}
+                                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-sky-500/25 bg-sky-500/10 text-sky-200">
+                                    <svg viewBox="0 0 20 20" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                        <path d="M10 2l6 2.5v4.5c0 4.2-2.4 6.7-6 9-3.6-2.3-6-4.8-6-9V4.5L10 2Z" stroke-linejoin="round" />
+                                        <path d="M7.5 10.2 9.2 12 12.8 8.4" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </span>
+                            {% endif %}
+                            <div class="min-w-0">
+                                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">{{ section.label }}</p>
+                                <h2 class="mt-1 text-lg font-semibold text-white">{{ section.title }}</h2>
+                            </div>
+                        </div>
+                        <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+                            {% if section.key == "active" %}
+                                Active exploitation and clearly urgent threat activity, grouped by the sources driving it.
+                            {% elif section.key == "research" %}
+                                Technical writeups and deeper analysis, organized by the labs and vendors publishing them.
+                            {% elif section.key == "sweden" %}
+                                Sweden and Nordics-focused reporting with recent source activity kept visible even when geography is niche.
+                            {% else %}
+                                Vendor and platform advisories, organized by source with recent changes surfaced first.
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        <span class="rounded-full border border-line/80 bg-slate-900/70 px-3 py-1.5 text-slate-300">{{ section.source_count }} sources</span>
+                        <span class="rounded-full border border-line/80 bg-slate-900/70 px-3 py-1.5 text-slate-300">{{ section.new_24h }} new / 24h</span>
+                        <span class="rounded-full border border-line/80 bg-slate-900/70 px-3 py-1.5 text-slate-300">{{ section.new_7d }} new / 7d</span>
+                        <a href="{{ section.section_url }}" class="rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1.5 text-sky-100 transition hover:border-sky-400/40 hover:text-white">Open {{ section.label }}</a>
+                    </div>
                 </div>
 
-                <div class="mt-3 grid grid-cols-3 gap-2 text-sm">
-                    <div class="rounded-lg border border-line bg-slate-900/60 p-2">
-                        <p class="text-[11px] uppercase tracking-wide text-slate-400">New 24h</p>
-                        <p class="mt-1 text-lg font-semibold text-white">{{ card.new_24h }}</p>
-                    </div>
-                    <div class="rounded-lg border border-line bg-slate-900/60 p-2">
-                        <p class="text-[11px] uppercase tracking-wide text-slate-400">New 7d</p>
-                        <p class="mt-1 text-lg font-semibold text-white">{{ card.new_7d }}</p>
-                    </div>
-                    <div class="rounded-lg border border-line bg-slate-900/60 p-2">
-                        <p class="text-[11px] uppercase tracking-wide text-slate-400">Total</p>
-                        <p class="mt-1 text-lg font-semibold text-white">{{ card.item_count }}</p>
-                    </div>
-                </div>
+                <div class="mt-5 grid gap-4 xl:grid-cols-2">
+                    {% for source_row in section.sources %}
+                        <article class="rounded-2xl border border-line/80 bg-slate-950/35 p-4">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="min-w-0">
+                                    <h3 class="min-w-0 break-words text-base font-medium text-white">{{ source_row.source.name }}</h3>
+                                    <div class="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-400">
+                                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1">{{ source_row.new_7d }} in 7d</span>
+                                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1">{{ source_row.new_24h }} in 24h</span>
+                                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1">{{ source_row.item_count }} total</span>
+                                        <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1">{{ source_row.feeds_total }} feeds</span>
+                                    </div>
+                                </div>
+                                {% if source_row.status == "OK" %}
+                                    <span class="shrink-0 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">OK</span>
+                                {% elif source_row.status == "Degraded" %}
+                                    <span class="shrink-0 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-300">Degraded</span>
+                                {% elif source_row.status == "Down" %}
+                                    <span class="shrink-0 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-[11px] font-medium text-rose-300">Down</span>
+                                {% else %}
+                                    <span class="shrink-0 rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] font-medium text-slate-300">Never</span>
+                                {% endif %}
+                            </div>
 
-                <div class="mt-3 rounded-lg border border-line bg-slate-900/40 p-3 text-xs text-slate-300">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <span>Last item:</span>
-                        {% if card.last_item_at %}
-                            <span class="text-slate-100" title="{{ card.last_item_at|date:'Y-m-d H:i' }} UTC">{{ card.last_item_at|naturaltime }}</span>
-                        {% else %}
-                            <span class="text-slate-400">No items yet</span>
-                        {% endif %}
-                    </div>
-                    <div class="mt-2 flex flex-wrap items-center gap-2 text-slate-300">
-                        <span>Feeds: {{ card.feeds_total }}</span>
-                        <span class="rounded bg-emerald-500/15 px-2 py-0.5 text-emerald-300">ok {{ card.feeds_ok }}</span>
-                        <span class="rounded bg-rose-500/15 px-2 py-0.5 text-rose-300">err {{ card.feeds_error }}</span>
-                        <span class="rounded bg-slate-700 px-2 py-0.5 text-slate-200">never {{ card.feeds_never }}</span>
-                    </div>
-                </div>
+                            <div class="mt-3 rounded-xl border border-line/80 bg-slate-900/45 p-3 text-xs text-slate-300">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <span>Latest change</span>
+                                    {% if source_row.last_item_at %}
+                                        <span class="text-slate-100" title="{{ source_row.last_item_at|date:'Y-m-d H:i' }} UTC">{{ source_row.last_item_at|naturaltime }}</span>
+                                    {% else %}
+                                        <span class="text-slate-400">No items yet</span>
+                                    {% endif %}
+                                </div>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    <span class="rounded-md bg-emerald-500/15 px-2 py-0.5 text-emerald-300">ok {{ source_row.feeds_ok }}</span>
+                                    <span class="rounded-md bg-rose-500/15 px-2 py-0.5 text-rose-300">err {{ source_row.feeds_error }}</span>
+                                    <span class="rounded-md bg-slate-800 px-2 py-0.5 text-slate-200">never {{ source_row.feeds_never }}</span>
+                                </div>
+                            </div>
 
-                <div class="mt-3 h-1 w-full rounded bg-gradient-to-r from-sky-500/40 via-cyan-300/20 to-transparent"></div>
+                            <div class="mt-4">
+                                <div class="mb-2 flex items-center justify-between gap-3">
+                                    <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Recent Items</p>
+                                    <span class="text-[11px] text-slate-500">Last 30 days</span>
+                                </div>
+                                <div class="space-y-2.5">
+                                    {% for item in source_row.recent_items %}
+                                        <article class="rounded-xl border border-line/70 bg-slate-950/55 p-3">
+                                            <div class="flex items-start justify-between gap-3">
+                                                <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="min-w-0 flex-1 text-sm font-medium text-white transition hover:text-sky-200">
+                                                    <span class="block overflow-hidden break-words [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{{ item.title }}</span>
+                                                </a>
+                                                <time class="shrink-0 text-[11px] text-slate-500" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">{{ item.activity_at|naturaltime }}</time>
+                                            </div>
+                                            <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                                                <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-slate-300">{{ item.feed.name|truncatechars:30 }}</span>
+                                                {% for cve in item.cves|slice:":2" %}
+                                                    <a href="/advisories?q={{ cve|urlencode }}" class="rounded-md border border-sky-500/30 bg-sky-500/15 px-2 py-1 text-sky-200 hover:bg-sky-500/25">{{ cve }}</a>
+                                                {% endfor %}
+                                            </div>
+                                        </article>
+                                    {% empty %}
+                                        <p class="rounded-xl border border-line/70 bg-slate-950/45 p-3 text-sm text-slate-400">No recent items in the last 30 days for this source and section.</p>
+                                    {% endfor %}
+                                </div>
+                            </div>
 
-                {% if card.source.tags %}
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        {% for tag in card.source.tags %}
-                            <span class="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">{{ tag }}</span>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <a href="{{ card.open_url }}" class="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-slate-950 hover:bg-sky-400">Open</a>
-                    {% if card.source.homepage %}
-                        <a
-                            class="min-w-0 max-w-full flex-1 rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-accent hover:text-accent2"
-                            href="{{ card.source.homepage }}"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="{{ card.source.homepage }}"
-                        >
-                            <span class="block max-w-full truncate overflow-hidden">Homepage: {{ card.source.homepage }}</span>
-                        </a>
-                    {% endif %}
+                            <div class="mt-4 flex flex-wrap items-center gap-2">
+                                <a href="{{ source_row.open_url }}" class="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-medium text-slate-950 transition hover:bg-sky-400">Browse source</a>
+                                <a href="{{ source_row.section_url }}" class="rounded-lg border border-line/80 bg-slate-900/70 px-3 py-1.5 text-xs text-slate-200 transition hover:border-slate-500 hover:text-white">Open {{ source_row.section_label }}</a>
+                                {% if source_row.source.homepage %}
+                                    <a href="{{ source_row.source.homepage }}" target="_blank" rel="noopener noreferrer" class="min-w-0 max-w-full flex-1 truncate rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-accent transition hover:text-accent2" title="{{ source_row.source.homepage }}">Homepage: {{ source_row.source.homepage }}</a>
+                                {% endif %}
+                            </div>
+                        </article>
+                    {% endfor %}
                 </div>
             </article>
         {% empty %}
-            <div class="rounded-2xl border border-line bg-panel/80 p-8 text-center text-slate-400 md:col-span-2 xl:col-span-3">
-                No sources configured yet.
+            <div class="rounded-2xl border border-line bg-panel/80 p-8 text-center text-slate-400">
+                No section/source browse coverage is available yet.
             </div>
         {% endfor %}
     </div>

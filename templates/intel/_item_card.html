@@ -6,6 +6,11 @@
                 {{ item.source.name }}
             </span>
             <span class="rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
+            {% if item.signal_label %}
+                <span class="rounded-md px-2 py-1 {% if item.signal_tone == 'amber' %}border border-amber-500/30 bg-amber-500/10 text-amber-200{% elif item.signal_tone == 'rose' %}border border-rose-500/30 bg-rose-500/10 text-rose-200{% else %}border border-sky-500/30 bg-sky-500/15 text-sky-200{% endif %}">
+                    {{ item.signal_label }}
+                </span>
+            {% endif %}
             {% if compact and item.cves %}
                 <span class="rounded-md border border-sky-500/40 bg-sky-500/15 px-2 py-1 text-sky-200">
                     {{ item.cves|length }} CVE{% if item.cves|length != 1 %}s{% endif %}

@@ -10,15 +10,15 @@
             <div class="min-w-0">
                 <h1 class="text-sm font-semibold text-white">Now</h1>
                 <p class="mt-0.5 text-[11px] leading-5 text-slate-400">
-                    High-signal cyber intel from the last 7 days.
+                    Curated serious threats and urgent security activity from the last 7 days.
                 </p>
             </div>
 
             <a
-                href="/advisories"
+                href="/sources"
                 class="shrink-0 rounded-md border border-slate-700/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-200 transition hover:bg-slate-800"
             >
-                All advisories
+                Browse Intel
             </a>
         </div>
 
@@ -49,10 +49,10 @@
                     <div class="min-w-0">
                         <h1 class="text-xl font-semibold text-white lg:text-2xl xl:text-[1.85rem]">Now</h1>
                         <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300 lg:text-[15px]">
-                            Curated high-signal view. High Signal uses a 7-day window and section blocks are balanced by source.
+                            Curated operational view. The front page now favors active exploitation, ransomware activity, critical CVE-driven items, and clearly urgent security impact while routine release notes are down-ranked into the browse layer.
                         </p>
                     </div>
-                    <a href="/advisories" class="shrink-0 rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-slate-800">Browse list</a>
+                    <a href="/sources" class="shrink-0 rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-200 transition hover:bg-slate-800">Browse by section</a>
                 </div>
             </div>
 
@@ -91,7 +91,17 @@
         <div id="high-signal" class="space-y-3 rounded-xl border border-line bg-panel/80 p-3 shadow-glow lg:col-span-8 sm:space-y-4 sm:p-4 xl:col-span-9 xl:rounded-2xl xl:p-6">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="space-y-1">
-                    <h2 class="text-sm font-semibold text-white sm:text-base xl:text-lg">High Signal (Last 7 days)</h2>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-200">
+                            <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                <path d="M10 2v4m0 8v4M2 10h4m8 0h4M5 5l2.5 2.5m5 5L15 15m0-10-2.5 2.5m-5 5L5 15" stroke-linecap="round" />
+                                <circle cx="10" cy="10" r="2.5" />
+                            </svg>
+                        </span>
+                        <h2 class="text-sm font-semibold text-white sm:text-base xl:text-lg">High Signal (Last 7 days)</h2>
+                        <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ high_signal_items|length }} curated</span>
+                    </div>
+                    <p class="text-xs leading-5 text-slate-400">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel. Routine release and maintenance notices are de-emphasized.</p>
                     <div class="flex flex-wrap gap-1.5 text-[11px] sm:hidden">
                         <a href="#advisories-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Advisories</a>
                         <a href="#research-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Research</a>
@@ -99,13 +109,16 @@
                         <a href="#trending-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Trending</a>
                     </div>
                 </div>
-                <a href="/active" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">View active page</a>
+                <div class="flex items-center gap-3">
+                    <a href="/sources" class="text-xs font-medium text-slate-300 hover:text-white sm:text-sm">Browse layer</a>
+                    <a href="/active" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">View active page</a>
+                </div>
             </div>
             <div class="space-y-2.5 sm:space-y-3">
                 {% for item in high_signal_items %}
                     {% include "intel/_item_card.html" with compact=False %}
                 {% empty %}
-                    <p class="text-sm text-slate-400">No high-signal items yet.</p>
+                    <p class="text-sm text-slate-400">No urgent high-signal items cleared the curated threshold yet. Use the section browse layer for the full recent intake.</p>
                 {% endfor %}
             </div>
         </div>
@@ -177,7 +190,15 @@
     <div class="grid gap-4 lg:grid-cols-12 lg:gap-5 xl:gap-6">
         <div id="advisories-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4 lg:col-span-7 xl:col-span-5 xl:p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h2 class="text-sm font-semibold text-white sm:text-base">Advisories</h2>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10 text-sky-200">
+                        <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                            <path d="M10 2l6 2.5v4.5c0 4.2-2.4 6.7-6 9-3.6-2.3-6-4.8-6-9V4.5L10 2Z" stroke-linejoin="round" />
+                            <path d="M7.5 10.2 9.2 12 12.8 8.4" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </span>
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Advisories</h2>
+                </div>
                 <a href="/advisories" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All advisories</a>
             </div>
             {% for item in advisories_items %}
@@ -189,7 +210,15 @@
 
         <div id="research-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4 lg:col-span-5 xl:col-span-4 xl:p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h2 class="text-sm font-semibold text-white sm:text-base">Research</h2>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-500/25 bg-cyan-500/10 text-cyan-200">
+                        <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                            <path d="M6 3h8M8 3v4l-4.5 6.8A2 2 0 0 0 5.2 17h9.6a2 2 0 0 0 1.7-3.2L12 7V3" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M7 12h6" stroke-linecap="round" />
+                        </svg>
+                    </span>
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Research</h2>
+                </div>
                 <a href="/research" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All research</a>
             </div>
             {% for item in research_items %}
@@ -201,7 +230,15 @@
 
         <div id="sweden-block" class="min-w-0 space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4 lg:col-span-12 xl:col-span-3 xl:p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h2 class="text-sm font-semibold text-white sm:text-base">Sweden</h2>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
+                        <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                            <path d="M10 17s5-4.1 5-8.2A5 5 0 1 0 5 8.8C5 12.9 10 17 10 17Z" stroke-linejoin="round" />
+                            <circle cx="10" cy="8" r="1.8" />
+                        </svg>
+                    </span>
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Sweden</h2>
+                </div>
                 <a href="/sweden" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All Sweden items</a>
             </div>
             {% for item in sweden_items %}

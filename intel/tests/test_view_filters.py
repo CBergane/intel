@@ -75,3 +75,71 @@ class ItemListFilterBehaviorTests(TestCase):
         self.assertContains(response, "Plain bulletin")
         self.assertNotContains(response, "Alpha advisory")
         self.assertEqual(response.context["filtered_total"], 1)
+
+    def test_source_facets_follow_current_section_and_time_window(self):
+        self._create_item(title="Fresh advisory", days_ago=1)
+        self._create_item(title="Old advisory", days_ago=20)
+
+        research_source = Source.objects.create(name="Research Source", slug="research-source")
+        research_feed = Feed.objects.create(
+            source=research_source,
+            name="Research Feed",
+            url="https://example.com/research-feed.xml",
+            feed_type=Feed.FeedType.RSS,
+            section=Feed.Section.RESEARCH,
+        )
+        Item.objects.create(
+            source=research_source,
+            feed=research_feed,
+            title="Research bulletin",
+            url="https://example.com/research-bulletin",
+            stable_id="",
+            published_at=timezone.now() - timedelta(days=1),
+            summary="Research bulletin",
+        )
+
+        response = self.client.get(reverse("advisories"), {"time": "7d"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [(row["slug"], row["count"]) for row in response.context["sources"]],
+            [("filter-source", 1)],
+        )
+        self.assertContains(response, "Filter Source · 1")
+        self.assertNotContains(response, "Research Source")
+
+    def test_selected_source_is_preserved_when_it_has_zero_results(self):
+        self._create_item(title="Current advisory", days_ago=1)
+
+        old_source = Source.objects.create(name="Old Source", slug="old-source")
+        old_feed = Feed.objects.create(
+            source=old_source,
+            name="Old Feed",
+            url="https://example.com/old-feed.xml",
+            feed_type=Feed.FeedType.RSS,
+            section=Feed.Section.ADVISORIES,
+        )
+        Item.objects.create(
+            source=old_source,
+            feed=old_feed,
+            title="Old advisory",
+            url="https://example.com/old-advisory",
+            stable_id="",
+            published_at=timezone.now() - timedelta(days=30),
+            summary="Old advisory",
+        )
+
+        response = self.client.get(
+            reverse("advisories"),
+            {"time": "7d", "source": "old-source"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["filtered_total"], 0)
+        self.assertEqual(response.context["selected_source"], "old-source")
+        self.assertEqual(response.context["selected_source_name"], "Old Source")
+        self.assertIn(
+            ("old-source", 0),
+            [(row["slug"], row["count"]) for row in response.context["sources"]],
+        )
+        self.assertContains(response, "Old Source · 0")

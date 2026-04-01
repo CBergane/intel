@@ -62,6 +62,51 @@ TIME_OPTIONS = [
     ("90d", "Last 90 days"),
 ]
 NOW_MAX_PER_SOURCE = 10
+ITEM_SECTION_ROUTE_ORDER = (
+    (Feed.Section.ADVISORIES, "advisories", "Advisories"),
+    (Feed.Section.ACTIVE, "active", "Active"),
+    (Feed.Section.RESEARCH, "research", "Research"),
+    (Feed.Section.SWEDEN, "sweden", "Sweden"),
+)
+ITEM_SECTION_ROUTE_NAMES = {
+    section: route_name for section, route_name, _label in ITEM_SECTION_ROUTE_ORDER
+}
+ITEM_SECTION_ROUTE_LABELS = {
+    section: label for section, _route_name, label in ITEM_SECTION_ROUTE_ORDER
+}
+DASHBOARD_EXPLOIT_KEYWORDS = (
+    "actively exploited",
+    "exploited in the wild",
+    "in the wild",
+    "zero-day",
+    "0day",
+    "kev",
+    "authentication bypass",
+    "remote code execution",
+    "rce",
+)
+DASHBOARD_RANSOMWARE_KEYWORDS = (
+    "ransomware",
+    "extortion",
+    "leak site",
+    "data leak",
+    "victim listing",
+)
+DASHBOARD_LOW_SIGNAL_TITLE_HINTS = (
+    "release notes",
+    "release note",
+    "maintenance release",
+    "maintenance update",
+    "version ",
+    "version:",
+    "product update",
+    "feature update",
+    "service update",
+    "platform update",
+    "minor update",
+    "release announcement",
+    "now available",
+)
 CVE_RE = re.compile(r"\bCVE-\d{4}-\d+\b", re.IGNORECASE)
 HIGH_SIGNAL_KEYWORDS = (
     "actively exploited",
@@ -212,22 +257,85 @@ def _item_cves(item) -> list[str]:
     return extract_cve_ids(_item_text(item))
 
 
-def score_dashboard_item(item, *, cves=None) -> int:
+def _dashboard_signal_profile(item, *, cves=None, now=None):
     if cves is None:
         cves = _item_cves(item)
+    if now is None:
+        now = timezone.now()
+
+    activity_at = getattr(item, "activity_at", None) or item.published_at or item.created_at or now
+    lowered_text = _item_text(item).lower()
+    lowered_title = (item.title or "").lower()
+
+    has_cves = bool(cves)
+    has_high_signal_keyword = any(keyword in lowered_text for keyword in HIGH_SIGNAL_KEYWORDS)
+    has_exploitation = item.feed.section == Feed.Section.ACTIVE or any(
+        keyword in lowered_text for keyword in DASHBOARD_EXPLOIT_KEYWORDS
+    )
+    has_ransomware = item.feed.adapter_key == "ransomware_live_victims" or any(
+        keyword in lowered_text for keyword in DASHBOARD_RANSOMWARE_KEYWORDS
+    )
+    has_urgent_wording = any(keyword in lowered_text for keyword in ("critical", "urgent", "emergency"))
+    is_low_signal_title = any(hint in lowered_title for hint in DASHBOARD_LOW_SIGNAL_TITLE_HINTS)
 
     score = 0
-    if cves:
+    if has_exploitation:
+        score += 24
+    if has_ransomware:
         score += 20
+    if has_cves:
+        score += 18 + min(len(cves), 3) * 2
+    if has_high_signal_keyword:
+        score += 12
+    if has_urgent_wording:
+        score += 8
 
-    lowered_text = _item_text(item).lower()
-    if any(keyword in lowered_text for keyword in HIGH_SIGNAL_KEYWORDS):
+    if item.feed.section == Feed.Section.ADVISORIES:
+        score += 8
+    elif item.feed.section == Feed.Section.SWEDEN:
+        score += 4
+    elif item.feed.section == Feed.Section.RESEARCH:
+        score += 3
+
+    age_hours = max((now - activity_at).total_seconds() / 3600, 0)
+    if age_hours <= 24:
         score += 10
+    elif age_hours <= 72:
+        score += 6
+    else:
+        score += 3
 
-    if item.feed.section in {Feed.Section.ADVISORIES, Feed.Section.SWEDEN}:
-        score += 5
+    if is_low_signal_title and not (has_cves or has_exploitation or has_ransomware or has_high_signal_keyword):
+        score -= 18
 
-    return score
+    signal_label = ""
+    signal_tone = ""
+    if has_exploitation:
+        signal_label = "Active exploitation"
+        signal_tone = "amber"
+    elif has_ransomware:
+        signal_label = "Ransomware"
+        signal_tone = "rose"
+    elif has_cves and has_urgent_wording:
+        signal_label = "Critical CVE"
+        signal_tone = "sky"
+    elif has_cves:
+        signal_label = "CVE-driven"
+        signal_tone = "sky"
+    elif has_high_signal_keyword or has_urgent_wording:
+        signal_label = "Urgent"
+        signal_tone = "amber"
+
+    return {
+        "score": score,
+        "signal_label": signal_label,
+        "signal_tone": signal_tone,
+        "is_low_signal_title": is_low_signal_title,
+    }
+
+
+def score_dashboard_item(item, *, cves=None) -> int:
+    return _dashboard_signal_profile(item, cves=cves)["score"]
 
 
 def _attach_item_meta(items):
@@ -259,7 +367,14 @@ def build_trending_cves(items, *, limit: int = 10):
     return counts.most_common(limit)
 
 
-def _filtered_items(request, section=None, *, balance_per_source=False):
+def _validated_time_window(raw_value: str) -> str:
+    selected_time = (raw_value or "7d").strip()
+    if selected_time not in TIME_RANGES:
+        selected_time = "7d"
+    return selected_time
+
+
+def _build_item_filter_state(request, *, section=None):
     queryset = Item.objects.select_related("source", "feed").annotate(
         activity_at=Coalesce("published_at", "created_at")
     )
@@ -268,29 +383,73 @@ def _filtered_items(request, section=None, *, balance_per_source=False):
 
     query = (request.GET.get("q") or "").strip()
     source_slug = (request.GET.get("source") or "").strip()
-    selected_time = (request.GET.get("time") or "7d").strip()
-    if selected_time not in TIME_RANGES:
-        selected_time = "7d"
+    selected_time = _validated_time_window(request.GET.get("time"))
 
     since = timezone.now() - TIME_RANGES[selected_time]
     window_queryset = queryset.filter(activity_at__gte=since)
+    source_rows = list(
+        window_queryset.values("source__slug", "source__name")
+        .annotate(item_count=Count("id"))
+        .order_by("source__name")
+    )
+    sources = [
+        {
+            "slug": row["source__slug"],
+            "name": row["source__name"],
+            "count": row["item_count"],
+        }
+        for row in source_rows
+    ]
+    selected_source_name = ""
+    selected_source_row = next((row for row in sources if row["slug"] == source_slug), None)
+    if selected_source_row:
+        selected_source_name = selected_source_row["name"]
+    elif source_slug:
+        selected_source = Source.objects.filter(slug=source_slug).only("name", "slug").first()
+        selected_source_name = selected_source.name if selected_source else source_slug
+        sources.append(
+            {
+                "slug": source_slug,
+                "name": selected_source_name,
+                "count": 0,
+            }
+        )
+        sources.sort(key=lambda row: (row["name"].lower(), row["slug"]))
+
     window_total = window_queryset.count()
 
+    filtered_queryset = window_queryset
     if query:
-        window_queryset = window_queryset.filter(
+        filtered_queryset = filtered_queryset.filter(
             Q(title__icontains=query)
             | Q(summary__icontains=query)
             | Q(source__name__icontains=query)
         )
 
     if source_slug:
-        window_queryset = window_queryset.filter(source__slug=source_slug)
-    filtered_total = window_queryset.count()
+        filtered_queryset = filtered_queryset.filter(source__slug=source_slug)
+    filtered_total = filtered_queryset.count()
     hidden_by_filters = max(0, window_total - filtered_total)
 
-    ordered = window_queryset.order_by("-activity_at", "-id")
+    return {
+        "query": query,
+        "selected_source": source_slug,
+        "selected_source_name": selected_source_name,
+        "selected_time": selected_time,
+        "window_total": window_total,
+        "filtered_total": filtered_total,
+        "hidden_by_filters": hidden_by_filters,
+        "sources": sources,
+        "time_options": TIME_OPTIONS,
+        "filtered_queryset": filtered_queryset,
+    }
 
-    if balance_per_source and not source_slug:
+
+def _filtered_items(request, section=None, *, balance_per_source=False):
+    filter_state = _build_item_filter_state(request, section=section)
+    ordered = filter_state["filtered_queryset"].order_by("-activity_at", "-id")
+
+    if balance_per_source and not filter_state["selected_source"]:
         source_counts = {}
         balanced_items = []
         for item in ordered:
@@ -306,17 +465,27 @@ def _filtered_items(request, section=None, *, balance_per_source=False):
     page_obj.object_list = _attach_item_meta(list(page_obj.object_list))
 
     return {
+        **{key: value for key, value in filter_state.items() if key != "filtered_queryset"},
         "page_obj": page_obj,
-        "query": query,
-        "selected_source": source_slug,
-        "selected_time": selected_time,
-        "window_total": window_total,
-        "filtered_total": filtered_total,
-        "hidden_by_filters": hidden_by_filters,
-        "balance_applied": balance_per_source and not source_slug,
-        "sources": Source.objects.filter(enabled=True).order_by("name"),
-        "time_options": TIME_OPTIONS,
+        "balance_applied": balance_per_source and not filter_state["selected_source"],
     }
+
+
+def _source_destination(section, *, source_slug: str) -> str:
+    route_name = ITEM_SECTION_ROUTE_NAMES.get(section, "advisories")
+    return f"{reverse(route_name)}?{urlencode({'source': source_slug})}"
+
+
+def _source_operational_status(*, feeds_total: int, feeds_error: int, feeds_never: int, total_items: int) -> str:
+    if feeds_total == 0 or (feeds_never == feeds_total and total_items == 0):
+        return "Never"
+    if feeds_error == 0 and feeds_total > 0:
+        return "OK"
+    if 0 < feeds_error < feeds_total:
+        return "Degraded"
+    if feeds_error == feeds_total and feeds_total > 0:
+        return "Down"
+    return "Degraded"
 
 
 def _render_items_page(request, *, title, nav_key, section=None):
@@ -349,12 +518,16 @@ def now_view(request):
     for item in high_candidates:
         item.cves = _item_cves(item)
         item.activity_at = item.activity_at or item.published_at or item.created_at
-        item.dashboard_score = score_dashboard_item(item, cves=item.cves)
+        signal_profile = _dashboard_signal_profile(item, cves=item.cves, now=now)
+        item.dashboard_score = signal_profile["score"]
+        item.signal_label = signal_profile["signal_label"]
+        item.signal_tone = signal_profile["signal_tone"]
+        item.is_low_signal_title = signal_profile["is_low_signal_title"]
     high_candidates.sort(
         key=lambda item: (item.dashboard_score, item.activity_at, item.id),
         reverse=True,
     )
-    high_signal_items = high_candidates[:15]
+    high_signal_items = [item for item in high_candidates if item.dashboard_score >= 20][:15]
 
     advisories_items = _balanced_items(
         ordered_by_activity.filter(feed__section=Feed.Section.ADVISORIES),
@@ -510,13 +683,16 @@ def sources_view(request):
     now = timezone.now()
     since_24h = now - timedelta(hours=24)
     since_7d = now - timedelta(days=7)
+    since_30d = now - timedelta(days=30)
 
-    sources = list(Source.objects.order_by("name"))
+    sources = {source.id: source for source in Source.objects.order_by("name")}
+    item_base = Item.objects.select_related("source", "feed").annotate(
+        activity_at=Coalesce("published_at", "created_at")
+    )
 
-    item_stats_by_source = {}
+    item_stats_by_key = {}
     for row in (
-        Item.objects.annotate(activity_at=Coalesce("published_at", "created_at"))
-        .values("source_id")
+        item_base.values("source_id", "feed__section")
         .annotate(
             item_count=Count("id"),
             new_24h=Count("id", filter=Q(activity_at__gte=since_24h)),
@@ -524,12 +700,22 @@ def sources_view(request):
             last_item_at=Max("activity_at"),
         )
     ):
-        item_stats_by_source[row["source_id"]] = row
+        item_stats_by_key[(row["source_id"], row["feed__section"])] = row
+
+    recent_items_by_key = {}
+    recent_items = _attach_item_meta(
+        list(item_base.filter(activity_at__gte=since_30d).order_by("-activity_at", "-id"))
+    )
+    for item in recent_items:
+        key = (item.source_id, item.feed.section)
+        bucket = recent_items_by_key.setdefault(key, [])
+        if len(bucket) < 3:
+            bucket.append(item)
 
     enabled_feeds = list(
         Feed.objects.filter(enabled=True)
         .select_related("source")
-        .only("id", "source_id", "last_error")
+        .only("id", "source_id", "section", "name", "last_error")
     )
     latest_run_by_feed = {}
     enabled_feed_ids = [feed.id for feed in enabled_feeds]
@@ -542,64 +728,108 @@ def sources_view(request):
             if run.feed_id not in latest_run_by_feed:
                 latest_run_by_feed[run.feed_id] = run
 
-    feed_health_by_source = {}
+    feed_health_by_key = {}
     for feed in enabled_feeds:
-        source_health = feed_health_by_source.setdefault(
-            feed.source_id,
+        key = (feed.source_id, feed.section)
+        section_health = feed_health_by_key.setdefault(
+            key,
             {"feeds_total": 0, "feeds_ok": 0, "feeds_error": 0, "feeds_never": 0},
         )
-        source_health["feeds_total"] += 1
+        section_health["feeds_total"] += 1
 
         latest_run = latest_run_by_feed.get(feed.id)
         if latest_run is None:
-            source_health["feeds_never"] += 1
+            section_health["feeds_never"] += 1
         elif latest_run.ok:
-            source_health["feeds_ok"] += 1
+            section_health["feeds_ok"] += 1
         elif (latest_run.error or "").strip() or (feed.last_error or "").strip():
-            source_health["feeds_error"] += 1
+            section_health["feeds_error"] += 1
         else:
-            source_health["feeds_error"] += 1
+            section_health["feeds_error"] += 1
 
-    source_cards = []
-    for source in sources:
-        item_stats = item_stats_by_source.get(
-            source.id,
-            {"item_count": 0, "new_24h": 0, "new_7d": 0, "last_item_at": None},
+    section_source_ids = {section: set() for section, _route_name, _label in ITEM_SECTION_ROUTE_ORDER}
+    for source_id, section in item_stats_by_key:
+        section_source_ids.setdefault(section, set()).add(source_id)
+    for source_id, section in feed_health_by_key:
+        section_source_ids.setdefault(section, set()).add(source_id)
+
+    dormant_sort_floor = now - timedelta(days=36500)
+    section_groups = []
+    active_sources_7d = set()
+    total_items_7d = 0
+
+    for section, route_name, label in ITEM_SECTION_ROUTE_ORDER:
+        source_rows = []
+        for source_id in section_source_ids.get(section, set()):
+            source = sources.get(source_id)
+            if source is None:
+                continue
+
+            stats = item_stats_by_key.get(
+                (source_id, section),
+                {"item_count": 0, "new_24h": 0, "new_7d": 0, "last_item_at": None},
+            )
+            feed_health = feed_health_by_key.get(
+                (source_id, section),
+                {"feeds_total": 0, "feeds_ok": 0, "feeds_error": 0, "feeds_never": 0},
+            )
+            status = _source_operational_status(
+                feeds_total=feed_health["feeds_total"],
+                feeds_error=feed_health["feeds_error"],
+                feeds_never=feed_health["feeds_never"],
+                total_items=stats["item_count"],
+            )
+            recent_source_items = recent_items_by_key.get((source_id, section), [])
+            open_url = _source_destination(section, source_slug=source.slug)
+
+            source_rows.append(
+                {
+                    "source": source,
+                    "status": status,
+                    "new_24h": stats["new_24h"],
+                    "new_7d": stats["new_7d"],
+                    "item_count": stats["item_count"],
+                    "last_item_at": stats["last_item_at"],
+                    "feeds_total": feed_health["feeds_total"],
+                    "feeds_ok": feed_health["feeds_ok"],
+                    "feeds_error": feed_health["feeds_error"],
+                    "feeds_never": feed_health["feeds_never"],
+                    "recent_items": recent_source_items,
+                    "open_url": open_url,
+                    "section_url": reverse(route_name),
+                    "section_label": label,
+                }
+            )
+
+            if stats["new_7d"]:
+                active_sources_7d.add((section, source_id))
+            total_items_7d += stats["new_7d"]
+
+        if not source_rows:
+            continue
+
+        source_rows.sort(key=lambda row: row["source"].name.lower())
+        source_rows.sort(
+            key=lambda row: (
+                row["last_item_at"] or dormant_sort_floor,
+                row["new_7d"],
+                row["item_count"],
+            ),
+            reverse=True,
         )
-        feed_health = feed_health_by_source.get(
-            source.id,
-            {"feeds_total": 0, "feeds_ok": 0, "feeds_error": 0, "feeds_never": 0},
-        )
 
-        feeds_total = feed_health["feeds_total"]
-        feeds_error = feed_health["feeds_error"]
-        feeds_never = feed_health["feeds_never"]
-        total_items = item_stats["item_count"]
-
-        if feeds_total == 0 or (feeds_never == feeds_total and total_items == 0):
-            source_status = "Never"
-        elif feeds_error == 0 and feeds_total > 0:
-            source_status = "OK"
-        elif 0 < feeds_error < feeds_total:
-            source_status = "Degraded"
-        elif feeds_error == feeds_total and feeds_total > 0:
-            source_status = "Down"
-        else:
-            source_status = "Degraded"
-
-        source_cards.append(
+        section_groups.append(
             {
-                "source": source,
-                "status": source_status,
-                "new_24h": item_stats["new_24h"],
-                "new_7d": item_stats["new_7d"],
-                "item_count": item_stats["item_count"],
-                "last_item_at": item_stats["last_item_at"],
-                "feeds_total": feed_health["feeds_total"],
-                "feeds_ok": feed_health["feeds_ok"],
-                "feeds_error": feed_health["feeds_error"],
-                "feeds_never": feed_health["feeds_never"],
-                "open_url": f"{reverse('advisories')}?source={source.slug}",
+                "key": section,
+                "title": "Active Exploitation" if section == Feed.Section.ACTIVE else (
+                    "Sweden / Nordics" if section == Feed.Section.SWEDEN else label
+                ),
+                "label": label,
+                "section_url": reverse(route_name),
+                "source_count": len(source_rows),
+                "new_24h": sum(row["new_24h"] for row in source_rows),
+                "new_7d": sum(row["new_7d"] for row in source_rows),
+                "sources": source_rows,
             }
         )
 
@@ -607,9 +837,12 @@ def sources_view(request):
         request,
         "intel/sources.html",
         {
-            "source_cards": source_cards,
+            "section_groups": section_groups,
+            "section_count": len(section_groups),
+            "active_sources_7d_count": len(active_sources_7d),
+            "items_7d_count": total_items_7d,
             "current_page": "sources",
-            "page_title": "Sources",
+            "page_title": "Browse Intel",
         },
     )
 
@@ -1000,12 +1233,12 @@ def _build_ransomware_map_state(*, window: str, selected_group: str = "", reques
     if selected_group:
         group_records = [record for record in group_records if record["group_key"] == selected_group]
 
-    country_rows = _ransomware_country_rows(group_records)
+    scope_country_rows = _ransomware_country_rows(group_records)
     selected_country = ""
     requested_country = (requested_country or "").strip()
     if requested_country:
         requested_country_key = _normalized_country_key(requested_country)
-        for row in country_rows:
+        for row in scope_country_rows:
             if row["country_key"] == requested_country_key:
                 selected_country = row["country"]
                 break
@@ -1020,6 +1253,7 @@ def _build_ransomware_map_state(*, window: str, selected_group: str = "", reques
             record for record in focused_records if record["country_key"] == selected_country_key
         ]
 
+    country_rows = _ransomware_country_rows(focused_records)
     for row in country_rows:
         row["is_selected"] = row["country_key"] == selected_country_key
 
@@ -1032,7 +1266,7 @@ def _build_ransomware_map_state(*, window: str, selected_group: str = "", reques
         window=window,
         selected_group=selected_group,
     )
-    map_empty_state = _ransomware_map_empty_state(group_records, country_rows)
+    map_empty_state = _ransomware_map_empty_state(focused_records, country_rows)
 
     for row in top_groups:
         row["url"] = _ransomware_map_url(
@@ -1066,7 +1300,7 @@ def _build_ransomware_map_state(*, window: str, selected_group: str = "", reques
         "victim_count": len(focused_records),
         "country_count": len(country_rows),
         "group_count": len(_ransomware_group_rows(focused_records)),
-        "countryless_count": max(len(group_records) - sum(row["record_count"] for row in country_rows), 0),
+        "countryless_count": max(len(focused_records) - sum(row["record_count"] for row in country_rows), 0),
     }
 
     return {

@@ -175,7 +175,19 @@ class RansomwareMapViewTests(TestCase):
                 for item in response.context["map_marker_data"]
             )
         )
+        self.assertEqual(response.context["summary"]["victim_count"], 2)
+        self.assertEqual(response.context["summary"]["country_count"], 1)
+        self.assertEqual(response.context["summary"]["group_count"], 2)
+        self.assertEqual(response.context["summary"]["countryless_count"], 0)
+        self.assertEqual(
+            {item["country_key"] for item in response.context["map_marker_data"]},
+            {"sweden"},
+        )
         self.assertTrue(all(record["country"] == "Sweden" for record in response.context["latest_victims"]))
+        self.assertEqual(
+            [row["country"] for row in response.context["top_countries"]],
+            ["Sweden"],
+        )
         self.assertEqual(
             {row["group_name"] for row in response.context["top_groups"]},
             {"Akira", "Qilin"},
@@ -254,11 +266,18 @@ class RansomwareMapViewTests(TestCase):
         self.assertEqual(payload["events"][0]["victim"], "Nordic Mills")
         self.assertEqual(payload["events"][0]["group"], "Akira")
         self.assertEqual(payload["events"][0]["country"], "Sweden")
+        self.assertEqual(payload["snapshot"]["summary"]["victim_count"], 1)
+        self.assertEqual(payload["snapshot"]["summary"]["country_count"], 1)
+        self.assertEqual(payload["snapshot"]["summary"]["group_count"], 1)
         self.assertEqual(
             {row["country"] for row in payload["snapshot"]["top_countries"]},
-            {"Sweden", "Finland"},
+            {"Sweden"},
         )
         self.assertEqual(
             [row["group_name"] for row in payload["snapshot"]["top_groups"]],
             ["Akira"],
+        )
+        self.assertEqual(
+            {row["country_key"] for row in payload["snapshot"]["map_marker_data"]},
+            {"sweden"},
         )

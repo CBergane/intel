@@ -35,7 +35,7 @@
                 <select id="id_source_mobile" name="source" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 focus:border-accent focus:outline-none">
                     <option value="">All sources</option>
                     {% for source in sources %}
-                        <option value="{{ source.slug }}" {% if selected_source == source.slug %}selected{% endif %}>{{ source.name }}</option>
+                        <option value="{{ source.slug }}" {% if selected_source == source.slug %}selected{% endif %}>{{ source.name }} · {{ source.count }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -70,7 +70,7 @@
             <select id="id_source" name="source" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none">
                 <option value="">All sources</option>
                 {% for source in sources %}
-                    <option value="{{ source.slug }}" {% if selected_source == source.slug %}selected{% endif %}>{{ source.name }}</option>
+                    <option value="{{ source.slug }}" {% if selected_source == source.slug %}selected{% endif %}>{{ source.name }} · {{ source.count }}</option>
                 {% endfor %}
             </select>
         </div>
@@ -98,7 +98,7 @@
                 <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">q: {{ query }}</span>
             {% endif %}
             {% if selected_source %}
-                <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">source: {{ selected_source }}</span>
+                <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">source: {{ selected_source_name|default:selected_source }}</span>
             {% endif %}
             <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">time: {{ selected_time }}</span>
         </div>

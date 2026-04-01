@@ -95,14 +95,14 @@ class DashboardViewTests(TestCase):
         self.assertEqual(counts["alpha"], 8)
         self.assertEqual(counts["beta"], 5)
 
-    def test_high_signal_scoring_prefers_cve_and_keyword_items(self):
+    def test_high_signal_scoring_prefers_urgent_items_and_drops_routine_release_titles(self):
         feed = self._create_feed(
             source_name="Research Source",
             source_slug="research-source",
             section=Feed.Section.RESEARCH,
         )
 
-        plain_title = "Routine update"
+        plain_title = "Platform maintenance release notes"
         keyword_title = "Exploit analysis"
         cve_title = "Patch for CVE-2026-5555"
 
@@ -116,8 +116,11 @@ class DashboardViewTests(TestCase):
         self._create_item(feed=feed, title=cve_title, summary="details", age_hours=2)
 
         response = self.client.get("/")
-        top_titles = [item.title for item in response.context["high_signal_items"][:3]]
+        top_titles = [item.title for item in response.context["high_signal_items"]]
+        top_labels = {item.title: getattr(item, "signal_label", "") for item in response.context["high_signal_items"]}
 
-        self.assertEqual(top_titles[0], cve_title)
-        self.assertEqual(top_titles[1], keyword_title)
-        self.assertEqual(top_titles[2], plain_title)
+        self.assertEqual(top_titles[0], keyword_title)
+        self.assertIn(cve_title, top_titles)
+        self.assertNotIn(plain_title, top_titles)
+        self.assertEqual(top_labels[keyword_title], "Active exploitation")
+        self.assertEqual(top_labels[cve_title], "CVE-driven")

@@ -95,27 +95,40 @@ class SourcesAnalyticsViewTests(TestCase):
             published_at=now - timedelta(days=12),
         )
 
-    def test_sources_page_renders_analytics_cards(self):
+    def test_sources_page_groups_sources_by_section_with_recent_items(self):
         response = self.client.get(reverse("sources"))
         self.assertEqual(response.status_code, 200)
 
-        cards = {card["source"].slug: card for card in response.context["source_cards"]}
-        alpha = cards["alpha-source"]
-        beta = cards["beta-source"]
+        section_groups = {group["key"]: group for group in response.context["section_groups"]}
+        advisories = section_groups["advisories"]
+        research = section_groups["research"]
+        alpha = next(row for row in advisories["sources"] if row["source"].slug == "alpha-source")
+        beta = next(row for row in research["sources"] if row["source"].slug == "beta-source")
 
+        self.assertEqual(response.context["page_title"], "Browse Intel")
+        self.assertEqual(response.context["section_count"], 2)
+        self.assertEqual(response.context["active_sources_7d_count"], 1)
+        self.assertEqual(response.context["items_7d_count"], 2)
+
+        self.assertEqual(advisories["source_count"], 1)
+        self.assertEqual(advisories["new_24h"], 1)
+        self.assertEqual(advisories["new_7d"], 2)
         self.assertEqual(alpha["new_24h"], 1)
         self.assertEqual(alpha["new_7d"], 2)
         self.assertEqual(alpha["item_count"], 3)
-        self.assertEqual(alpha["status"], "Degraded")
+        self.assertEqual(alpha["status"], "OK")
+        self.assertEqual(alpha["recent_items"][0].title, "Alpha fresh")
+        self.assertEqual(alpha["open_url"], reverse("advisories") + "?source=alpha-source")
 
+        self.assertEqual(research["source_count"], 2)
         self.assertEqual(beta["new_24h"], 0)
         self.assertEqual(beta["new_7d"], 0)
         self.assertEqual(beta["item_count"], 0)
         self.assertEqual(beta["status"], "Never")
+        self.assertEqual(beta["recent_items"], [])
+        self.assertEqual(beta["open_url"], reverse("research") + "?source=beta-source")
 
-        self.assertContains(response, "Degraded")
-        self.assertContains(response, "Never")
-        self.assertContains(response, "New 24h")
-        self.assertContains(response, "New 7d")
-        self.assertContains(response, "Total")
-        self.assertContains(response, "truncate overflow-hidden")
+        self.assertContains(response, "Section → Source → Recent Items")
+        self.assertContains(response, "Browse source")
+        self.assertContains(response, "Open Research")
+        self.assertContains(response, "No recent items in the last 30 days for this source and section.")
