@@ -2,9 +2,9 @@
 <article class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 xl:p-5">
     <div class="flex min-w-0 items-start justify-between gap-2">
         <div class="min-w-0 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px] md:text-xs">
-            <span class="max-w-[10.5rem] truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300 sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]">
+            <a href="{{ item.source_browse_url }}" class="max-w-[10.5rem] truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300 transition hover:border-sky-400/30 hover:text-white sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]">
                 {{ item.source.name }}
-            </span>
+            </a>
             <span class="rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
             {% if item.signal_label %}
                 <span class="rounded-md px-2 py-1 {% if item.signal_tone == 'amber' %}border border-amber-500/30 bg-amber-500/10 text-amber-200{% elif item.signal_tone == 'rose' %}border border-rose-500/30 bg-rose-500/10 text-rose-200{% else %}border border-sky-500/30 bg-sky-500/15 text-sky-200{% endif %}">

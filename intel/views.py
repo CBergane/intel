@@ -342,6 +342,10 @@ def _attach_item_meta(items):
     for item in items:
         item.cves = _item_cves(item)
         item.activity_at = getattr(item, "activity_at", None) or item.published_at or item.created_at
+        item.source_browse_url = _source_destination(
+            getattr(item.feed, "section", Feed.Section.ADVISORIES),
+            source_slug=item.source.slug,
+        )
     return items
 
 
@@ -476,6 +480,43 @@ def _source_destination(section, *, source_slug: str) -> str:
     return f"{reverse(route_name)}?{urlencode({'source': source_slug})}"
 
 
+def _source_browse_overview_url() -> str:
+    return reverse("sources")
+
+
+def _preferred_source_section_from_rows(section_rows):
+    if not section_rows:
+        return None
+
+    section_priority = {section: index for index, (section, _route_name, _label) in enumerate(ITEM_SECTION_ROUTE_ORDER)}
+    dormant_sort_floor = timezone.now() - timedelta(days=36500)
+    ordered_rows = sorted(
+        section_rows,
+        key=lambda row: (
+            row["last_item_at"] or dormant_sort_floor,
+            row["item_count"],
+            -section_priority.get(row["section"], 99),
+        ),
+        reverse=True,
+    )
+    best_row = ordered_rows[0]
+    if len(ordered_rows) > 1:
+        second_row = ordered_rows[1]
+        if (
+            best_row["last_item_at"] == second_row["last_item_at"]
+            and best_row["item_count"] == second_row["item_count"]
+        ):
+            return None
+    return best_row["section"]
+
+
+def _aggregate_source_destination(section_rows, *, source_slug: str) -> str:
+    preferred_section = _preferred_source_section_from_rows(section_rows)
+    if preferred_section is None:
+        return _source_browse_overview_url()
+    return _source_destination(preferred_section, source_slug=source_slug)
+
+
 def _source_operational_status(*, feeds_total: int, feeds_error: int, feeds_never: int, total_items: int) -> str:
     if feeds_total == 0 or (feeds_never == feeds_total and total_items == 0):
         return "Never"
@@ -518,6 +559,7 @@ def now_view(request):
     for item in high_candidates:
         item.cves = _item_cves(item)
         item.activity_at = item.activity_at or item.published_at or item.created_at
+        item.source_browse_url = _source_destination(item.feed.section, source_slug=item.source.slug)
         signal_profile = _dashboard_signal_profile(item, cves=item.cves, now=now)
         item.dashboard_score = signal_profile["score"]
         item.signal_label = signal_profile["signal_label"]
@@ -556,13 +598,32 @@ def now_view(request):
         )
     )
 
+    trending_source_rows = list(
+        item_base.filter(activity_at__gte=now - timedelta(hours=48))
+        .values("source__name", "source__slug", "feed__section")
+        .annotate(item_count=Count("id"), last_item_at=Max("activity_at"))
+    )
+    trending_sections_by_source = {}
+    for row in trending_source_rows:
+        source_slug = row["source__slug"]
+        trending_sections_by_source.setdefault(source_slug, []).append(
+            {
+                "section": row["feed__section"],
+                "item_count": row["item_count"],
+                "last_item_at": row["last_item_at"],
+            }
+        )
     trending_sources = list(
-        Item.objects.annotate(activity_at=Coalesce("published_at", "created_at"))
-        .filter(activity_at__gte=now - timedelta(hours=48))
+        item_base.filter(activity_at__gte=now - timedelta(hours=48))
         .values("source__name", "source__slug")
         .annotate(item_count=Count("id"))
         .order_by("-item_count", "source__name")[:8]
     )
+    for row in trending_sources:
+        row["open_url"] = _aggregate_source_destination(
+            trending_sections_by_source.get(row["source__slug"], []),
+            source_slug=row["source__slug"],
+        )
     trending_cves = build_trending_cves(
         list(ordered_by_activity.filter(activity_at__gte=now - timedelta(days=7))[:400]),
         limit=10,

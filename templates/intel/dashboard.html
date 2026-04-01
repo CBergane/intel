@@ -162,7 +162,7 @@
                 <ul class="space-y-2 text-sm text-slate-300">
                     {% for row in trending_sources %}
                         <li class="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
-                            <a href="/advisories?source={{ row.source__slug|urlencode }}" class="min-w-0 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
+                            <a href="{{ row.open_url }}" class="min-w-0 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
                             <span class="rounded bg-slate-800 px-2 py-0.5 text-xs">{{ row.item_count }}</span>
                         </li>
                     {% empty %}

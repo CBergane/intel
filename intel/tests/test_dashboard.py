@@ -2,6 +2,7 @@ from collections import Counter
 from datetime import timedelta
 
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from intel.models import Feed, Item, Source
@@ -124,3 +125,73 @@ class DashboardViewTests(TestCase):
         self.assertNotIn(plain_title, top_titles)
         self.assertEqual(top_labels[keyword_title], "Active exploitation")
         self.assertEqual(top_labels[cve_title], "CVE-driven")
+
+    def test_high_signal_item_source_links_use_item_section(self):
+        feed = self._create_feed(
+            source_name="Bleeping Computer",
+            source_slug="bleeping-computer",
+            section=Feed.Section.ACTIVE,
+        )
+        self._create_item(
+            feed=feed,
+            title="Exploit campaign expands",
+            summary="Actively exploited vulnerability in the wild",
+            age_hours=1,
+        )
+
+        response = self.client.get("/")
+
+        item = next(
+            item for item in response.context["high_signal_items"] if item.source.slug == "bleeping-computer"
+        )
+        expected_url = reverse("active") + "?source=bleeping-computer"
+        self.assertEqual(item.source_browse_url, expected_url)
+        self.assertContains(response, f'href="{expected_url}"')
+
+    def test_trending_sources_route_to_most_relevant_recent_section(self):
+        active_feed = self._create_feed(
+            source_name="Bleeping Computer",
+            source_slug="bleeping-computer",
+            section=Feed.Section.ACTIVE,
+        )
+        advisories_feed = Feed.objects.create(
+            source=active_feed.source,
+            name="Bleeping Computer Advisories",
+            url="https://example.com/bleeping-computer-advisories.xml",
+            feed_type=Feed.FeedType.RSS,
+            section=Feed.Section.ADVISORIES,
+        )
+        self._create_item(feed=active_feed, title="Fresh active item", age_hours=1)
+        self._create_item(feed=advisories_feed, title="Older advisory item", age_hours=8)
+
+        response = self.client.get("/")
+
+        row = next(
+            row for row in response.context["trending_sources"] if row["source__slug"] == "bleeping-computer"
+        )
+        expected_url = reverse("active") + "?source=bleeping-computer"
+        self.assertEqual(row["open_url"], expected_url)
+        self.assertContains(response, f'href="{expected_url}"')
+
+    def test_trending_sources_fall_back_to_browse_overview_when_recent_sections_tie(self):
+        active_feed = self._create_feed(
+            source_name="Multi Section Source",
+            source_slug="multi-section-source",
+            section=Feed.Section.ACTIVE,
+        )
+        advisories_feed = Feed.objects.create(
+            source=active_feed.source,
+            name="Multi Section Advisories",
+            url="https://example.com/multi-section-advisories.xml",
+            feed_type=Feed.FeedType.RSS,
+            section=Feed.Section.ADVISORIES,
+        )
+        self._create_item(feed=active_feed, title="Same time active", age_hours=2)
+        self._create_item(feed=advisories_feed, title="Same time advisory", age_hours=2)
+
+        response = self.client.get("/")
+
+        row = next(
+            row for row in response.context["trending_sources"] if row["source__slug"] == "multi-section-source"
+        )
+        self.assertEqual(row["open_url"], reverse("sources"))
