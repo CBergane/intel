@@ -266,6 +266,12 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, "All active items")
         self.assertContains(response, "Fresh active exploitation report")
         self.assertContains(response, 'xl:grid-cols-3', html=False)
+        self.assertContains(response, 'data-card-layout="dashboard-active-preview"')
+        self.assertContains(
+            response,
+            'data-card-layout="dashboard-active-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]"',
+            html=False,
+        )
 
     def test_lower_preview_sections_render_two_compact_items_per_section(self):
         advisories_feed = self._create_feed(

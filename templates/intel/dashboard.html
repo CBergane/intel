@@ -208,7 +208,7 @@
         </div>
         <div class="grid gap-3 md:grid-cols-2 md:items-start xl:grid-cols-3">
             {% for item in active_items %}
-                {% include "intel/_item_card.html" with compact=True front_page=True %}
+                {% include "intel/_dashboard_active_preview_card.html" %}
             {% empty %}
                 <p class="text-sm text-slate-400 md:col-span-2 xl:col-span-3">No recent active items found.</p>
             {% endfor %}
