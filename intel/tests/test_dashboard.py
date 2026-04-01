@@ -196,7 +196,7 @@ class DashboardViewTests(TestCase):
         )
         self.assertEqual(row["open_url"], reverse("sources"))
 
-    def test_dashboard_front_page_cards_use_consistent_front_page_layout_hooks(self):
+    def test_dashboard_front_page_cards_keep_front_page_layout_without_full_height_stretch(self):
         active_feed = self._create_feed(
             source_name="High Signal Source",
             source_slug="high-signal-source",
@@ -224,3 +224,13 @@ class DashboardViewTests(TestCase):
 
         self.assertContains(response, 'data-card-layout="front-page"')
         self.assertContains(response, 'lg:items-stretch')
+        self.assertContains(
+            response,
+            'data-card-layout="front-page" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 flex flex-col xl:p-5"',
+            html=False,
+        )
+        self.assertNotContains(
+            response,
+            'data-card-layout="front-page" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 flex h-full flex-col',
+            html=False,
+        )

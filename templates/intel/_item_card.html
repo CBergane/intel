@@ -1,5 +1,5 @@
 {% load humanize %}
-<article data-card-layout="{% if front_page %}front-page{% else %}standard{% endif %}" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 {% if front_page %}flex h-full flex-col{% endif %} {% if compact and front_page %}min-h-[12.5rem] lg:min-h-[13rem]{% elif front_page %}min-h-[15rem] lg:min-h-[16rem]{% endif %} xl:p-5">
+<article data-card-layout="{% if front_page %}front-page{% else %}standard{% endif %}" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 {% if front_page %}flex flex-col{% endif %} xl:p-5">
     <div class="flex min-w-0 items-start justify-between gap-3">
         <div class="min-w-0 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px] md:text-xs">
             <a href="{{ item.source_browse_url }}" class="max-w-[10.5rem] truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300 transition hover:border-sky-400/30 hover:text-white sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]">
