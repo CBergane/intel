@@ -195,3 +195,32 @@ class DashboardViewTests(TestCase):
             row for row in response.context["trending_sources"] if row["source__slug"] == "multi-section-source"
         )
         self.assertEqual(row["open_url"], reverse("sources"))
+
+    def test_dashboard_front_page_cards_use_consistent_front_page_layout_hooks(self):
+        active_feed = self._create_feed(
+            source_name="High Signal Source",
+            source_slug="high-signal-source",
+            section=Feed.Section.ACTIVE,
+        )
+        advisory_feed = self._create_feed(
+            source_name="Vendor Advisories",
+            source_slug="vendor-advisories",
+            section=Feed.Section.ADVISORIES,
+        )
+        self._create_item(
+            feed=active_feed,
+            title="Actively exploited VPN zero-day under attack",
+            summary="Urgent exploitation activity in the wild",
+            age_hours=1,
+        )
+        self._create_item(
+            feed=advisory_feed,
+            title="Routine advisory update",
+            summary="Stable maintenance release information",
+            age_hours=2,
+        )
+
+        response = self.client.get("/")
+
+        self.assertContains(response, 'data-card-layout="front-page"')
+        self.assertContains(response, 'lg:items-stretch')

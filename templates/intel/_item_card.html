@@ -1,6 +1,6 @@
 {% load humanize %}
-<article class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 xl:p-5">
-    <div class="flex min-w-0 items-start justify-between gap-2">
+<article data-card-layout="{% if front_page %}front-page{% else %}standard{% endif %}" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 {% if front_page %}flex h-full flex-col{% endif %} {% if compact and front_page %}min-h-[12.5rem] lg:min-h-[13rem]{% elif front_page %}min-h-[15rem] lg:min-h-[16rem]{% endif %} xl:p-5">
+    <div class="flex min-w-0 items-start justify-between gap-3">
         <div class="min-w-0 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px] md:text-xs">
             <a href="{{ item.source_browse_url }}" class="max-w-[10.5rem] truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300 transition hover:border-sky-400/30 hover:text-white sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]">
                 {{ item.source.name }}
@@ -22,36 +22,38 @@
         </time>
     </div>
 
-    <h2 class="{% if compact %}text-[15px] sm:text-base{% else %}text-base sm:text-lg{% endif %} mt-2 min-w-0 break-words font-medium leading-tight text-white">
-        {% if item.url %}
-            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block hover:text-accent">
-                <span class="block overflow-hidden break-words [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact %}[-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]{% else %}[-webkit-line-clamp:3] lg:[-webkit-line-clamp:4]{% endif %}">
+    <div class="mt-2.5 {% if front_page %}flex flex-1 flex-col{% endif %}">
+        <h2 class="{% if compact %}text-[15px] sm:text-base{% else %}text-base sm:text-lg{% endif %} min-w-0 break-words font-medium leading-tight text-white">
+            {% if item.url %}
+                <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block hover:text-accent">
+                    <span class="block overflow-hidden break-words [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact and front_page %}[-webkit-line-clamp:2]{% elif compact %}[-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]{% elif front_page %}[-webkit-line-clamp:3]{% else %}[-webkit-line-clamp:3] lg:[-webkit-line-clamp:4]{% endif %}">
+                        {{ item.title }}
+                    </span>
+                </a>
+            {% else %}
+                <span class="block overflow-hidden break-words [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact and front_page %}[-webkit-line-clamp:2]{% elif compact %}[-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]{% elif front_page %}[-webkit-line-clamp:3]{% else %}[-webkit-line-clamp:3] lg:[-webkit-line-clamp:4]{% endif %}">
                     {{ item.title }}
                 </span>
-            </a>
-        {% else %}
-            <span class="block overflow-hidden break-words [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact %}[-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]{% else %}[-webkit-line-clamp:3] lg:[-webkit-line-clamp:4]{% endif %}">
-                {{ item.title }}
-            </span>
+            {% endif %}
+        </h2>
+
+        {% if item.cves and not compact %}
+            <div class="mt-2 flex flex-wrap gap-1.5">
+                {% for cve in item.cves|slice:":3" %}
+                    <a href="/advisories?q={{ cve|urlencode }}" class="rounded-md border border-sky-500/30 bg-sky-500/15 px-2 py-1 text-[11px] font-medium text-sky-200 hover:bg-sky-500/25">{{ cve }}</a>
+                {% endfor %}
+            </div>
         {% endif %}
-    </h2>
 
-    {% if item.cves and not compact %}
-        <div class="mt-2 flex flex-wrap gap-1.5">
-            {% for cve in item.cves|slice:":3" %}
-                <a href="/advisories?q={{ cve|urlencode }}" class="rounded-md border border-sky-500/30 bg-sky-500/15 px-2 py-1 text-[11px] font-medium text-sky-200 hover:bg-sky-500/25">{{ cve }}</a>
-            {% endfor %}
-        </div>
-    {% endif %}
+        {% if item.summary %}
+            <p class="mt-2 overflow-hidden break-words text-sm leading-5 text-slate-300 md:text-[15px] md:leading-6 [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact and front_page %}[-webkit-line-clamp:2]{% elif compact %}[-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]{% elif front_page %}[-webkit-line-clamp:3]{% else %}[-webkit-line-clamp:3] lg:[-webkit-line-clamp:4]{% endif %} {% if front_page %}flex-1{% endif %}">
+                {{ item.summary|striptags }}
+            </p>
+        {% endif %}
+    </div>
 
-    {% if item.summary %}
-        <p class="mt-2 overflow-hidden break-words text-sm leading-5 text-slate-300 md:text-[15px] md:leading-6 [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact %}[-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]{% else %}[-webkit-line-clamp:3] lg:[-webkit-line-clamp:4]{% endif %}">
-            {{ item.summary|striptags }}
-        </p>
-    {% endif %}
-
-    <div class="mt-3 flex flex-wrap items-center gap-2">
-        <p class="min-w-0 flex-1 truncate text-[11px] text-slate-500 md:text-xs md:overflow-visible md:whitespace-normal md:leading-5">{{ item.feed.name|truncatechars:44 }}</p>
+    <div class="{% if front_page %}mt-auto flex flex-wrap items-center gap-2 pt-2{% else %}mt-3 flex flex-wrap items-center gap-2{% endif %}">
+        <p class="min-w-0 flex-1 text-[11px] text-slate-500 md:text-xs {% if front_page %}line-clamp-2 leading-5{% else %}truncate md:overflow-visible md:whitespace-normal md:leading-5{% endif %}">{{ item.feed.name|truncatechars:44 }}</p>
         {% if item.url %}
             <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full shrink-0 items-center justify-center rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-sky-400 sm:w-auto sm:px-2.5 sm:py-1.5">
                 Open Source
