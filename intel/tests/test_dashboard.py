@@ -234,3 +234,35 @@ class DashboardViewTests(TestCase):
             'data-card-layout="front-page" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 flex h-full flex-col',
             html=False,
         )
+
+    def test_dashboard_includes_dedicated_active_preview_section(self):
+        active_feed = self._create_feed(
+            source_name="Exploit Tracker",
+            source_slug="exploit-tracker",
+            section=Feed.Section.ACTIVE,
+        )
+        advisory_feed = self._create_feed(
+            source_name="Vendor Advisories",
+            source_slug="vendor-advisories",
+            section=Feed.Section.ADVISORIES,
+        )
+        self._create_item(
+            feed=active_feed,
+            title="Fresh active exploitation report",
+            summary="Operational exploit activity",
+            age_hours=1,
+        )
+        self._create_item(
+            feed=advisory_feed,
+            title="Routine advisory item",
+            summary="General advisory note",
+            age_hours=2,
+        )
+
+        response = self.client.get("/")
+
+        self.assertEqual(len(response.context["active_items"]), 1)
+        self.assertContains(response, 'id="active-block"', html=False)
+        self.assertContains(response, "All active items")
+        self.assertContains(response, "Fresh active exploitation report")
+        self.assertContains(response, 'xl:grid-cols-3', html=False)

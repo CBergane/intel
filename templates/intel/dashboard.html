@@ -80,6 +80,7 @@
     <nav class="sticky top-[3.25rem] z-30 hidden rounded-xl border border-line/80 bg-night/90 p-1.5 backdrop-blur sm:block lg:hidden">
         <div class="no-scrollbar flex gap-2 overflow-x-auto px-0.5 text-xs">
             <a href="#high-signal" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">High Signal</a>
+            <a href="#active-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Active</a>
             <a href="#advisories-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Advisories</a>
             <a href="#research-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Research</a>
             <a href="#sweden-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Sweden</a>
@@ -103,6 +104,7 @@
                     </div>
                     <p class="text-xs leading-5 text-slate-400">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel. Routine release and maintenance notices are de-emphasized.</p>
                     <div class="flex flex-wrap gap-1.5 text-[11px] sm:hidden">
+                        <a href="#active-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Active</a>
                         <a href="#advisories-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Advisories</a>
                         <a href="#research-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Research</a>
                         <a href="#sweden-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Sweden</a>
@@ -186,6 +188,32 @@
             </div>
         </aside>
     </div>
+
+    <section id="active-block" class="space-y-3 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3.5 sm:p-4 xl:rounded-2xl xl:border-line/80 xl:bg-slate-900/55 xl:p-5">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div class="space-y-1">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-500/25 bg-rose-500/10 text-rose-200">
+                        <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                            <path d="M4 10h3l1.4-3 2.4 6 1.7-3H16" stroke-linecap="round" stroke-linejoin="round" />
+                            <path d="M10 18c4.2-2.8 6.5-5.6 6.5-8.7A3.8 3.8 0 0 0 12.7 5c-1.2 0-2.1.5-2.7 1.4C9.4 5.5 8.4 5 7.3 5A3.8 3.8 0 0 0 3.5 9.3c0 3.1 2.3 5.9 6.5 8.7Z" stroke-linejoin="round" />
+                        </svg>
+                    </span>
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Active</h2>
+                    <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ active_items|length }} recent</span>
+                </div>
+                <p class="text-xs leading-5 text-slate-400">Fast scan of recent exploitation and operational threat activity before dropping into the full Active view.</p>
+            </div>
+            <a href="/active" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All active items</a>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2 md:items-start xl:grid-cols-3">
+            {% for item in active_items %}
+                {% include "intel/_item_card.html" with compact=True front_page=True %}
+            {% empty %}
+                <p class="text-sm text-slate-400 md:col-span-2 xl:col-span-3">No recent active items found.</p>
+            {% endfor %}
+        </div>
+    </section>
 
     <div class="grid gap-4 lg:grid-cols-12 lg:items-stretch lg:gap-5 xl:gap-6">
         <div id="advisories-block" class="flex min-w-0 flex-col space-y-2.5 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3 sm:p-4 lg:col-span-7 xl:col-span-5 xl:p-5">

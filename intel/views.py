@@ -571,6 +571,14 @@ def now_view(request):
     )
     high_signal_items = [item for item in high_candidates if item.dashboard_score >= 20][:15]
 
+    active_items = _balanced_items(
+        ordered_by_activity.filter(
+            feed__section=Feed.Section.ACTIVE,
+            activity_at__gte=now - timedelta(days=14),
+        ),
+        limit=6,
+        per_source_max=4,
+    )
     advisories_items = _balanced_items(
         ordered_by_activity.filter(feed__section=Feed.Section.ADVISORIES),
         limit=20,
@@ -668,6 +676,7 @@ def now_view(request):
         "active_feeds_count": active_feeds_count,
         "dark_hits_30d_count": dark_hits_30d_count,
         "high_signal_items": high_signal_items,
+        "active_items": active_items,
         "advisories_items": advisories_items,
         "research_items": research_items,
         "sweden_items": sweden_items,
