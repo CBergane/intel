@@ -4,40 +4,40 @@
 {% block title %}Now | BorealSec Intel{% endblock %}
 
 {% block content %}
-<section class="space-y-4 sm:space-y-5 xl:space-y-7">
-    <div class="space-y-3 md:hidden">
-        <div class="flex items-start justify-between gap-3 px-1">
+<section class="space-y-3 sm:space-y-5 xl:space-y-7">
+    <div class="space-y-2.5 md:hidden">
+        <div class="flex items-start justify-between gap-2.5 px-0.5">
             <div class="min-w-0">
                 <h1 class="text-sm font-semibold text-white">Now</h1>
-                <p class="mt-0.5 text-[11px] leading-5 text-slate-400">
+                <p class="mt-0.5 text-[10px] leading-[1.15rem] text-slate-400">
                     Curated serious threats and urgent security activity from the last 7 days.
                 </p>
             </div>
 
             <a
                 href="/sources"
-                class="shrink-0 rounded-md border border-slate-700/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-200 transition hover:bg-slate-800"
+                class="shrink-0 rounded-md border border-slate-700/80 px-2.5 py-1.5 text-[10px] font-medium text-slate-200 transition hover:bg-slate-800"
             >
                 Browse Intel
             </a>
         </div>
 
-        <div class="grid grid-cols-2 gap-2.5">
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow">
-                <p class="text-2xl font-bold tabular-nums text-accent">{{ items_today_count }}</p>
-                <p class="mt-1 text-[11px] text-slate-400">Items today</p>
+        <div class="grid grid-cols-2 gap-2">
+            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 shadow-glow">
+                <p class="text-xl font-bold tabular-nums text-accent">{{ items_today_count }}</p>
+                <p class="mt-0.5 text-[10px] text-slate-400">Items today</p>
             </div>
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow">
-                <p class="text-2xl font-bold tabular-nums text-accent">{{ items_week_count }}</p>
-                <p class="mt-1 text-[11px] text-slate-400">This week</p>
+            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 shadow-glow">
+                <p class="text-xl font-bold tabular-nums text-accent">{{ items_week_count }}</p>
+                <p class="mt-0.5 text-[10px] text-slate-400">This week</p>
             </div>
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow">
-                <p class="text-2xl font-bold tabular-nums text-accent">{{ active_feeds_count }}</p>
-                <p class="mt-1 text-[11px] text-slate-400">Active feeds</p>
+            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 shadow-glow">
+                <p class="text-xl font-bold tabular-nums text-accent">{{ active_feeds_count }}</p>
+                <p class="mt-0.5 text-[10px] text-slate-400">Active feeds</p>
             </div>
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow">
-                <p class="text-2xl font-bold tabular-nums text-accent">{{ dark_hits_30d_count }}</p>
-                <p class="mt-1 text-[11px] text-slate-400">Dark hits (30d)</p>
+            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 shadow-glow">
+                <p class="text-xl font-bold tabular-nums text-accent">{{ dark_hits_30d_count }}</p>
+                <p class="mt-0.5 text-[10px] text-slate-400">Dark hits (30d)</p>
             </div>
         </div>
     </div>
@@ -89,7 +89,7 @@
     </nav>
 
     <div class="grid gap-4 lg:grid-cols-12 lg:items-start lg:gap-5 xl:gap-6">
-        <div id="high-signal" class="flex flex-col space-y-3 rounded-xl border border-line bg-panel/80 p-3 shadow-glow lg:col-span-8 sm:space-y-4 sm:p-4 xl:col-span-9 xl:rounded-2xl xl:p-6">
+        <div id="high-signal" class="flex flex-col space-y-2.5 rounded-xl border border-line bg-panel/80 p-2.5 shadow-glow lg:col-span-8 sm:space-y-4 sm:p-4 xl:col-span-9 xl:rounded-2xl xl:p-6">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="space-y-1">
                     <div class="flex flex-wrap items-center gap-2">
@@ -102,7 +102,7 @@
                         <h2 class="text-sm font-semibold text-white sm:text-base xl:text-lg">High Signal (Last 7 days)</h2>
                         <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ high_signal_items|length }} curated</span>
                     </div>
-                    <p class="text-xs leading-5 text-slate-400">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel. Routine release and maintenance notices are de-emphasized.</p>
+                    <p class="text-[11px] leading-[1.15rem] text-slate-400 sm:text-xs sm:leading-5">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel. Routine release and maintenance notices are de-emphasized.</p>
                     <div class="flex flex-wrap gap-1.5 text-[11px] sm:hidden">
                         <a href="#active-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Active</a>
                         <a href="#advisories-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Advisories</a>
@@ -112,11 +112,11 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <a href="/sources" class="text-xs font-medium text-slate-300 hover:text-white sm:text-sm">Browse layer</a>
-                    <a href="/active" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">View active page</a>
+                    <a href="/sources" class="text-[11px] font-medium text-slate-300 hover:text-white sm:text-sm">Browse layer</a>
+                    <a href="/active" class="text-[11px] font-medium text-sky-300 hover:text-sky-200 sm:text-sm">View active page</a>
                 </div>
             </div>
-            <div class="flex-1 space-y-2.5 sm:space-y-3">
+            <div class="flex-1 space-y-2 sm:space-y-3">
                 {% for item in high_signal_items %}
                     {% include "intel/_item_card.html" with compact=False front_page=True %}
                 {% empty %}
@@ -125,8 +125,8 @@
             </div>
         </div>
 
-        <aside id="trending-block" class="space-y-3 lg:col-span-4 lg:space-y-4 xl:sticky xl:top-36 xl:col-span-3 xl:space-y-3">
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
+        <aside id="trending-block" class="space-y-2.5 lg:col-span-4 lg:space-y-4 xl:sticky xl:top-36 xl:col-span-3 xl:space-y-3">
+            <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <h2 class="text-sm font-semibold text-white sm:text-base">Feed Health</h2>
                     <a href="/feed-health" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">Open panel</a>
@@ -149,7 +149,7 @@
                         <p class="mt-1 text-sm font-semibold text-amber-300">{{ feed_status_counts.never }}</p>
                     </div>
                 </div>
-                <p class="mt-3 text-xs text-slate-400">
+                <p class="mt-2.5 text-[11px] text-slate-400 sm:text-xs">
                     Last ingest:
                     {% if last_ingest_finished_at %}
                         <span class="font-medium text-white" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
@@ -159,7 +159,7 @@
                 </p>
             </div>
 
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
+            <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
                 <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending Sources (48h)</h2>
                 <ul class="space-y-2 text-sm text-slate-300">
                     {% for row in trending_sources %}
@@ -173,7 +173,7 @@
                 </ul>
             </div>
 
-            <div class="rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
+            <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
                 <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending CVEs (7d)</h2>
                 <div class="flex flex-wrap gap-2">
                     {% for cve, count in trending_cves %}
@@ -189,7 +189,7 @@
         </aside>
     </div>
 
-    <section id="active-block" class="space-y-3 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-3.5 sm:p-4 xl:rounded-2xl xl:border-line/80 xl:bg-slate-900/55 xl:p-5">
+    <section id="active-block" class="space-y-2.5 rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:space-y-3.5 sm:p-4 xl:rounded-2xl xl:border-line/80 xl:bg-slate-900/55 xl:p-5">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div class="space-y-1">
                 <div class="flex flex-wrap items-center gap-2">
@@ -202,11 +202,11 @@
                     <h2 class="text-sm font-semibold text-white sm:text-base">Active</h2>
                     <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ active_items|length }} recent</span>
                 </div>
-                <p class="text-xs leading-5 text-slate-400">Fast scan of recent exploitation and operational threat activity before dropping into the full Active view.</p>
+                <p class="text-[11px] leading-[1.15rem] text-slate-400 sm:text-xs sm:leading-5">Fast scan of recent exploitation and operational threat activity before dropping into the full Active view.</p>
             </div>
-            <a href="/active" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All active items</a>
+            <a href="/active" class="text-[11px] font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All active items</a>
         </div>
-        <div class="grid gap-3 md:grid-cols-2 md:items-start xl:grid-cols-3">
+        <div class="grid gap-2.5 md:grid-cols-2 md:items-start xl:grid-cols-3">
             {% for item in active_items %}
                 {% include "intel/_dashboard_active_preview_card.html" %}
             {% empty %}
@@ -215,8 +215,8 @@
         </div>
     </section>
 
-    <div class="grid gap-4 lg:grid-cols-3 lg:items-start lg:gap-5 xl:gap-6">
-        <div id="advisories-block" class="flex min-w-0 flex-col space-y-2 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-2.5 sm:p-4 xl:p-5">
+    <div class="grid gap-3 lg:grid-cols-3 lg:items-start lg:gap-5 xl:gap-6">
+        <div id="advisories-block" class="flex min-w-0 flex-col space-y-2 rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:space-y-2.5 sm:p-4 xl:p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-2">
                     <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10 text-sky-200">
@@ -229,7 +229,7 @@
                 </div>
                 <a href="/advisories" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All advisories</a>
             </div>
-            <div class="grid gap-2.5">
+            <div class="grid gap-2">
                 {% for item in advisories_items|slice:":2" %}
                     {% include "intel/_dashboard_preview_card.html" %}
                 {% empty %}
@@ -238,7 +238,7 @@
             </div>
         </div>
 
-        <div id="research-block" class="flex min-w-0 flex-col space-y-2 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-2.5 sm:p-4 xl:p-5">
+        <div id="research-block" class="flex min-w-0 flex-col space-y-2 rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:space-y-2.5 sm:p-4 xl:p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-2">
                     <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-500/25 bg-cyan-500/10 text-cyan-200">
@@ -251,7 +251,7 @@
                 </div>
                 <a href="/research" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All research</a>
             </div>
-            <div class="grid gap-2.5">
+            <div class="grid gap-2">
                 {% for item in research_items|slice:":2" %}
                     {% include "intel/_dashboard_preview_card.html" %}
                 {% empty %}
@@ -260,7 +260,7 @@
             </div>
         </div>
 
-        <div id="sweden-block" class="flex min-w-0 flex-col space-y-2 rounded-xl border border-line bg-panel/80 p-3.5 shadow-glow sm:space-y-2.5 sm:p-4 xl:p-5">
+        <div id="sweden-block" class="flex min-w-0 flex-col space-y-2 rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:space-y-2.5 sm:p-4 xl:p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div class="flex items-center gap-2">
                     <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
@@ -273,7 +273,7 @@
                 </div>
                 <a href="/sweden" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All Sweden items</a>
             </div>
-            <div class="grid gap-2.5">
+            <div class="grid gap-2">
                 {% for item in sweden_items|slice:":2" %}
                     {% include "intel/_dashboard_preview_card.html" %}
                 {% empty %}

@@ -226,7 +226,7 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'lg:grid-cols-3')
         self.assertContains(
             response,
-            'data-card-layout="front-page" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-3 shadow-glow sm:p-4 flex flex-col xl:p-5"',
+            'data-card-layout="front-page" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-2.5 sm:p-4 shadow-glow flex flex-col xl:p-5"',
             html=False,
         )
         self.assertNotContains(
@@ -269,7 +269,7 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'data-card-layout="dashboard-active-preview"')
         self.assertContains(
             response,
-            'data-card-layout="dashboard-active-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]"',
+            'data-card-layout="dashboard-active-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]"',
             html=False,
         )
 
@@ -324,6 +324,26 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'data-card-layout="dashboard-preview"')
         self.assertContains(
             response,
-            'data-card-layout="dashboard-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/60 px-3 py-3 md:min-h-[11.5rem]"',
+            'data-card-layout="dashboard-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/60 px-2.5 py-2.5 md:min-h-[11.5rem] sm:px-3 sm:py-3"',
             html=False,
         )
+
+    def test_dashboard_mobile_layout_uses_compact_spacing_and_clamps(self):
+        active_feed = self._create_feed(
+            source_name="Mobile High Signal",
+            source_slug="mobile-high-signal",
+            section=Feed.Section.ACTIVE,
+        )
+        self._create_item(
+            feed=active_feed,
+            title="Critical authentication bypass exploited in the wild across exposed gateways",
+            summary="Urgent exploitation activity with longer supporting context that should clamp on smaller screens.",
+            age_hours=1,
+        )
+
+        response = self.client.get("/")
+
+        self.assertContains(response, 'class="space-y-3 sm:space-y-5 xl:space-y-7"', html=False)
+        self.assertContains(response, 'class="grid grid-cols-2 gap-2"', html=False)
+        self.assertContains(response, '[-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]', html=False)
+        self.assertContains(response, 'text-[13px] leading-5 sm:mt-2 sm:text-sm', html=False)

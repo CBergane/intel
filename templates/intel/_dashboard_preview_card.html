@@ -1,12 +1,12 @@
 {% load humanize %}
-<article data-card-layout="dashboard-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/60 px-3 py-3 md:min-h-[11.5rem]">
+<article data-card-layout="dashboard-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/60 px-2.5 py-2.5 md:min-h-[11.5rem] sm:px-3 sm:py-3">
     <div class="flex items-start justify-between gap-2">
-        <a href="{{ item.source_browse_url }}" class="min-w-0 max-w-[11rem] truncate text-[11px] font-medium text-slate-300 transition hover:text-white">{{ item.source.name }}</a>
-        <time class="shrink-0 text-[10px] text-slate-500" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
+        <a href="{{ item.source_browse_url }}" class="min-w-0 max-w-[9rem] truncate text-[10px] font-medium text-slate-300 transition hover:text-white sm:max-w-[11rem] sm:text-[11px]">{{ item.source.name }}</a>
+        <time class="shrink-0 text-[9px] text-slate-500 sm:text-[10px]" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
             {{ item.activity_at|naturaltime }}
         </time>
     </div>
-    <h3 class="mt-2 text-sm font-medium leading-snug text-white">
+    <h3 class="mt-1.5 text-[13px] font-medium leading-snug text-white sm:mt-2 sm:text-sm">
         {% if item.url %}
             <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block hover:text-accent">
                 <span class="block overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
@@ -20,14 +20,14 @@
         {% endif %}
     </h3>
     {% if item.summary %}
-        <p class="mt-1.5 overflow-hidden text-[13px] leading-5 text-slate-400 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+        <p class="mt-1 overflow-hidden text-[12px] leading-[1.1rem] text-slate-400 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:mt-1.5 sm:text-[13px] sm:leading-5">
             {{ item.summary|striptags }}
         </p>
     {% endif %}
-    <div class="mt-auto flex items-center gap-2 pt-3">
-        <p class="min-w-0 flex-1 truncate text-[10px] text-slate-500">{{ item.feed.name|truncatechars:34 }}</p>
+    <div class="mt-auto flex items-center gap-2 pt-2 sm:pt-3">
+        <p class="min-w-0 flex-1 truncate text-[9px] text-slate-500 sm:text-[10px]">{{ item.feed.name|truncatechars:30 }}</p>
         {% if item.url %}
-            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="shrink-0 rounded-md border border-slate-700/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-200 transition hover:bg-slate-800">
+            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="shrink-0 rounded-md border border-slate-700/80 px-2 py-1.5 text-[10px] font-medium text-slate-200 transition hover:bg-slate-800 sm:px-2.5 sm:text-[11px]">
                 Open
             </a>
         {% endif %}

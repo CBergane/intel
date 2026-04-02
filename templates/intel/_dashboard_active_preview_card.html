@@ -1,8 +1,8 @@
 {% load humanize %}
-<article data-card-layout="dashboard-active-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]">
-    <div class="flex items-start justify-between gap-2.5">
-        <div class="min-w-0 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-[11px]">
-            <a href="{{ item.source_browse_url }}" class="max-w-[11.5rem] truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 font-medium text-slate-300 transition hover:border-sky-400/30 hover:text-white">
+<article data-card-layout="dashboard-active-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]">
+    <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0 flex flex-wrap items-center gap-1.5 text-[9px] sm:text-[11px]">
+            <a href="{{ item.source_browse_url }}" class="max-w-[8.5rem] truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 font-medium text-slate-300 transition hover:border-sky-400/30 hover:text-white sm:max-w-[11.5rem]">
                 {{ item.source.name }}
             </a>
             <span class="rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
@@ -12,34 +12,34 @@
                 </span>
             {% endif %}
         </div>
-        <time class="shrink-0 text-[10px] text-slate-500 sm:text-[11px]" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
+        <time class="shrink-0 text-[9px] text-slate-500 sm:text-[11px]" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
             {{ item.activity_at|naturaltime }}
         </time>
     </div>
-    <div class="mt-2.5 flex flex-1 flex-col">
+    <div class="mt-2 flex flex-1 flex-col sm:mt-2.5">
         <h3 class="text-[15px] font-medium leading-snug text-white sm:text-base">
             {% if item.url %}
                 <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block hover:text-accent">
-                    <span class="block overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]">
+                    <span class="block overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]">
                         {{ item.title }}
                     </span>
                 </a>
             {% else %}
-                <span class="block overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]">
+                <span class="block overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]">
                     {{ item.title }}
                 </span>
             {% endif %}
         </h3>
         {% if item.summary %}
-            <p class="mt-2 overflow-hidden text-[13px] leading-5 text-slate-300 sm:text-sm [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
+            <p class="mt-1.5 overflow-hidden text-[13px] leading-5 text-slate-300 sm:mt-2 sm:text-sm [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]">
                 {{ item.summary|striptags }}
             </p>
         {% endif %}
     </div>
-    <div class="mt-auto flex items-center gap-2 pt-3">
-        <p class="min-w-0 flex-1 truncate text-[10px] text-slate-500 sm:text-[11px]">{{ item.feed.name|truncatechars:38 }}</p>
+    <div class="mt-auto flex items-center gap-2 pt-2.5 sm:pt-3">
+        <p class="min-w-0 flex-1 truncate text-[10px] text-slate-500 sm:text-[11px]">{{ item.feed.name|truncatechars:34 }}</p>
         {% if item.url %}
-            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="shrink-0 rounded-md border border-slate-700/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-200 transition hover:bg-slate-800">
+            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="shrink-0 rounded-md border border-slate-700/80 px-2.5 py-1.5 text-[10px] font-medium text-slate-200 transition hover:bg-slate-800 sm:text-[11px]">
                 Open
             </a>
         {% endif %}
