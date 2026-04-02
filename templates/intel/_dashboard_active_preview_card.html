@@ -1,8 +1,8 @@
 {% load humanize %}
-<article data-card-layout="dashboard-active-preview" class="group w-full min-w-0 overflow-hidden flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3 py-3 max-[320px]:px-2.5 max-[320px]:py-2.5 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]">
-    <div class="flex min-w-0 flex-wrap items-start gap-2 max-[320px]:gap-1.5">
-        <div class="min-w-0 flex flex-1 flex-wrap items-center gap-1.5 max-[320px]:gap-1 text-[9px] max-[320px]:text-[8px] sm:text-[11px]">
-            <a href="{{ item.source_browse_url }}" class="min-w-0 max-w-[8rem] max-[320px]:max-w-[5.5rem] truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 max-[320px]:px-1.5 max-[320px]:py-0.5 font-medium text-slate-300 transition hover:border-sky-400/30 hover:text-white sm:max-w-[11.5rem]">
+<article data-card-layout="dashboard-active-preview" class="group w-full min-w-0 overflow-hidden flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3 py-3 max-[430px]:px-2.5 max-[430px]:py-2.5 max-[320px]:px-2.5 max-[320px]:py-2.5 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]">
+    <div class="flex min-w-0 flex-wrap items-start gap-2 max-[430px]:gap-1.5 max-[320px]:gap-1.5">
+        <div class="min-w-0 flex flex-1 flex-wrap items-center gap-1.5 max-[430px]:gap-1 max-[320px]:gap-1 text-[9px] max-[430px]:text-[8.5px] max-[320px]:text-[8px] sm:text-[11px]">
+            <a href="{{ item.source_browse_url }}" class="min-w-0 max-w-[8rem] max-[430px]:max-w-[6.5rem] max-[320px]:max-w-[5.5rem] truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 max-[430px]:px-1.5 max-[430px]:py-0.5 max-[320px]:px-1.5 max-[320px]:py-0.5 font-medium text-slate-300 transition hover:border-sky-400/30 hover:text-white sm:max-w-[11.5rem]">
                 {{ item.source.name }}
             </a>
             <span class="hidden sm:inline-flex rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
@@ -12,12 +12,12 @@
                 </span>
             {% endif %}
         </div>
-        <time class="max-w-full text-[9px] max-[320px]:text-[8px] text-slate-500 sm:ml-auto sm:text-[11px]" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
+        <time class="max-w-full text-[9px] max-[430px]:text-[8.5px] max-[320px]:text-[8px] text-slate-500 sm:ml-auto sm:text-[11px]" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
             {{ item.activity_at|naturaltime }}
         </time>
     </div>
-    <div class="mt-2 flex flex-1 flex-col sm:mt-2.5">
-        <h3 class="text-[15px] max-[320px]:text-[13px] font-medium leading-snug text-white sm:text-base">
+    <div class="mt-2 flex flex-1 flex-col max-[430px]:mt-1.5 sm:mt-2.5">
+        <h3 class="text-[15px] max-[430px]:text-[14px] max-[320px]:text-[13px] font-medium leading-snug text-white sm:text-base">
             {% if item.url %}
                 <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block hover:text-accent">
                     <span class="block overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]">
@@ -31,15 +31,15 @@
             {% endif %}
         </h3>
         {% if item.summary %}
-            <p class="mt-1.5 overflow-hidden text-[13px] max-[320px]:text-[11px] leading-5 max-[320px]:leading-[1.1rem] text-slate-300 sm:mt-2 sm:text-sm [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:1] sm:[-webkit-line-clamp:3]">
+            <p class="mt-1.5 overflow-hidden text-[13px] max-[430px]:mt-1 max-[430px]:text-[12px] max-[320px]:text-[11px] leading-5 max-[430px]:leading-[1.05rem] max-[320px]:leading-[1.1rem] text-slate-300 sm:mt-2 sm:text-sm [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:1] sm:[-webkit-line-clamp:3]">
                 {{ item.summary|striptags }}
             </p>
         {% endif %}
     </div>
-    <div class="mt-auto flex flex-wrap items-center gap-2 pt-2.5 sm:pt-3">
+    <div class="mt-auto flex flex-wrap items-center gap-2 max-[430px]:gap-1.5 pt-2.5 max-[430px]:pt-2 sm:pt-3">
         <p class="hidden min-w-0 flex-1 truncate text-[10px] text-slate-500 sm:block sm:text-[11px]">{{ item.feed.name|truncatechars:34 }}</p>
         {% if item.url %}
-            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="w-full max-w-full rounded-md border border-slate-700/80 px-2.5 py-1.5 max-[320px]:py-1 max-[320px]:text-[10px] text-center text-[10px] font-medium text-slate-200 transition hover:bg-slate-800 sm:w-auto sm:text-[11px]">
+            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="w-full max-w-full rounded-md border border-slate-700/80 px-2.5 py-1.5 max-[430px]:px-2 max-[430px]:py-1 max-[430px]:text-[10px] max-[320px]:py-1 max-[320px]:text-[10px] text-center text-[10px] font-medium text-slate-200 transition hover:bg-slate-800 sm:w-auto sm:text-[11px]">
                 Open
             </a>
         {% endif %}
