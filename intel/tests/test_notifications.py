@@ -10,7 +10,9 @@ from intel.models import Feed, Item, Source
 from intel.notifications import (
     build_dark_hit_alert_fingerprint,
     dark_hit_alert_reason,
+    get_generic_intel_alert_context,
     send_dark_hit_alert,
+    send_generic_intel_alert,
     send_high_epss_alert,
     should_emit_dark_hit_alert,
 )
@@ -82,6 +84,39 @@ def _make_item(title="CVE-2024-1234 \u2014 EPSS 85.0%", url="https://www.cve.org
         title=title,
         url=url,
         summary="EPSS score: 85.0% (percentile: 99.9%). High likelihood of exploitation.",
+        published_at=timezone.now(),
+    )
+
+
+def _make_generic_item(
+    *,
+    section=Feed.Section.ADVISORIES,
+    adapter_key="",
+    source_name="Intel Source",
+    source_slug="intel-source",
+    title="Critical advisory for CVE-2026-1111",
+    summary="Urgent remote code execution issue under active investigation.",
+    url="https://example.com/high-signal",
+    raw_payload=None,
+):
+    source = Source.objects.create(name=source_name, slug=source_slug)
+    feed = Feed.objects.create(
+        source=source,
+        name=f"{source_name} Feed",
+        url=f"https://example.com/{source_slug}.xml",
+        feed_type=Feed.FeedType.RSS,
+        adapter_key=adapter_key,
+        section=section,
+        max_age_days=14,
+        max_items_per_run=200,
+    )
+    return Item.objects.create(
+        source=source,
+        feed=feed,
+        title=title,
+        url=url,
+        summary=summary,
+        raw_payload=raw_payload or {},
         published_at=timezone.now(),
     )
 
@@ -273,3 +308,64 @@ class EPSSAlertTests(TestCase):
             mock_post.assert_called_once()
             call_url = mock_post.call_args.args[0]
             self.assertIn("fallback", call_url)
+
+
+class GenericIntelAlertTests(TestCase):
+    def test_generic_intel_alert_context_accepts_high_signal_active_item(self):
+        item = _make_generic_item(
+            section=Feed.Section.ACTIVE,
+            title="VPN gateway targeted in the wild",
+            summary="Authentication bypass is actively exploited in the wild.",
+        )
+
+        context = get_generic_intel_alert_context(item)
+
+        self.assertIsNotNone(context)
+        self.assertEqual(context["why_alerted"], "active exploitation")
+
+    def test_generic_intel_alert_context_rejects_low_signal_release_notes(self):
+        item = _make_generic_item(
+            section=Feed.Section.RESEARCH,
+            title="Platform maintenance release notes",
+            summary="Routine product update and version availability notice.",
+        )
+
+        self.assertIsNone(get_generic_intel_alert_context(item))
+
+    @override_settings(INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/token")
+    def test_send_generic_intel_alert_includes_summary_and_reason(self):
+        item = _make_generic_item(
+            section=Feed.Section.SWEDEN,
+            title="Nordic CERT warns of credential theft campaign",
+            summary="Swedish organizations are targeted in a credential theft campaign.",
+            raw_payload={"country": "Sweden"},
+        )
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_generic_intel_alert(
+                item,
+                why_alerted="Sweden-relevant intel",
+                cves=["CVE-2026-2222"],
+                country="Sweden",
+            )
+
+        mock_post.assert_called_once()
+        sent_json = mock_post.call_args.kwargs.get("json") or mock_post.call_args.args[1]
+        embed = sent_json["embeds"][0]
+        self.assertEqual(embed["title"], "High-signal intel: Nordic CERT warns of credential theft campaign")
+        self.assertEqual(
+            embed["description"],
+            "Swedish organizations are targeted in a credential theft campaign.",
+        )
+        self.assertIn(
+            {"name": "Why alerted", "value": "Sweden-relevant intel", "inline": True},
+            embed["fields"],
+        )
+        self.assertIn(
+            {"name": "CVE", "value": "CVE-2026-2222", "inline": True},
+            embed["fields"],
+        )
+        self.assertIn(
+            {"name": "Country", "value": "Sweden", "inline": True},
+            embed["fields"],
+        )

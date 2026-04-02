@@ -230,6 +230,114 @@ class IngestionGuardrailTests(TestCase):
         self.assertTrue(Item.objects.filter(url="https://example.com/alert-one").exists())
         self.assertTrue(Item.objects.filter(url="https://example.com/alert-two").exists())
 
+    def test_regular_high_signal_item_sends_generic_intel_alert(self):
+        self.feed.section = Feed.Section.RESEARCH
+        self.feed.save(update_fields=["section", "updated_at"])
+        entries = [
+            {
+                "title": "Critical CVE-2026-4444 authentication bypass under attack",
+                "link": "https://example.com/high-signal",
+                "summary": "Urgent advisory for an actively exploited authentication bypass vulnerability.",
+                "published": timezone.now().isoformat(),
+            }
+        ]
+        normalized = [
+            normalize_syndication_entry(
+                self.feed,
+                entry,
+                fallback_published_at=timezone.now(),
+            )
+            for entry in entries
+        ]
+
+        with patch(
+            "intel.management.commands.ingest_sources.Command._fetch_with_retries",
+            return_value=(b"<rss/>", 200),
+        ), patch(
+            "intel.management.commands.ingest_sources.parse_feed_payload",
+            return_value=normalized,
+        ), patch(
+            "intel.management.commands.ingest_sources.send_generic_intel_alert"
+        ) as mock_generic:
+            call_command("ingest_sources", feed=str(self.feed.id))
+
+        mock_generic.assert_called_once()
+        alerted_item = mock_generic.call_args.args[0]
+        self.assertEqual(alerted_item.title, "Critical CVE-2026-4444 authentication bypass under attack")
+        self.assertEqual(
+            mock_generic.call_args.kwargs["why_alerted"],
+            "active exploitation",
+        )
+
+    def test_regular_low_signal_item_does_not_send_generic_intel_alert(self):
+        self.feed.section = Feed.Section.RESEARCH
+        self.feed.save(update_fields=["section", "updated_at"])
+        entries = [
+            {
+                "title": "Platform maintenance release notes",
+                "link": "https://example.com/release-notes",
+                "summary": "Routine product update and version availability notice.",
+                "published": timezone.now().isoformat(),
+            }
+        ]
+        normalized = [
+            normalize_syndication_entry(
+                self.feed,
+                entry,
+                fallback_published_at=timezone.now(),
+            )
+            for entry in entries
+        ]
+
+        with patch(
+            "intel.management.commands.ingest_sources.Command._fetch_with_retries",
+            return_value=(b"<rss/>", 200),
+        ), patch(
+            "intel.management.commands.ingest_sources.parse_feed_payload",
+            return_value=normalized,
+        ), patch(
+            "intel.management.commands.ingest_sources.send_generic_intel_alert"
+        ) as mock_generic:
+            call_command("ingest_sources", feed=str(self.feed.id))
+
+        mock_generic.assert_not_called()
+
+    def test_epss_items_keep_specialized_alert_path_without_generic_alert(self):
+        epss_feed = Feed.objects.create(
+            source=self.source,
+            name="EPSS Feed",
+            url="https://example.com/epss.json",
+            feed_type=Feed.FeedType.JSON,
+            adapter_key="epss",
+            section=Feed.Section.ACTIVE,
+            max_age_days=365,
+            max_items_per_run=10,
+        )
+        payload = {
+            "status": "OK",
+            "data": [
+                {
+                    "cve": "CVE-2026-9999",
+                    "epss": "0.91",
+                    "percentile": "0.999",
+                    "date": "2026-03-01",
+                }
+            ],
+        }
+
+        with patch(
+            "intel.management.commands.ingest_sources.Command._fetch_with_retries",
+            return_value=(json.dumps(payload).encode("utf-8"), 200),
+        ), patch(
+            "intel.management.commands.ingest_sources.send_high_epss_alert"
+        ) as mock_epss, patch(
+            "intel.management.commands.ingest_sources.send_generic_intel_alert"
+        ) as mock_generic:
+            call_command("ingest_sources", feed=str(epss_feed.id))
+
+        mock_epss.assert_called_once()
+        mock_generic.assert_not_called()
+
 
 class PruneItemsCommandTests(TestCase):
     def setUp(self):
