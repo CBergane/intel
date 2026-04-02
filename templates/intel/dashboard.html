@@ -6,7 +6,7 @@
 {% block content %}
 <section class="space-y-3 sm:space-y-5 xl:space-y-7">
     <div class="space-y-2.5 md:hidden">
-        <div class="flex items-start justify-between gap-2.5 px-0.5">
+        <div class="flex flex-wrap items-start justify-between gap-2.5 px-0.5">
             <div class="min-w-0">
                 <h1 class="text-sm font-semibold text-white">Now</h1>
                 <p class="mt-0.5 text-[10px] leading-[1.15rem] text-slate-400">
@@ -111,7 +111,7 @@
                         <a href="#trending-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Trending</a>
                     </div>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                     <a href="/sources" class="text-[11px] font-medium text-slate-300 hover:text-white sm:text-sm">Browse layer</a>
                     <a href="/active" class="text-[11px] font-medium text-sky-300 hover:text-sky-200 sm:text-sm">View active page</a>
                 </div>
@@ -125,7 +125,7 @@
             </div>
         </div>
 
-        <aside id="trending-block" class="space-y-2.5 lg:col-span-4 lg:space-y-4 xl:sticky xl:top-36 xl:col-span-3 xl:space-y-3">
+        <aside id="trending-block" class="min-w-0 space-y-2.5 lg:col-span-4 lg:space-y-4 xl:sticky xl:top-36 xl:col-span-3 xl:space-y-3">
             <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
                 <div class="mb-3 flex items-center justify-between gap-3">
                     <h2 class="text-sm font-semibold text-white sm:text-base">Feed Health</h2>
@@ -163,8 +163,8 @@
                 <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending Sources (48h)</h2>
                 <ul class="space-y-2 text-sm text-slate-300">
                     {% for row in trending_sources %}
-                        <li class="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
-                            <a href="{{ row.open_url }}" class="min-w-0 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
+                        <li class="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
+                            <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
                             <span class="rounded bg-slate-800 px-2 py-0.5 text-xs">{{ row.item_count }}</span>
                         </li>
                     {% empty %}

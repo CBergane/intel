@@ -1,8 +1,8 @@
 {% load humanize %}
-<article data-card-layout="{% if front_page %}front-page{% else %}standard{% endif %}" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 {% if front_page %}p-2.5 sm:p-4{% else %}p-3 sm:p-4{% endif %} shadow-glow {% if front_page %}flex flex-col{% endif %} xl:p-5">
-    <div class="flex min-w-0 items-start justify-between {% if front_page %}gap-2.5{% else %}gap-3{% endif %}">
-        <div class="min-w-0 flex flex-wrap items-center gap-1.5 {% if front_page %}text-[9px] sm:text-[11px] md:text-xs{% else %}text-[10px] sm:text-[11px] md:text-xs{% endif %}">
-            <a href="{{ item.source_browse_url }}" class="truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300 transition hover:border-sky-400/30 hover:text-white {% if front_page %}max-w-[8.5rem] sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]{% else %}max-w-[10.5rem] sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]{% endif %}">
+<article data-card-layout="{% if front_page %}front-page{% else %}standard{% endif %}" class="group w-full min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 {% if front_page %}p-2.5 sm:p-4{% else %}p-3 sm:p-4{% endif %} shadow-glow {% if front_page %}flex flex-col{% endif %} xl:p-5">
+    <div class="flex min-w-0 flex-wrap items-start {% if front_page %}gap-2{% else %}gap-2.5{% endif %}">
+        <div class="min-w-0 flex flex-1 flex-wrap items-center gap-1.5 {% if front_page %}text-[9px] sm:text-[11px] md:text-xs{% else %}text-[10px] sm:text-[11px] md:text-xs{% endif %}">
+            <a href="{{ item.source_browse_url }}" class="min-w-0 truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300 transition hover:border-sky-400/30 hover:text-white {% if front_page %}max-w-[8rem] sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]{% else %}max-w-[10rem] sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]{% endif %}">
                 {{ item.source.name }}
             </a>
             <span class="rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
@@ -17,7 +17,7 @@
                 </span>
             {% endif %}
         </div>
-        <time class="shrink-0 {% if front_page %}text-[9px] sm:text-[11px] md:text-xs{% else %}text-[10px] sm:text-[11px] md:text-xs{% endif %} text-slate-500" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
+        <time class="max-w-full text-[9px] text-slate-500 sm:ml-auto {% if front_page %}sm:text-[11px] md:text-xs{% else %}sm:text-[11px] md:text-xs{% endif %}" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
             {{ item.activity_at|naturaltime }}
         </time>
     </div>
@@ -55,7 +55,7 @@
     <div class="{% if front_page %}mt-auto flex flex-wrap items-center gap-2 pt-2{% else %}mt-3 flex flex-wrap items-center gap-2{% endif %}">
         <p class="min-w-0 flex-1 text-slate-500 {% if front_page %}line-clamp-1 text-[10px] leading-[1.1rem] sm:line-clamp-2 sm:text-[11px] sm:leading-5 md:text-xs{% else %}text-[11px] md:text-xs truncate md:overflow-visible md:whitespace-normal md:leading-5{% endif %}">{{ item.feed.name|truncatechars:44 }}</p>
         {% if item.url %}
-            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full shrink-0 items-center justify-center rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-sky-400 sm:w-auto sm:px-2.5 sm:py-1.5 sm:text-xs">
+            <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full max-w-full items-center justify-center rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-sky-400 sm:w-auto sm:px-2.5 sm:py-1.5 sm:text-xs">
                 Open Source
             </a>
         {% endif %}

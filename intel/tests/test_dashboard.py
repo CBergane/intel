@@ -226,7 +226,7 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'lg:grid-cols-3')
         self.assertContains(
             response,
-            'data-card-layout="front-page" class="group min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-2.5 sm:p-4 shadow-glow flex flex-col xl:p-5"',
+            'data-card-layout="front-page" class="group w-full min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-2.5 sm:p-4 shadow-glow flex flex-col xl:p-5"',
             html=False,
         )
         self.assertNotContains(
@@ -269,7 +269,7 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'data-card-layout="dashboard-active-preview"')
         self.assertContains(
             response,
-            'data-card-layout="dashboard-active-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]"',
+            'data-card-layout="dashboard-active-preview" class="group w-full min-w-0 overflow-hidden flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]"',
             html=False,
         )
 
@@ -324,7 +324,7 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'data-card-layout="dashboard-preview"')
         self.assertContains(
             response,
-            'data-card-layout="dashboard-preview" class="group flex flex-col rounded-xl border border-line/80 bg-slate-900/60 px-2.5 py-2.5 md:min-h-[11.5rem] sm:px-3 sm:py-3"',
+            'data-card-layout="dashboard-preview" class="group w-full min-w-0 overflow-hidden flex flex-col rounded-xl border border-line/80 bg-slate-900/60 px-2.5 py-2.5 md:min-h-[11.5rem] sm:px-3 sm:py-3"',
             html=False,
         )
 
@@ -347,3 +347,6 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'class="grid grid-cols-2 gap-2"', html=False)
         self.assertContains(response, '[-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]', html=False)
         self.assertContains(response, 'text-[13px] leading-5 sm:mt-2 sm:text-sm', html=False)
+        self.assertContains(response, 'flex min-w-0 flex-wrap items-start gap-2', html=False)
+        self.assertContains(response, 'class="inline-flex w-full max-w-full items-center justify-center rounded-lg bg-sky-500', html=False)
+        self.assertContains(response, 'class="w-full max-w-full rounded-md border border-slate-700/80', html=False)
