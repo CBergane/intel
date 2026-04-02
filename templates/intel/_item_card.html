@@ -1,11 +1,11 @@
 {% load humanize %}
-<article data-card-layout="{% if front_page %}front-page{% else %}standard{% endif %}" class="group w-full min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 {% if front_page %}p-2.5 sm:p-4{% else %}p-3 sm:p-4{% endif %} shadow-glow {% if front_page %}flex flex-col{% endif %} xl:p-5">
+<article data-card-layout="{% if front_page %}front-page{% else %}standard{% endif %}" class="group w-full min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 {% if front_page and mobile_dense %}p-2 sm:p-4{% elif front_page %}p-2.5 sm:p-4{% else %}p-3 sm:p-4{% endif %} shadow-glow {% if front_page %}flex flex-col{% endif %} xl:p-5">
     <div class="flex min-w-0 flex-wrap items-start {% if front_page %}gap-2{% else %}gap-2.5{% endif %}">
         <div class="min-w-0 flex flex-1 flex-wrap items-center gap-1.5 {% if front_page %}text-[9px] sm:text-[11px] md:text-xs{% else %}text-[10px] sm:text-[11px] md:text-xs{% endif %}">
-            <a href="{{ item.source_browse_url }}" class="min-w-0 truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300 transition hover:border-sky-400/30 hover:text-white {% if front_page %}max-w-[8rem] sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]{% else %}max-w-[10rem] sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]{% endif %}">
+            <a href="{{ item.source_browse_url }}" class="min-w-0 truncate rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300 transition hover:border-sky-400/30 hover:text-white {% if front_page and mobile_dense %}max-w-[7rem] sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]{% elif front_page %}max-w-[8rem] sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]{% else %}max-w-[10rem] sm:max-w-[12rem] md:max-w-[15rem] lg:max-w-[18rem]{% endif %}">
                 {{ item.source.name }}
             </a>
-            <span class="rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
+            <span class="{% if front_page and mobile_dense %}hidden sm:inline-flex {% endif %}rounded-md border border-line/70 bg-slate-800/80 px-2 py-1 text-slate-300">{{ item.feed.get_section_display }}</span>
             {% if item.signal_label %}
                 <span class="rounded-md px-2 py-1 {% if item.signal_tone == 'amber' %}border border-amber-500/30 bg-amber-500/10 text-amber-200{% elif item.signal_tone == 'rose' %}border border-rose-500/30 bg-rose-500/10 text-rose-200{% else %}border border-sky-500/30 bg-sky-500/15 text-sky-200{% endif %}">
                     {{ item.signal_label }}
@@ -23,7 +23,7 @@
     </div>
 
     <div class="{% if front_page %}mt-2 flex flex-1 flex-col sm:mt-2.5{% else %}mt-2.5{% endif %}">
-        <h2 class="{% if compact %}text-[15px] sm:text-base{% elif front_page %}text-[15px] sm:text-lg{% else %}text-base sm:text-lg{% endif %} min-w-0 break-words font-medium leading-tight text-white">
+        <h2 class="{% if compact %}text-[15px] sm:text-base{% elif front_page and mobile_dense %}text-[14px] sm:text-lg{% elif front_page %}text-[15px] sm:text-lg{% else %}text-base sm:text-lg{% endif %} min-w-0 break-words font-medium leading-tight text-white">
             {% if item.url %}
                 <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block hover:text-accent">
                     <span class="block overflow-hidden break-words [display:-webkit-box] [-webkit-box-orient:vertical] {% if compact and front_page %}[-webkit-line-clamp:2]{% elif compact %}[-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]{% elif front_page %}[-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]{% else %}[-webkit-line-clamp:3] lg:[-webkit-line-clamp:4]{% endif %}">
@@ -46,7 +46,7 @@
         {% endif %}
 
         {% if item.summary %}
-            <p class="overflow-hidden break-words text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] {% if front_page %}mt-1.5 text-[13px] leading-5 sm:mt-2 sm:text-sm md:text-[15px] md:leading-6{% else %}mt-2 text-sm leading-5 md:text-[15px] md:leading-6{% endif %} {% if compact and front_page %}[-webkit-line-clamp:2]{% elif compact %}[-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]{% elif front_page %}[-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]{% else %}[-webkit-line-clamp:3] lg:[-webkit-line-clamp:4]{% endif %} {% if front_page %}flex-1{% endif %}">
+            <p class="overflow-hidden break-words text-slate-300 [display:-webkit-box] [-webkit-box-orient:vertical] {% if front_page and mobile_dense %}mt-1 text-[12px] leading-[1.1rem] sm:mt-2 sm:text-sm md:text-[15px] md:leading-6{% elif front_page %}mt-1.5 text-[13px] leading-5 sm:mt-2 sm:text-sm md:text-[15px] md:leading-6{% else %}mt-2 text-sm leading-5 md:text-[15px] md:leading-6{% endif %} {% if compact and front_page %}[-webkit-line-clamp:2]{% elif compact %}[-webkit-line-clamp:2] lg:[-webkit-line-clamp:3]{% elif front_page and mobile_dense %}[-webkit-line-clamp:1] sm:[-webkit-line-clamp:3]{% elif front_page %}[-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]{% else %}[-webkit-line-clamp:3] lg:[-webkit-line-clamp:4]{% endif %} {% if front_page %}flex-1{% endif %}">
                 {{ item.summary|striptags }}
             </p>
         {% endif %}
@@ -56,7 +56,12 @@
         <p class="min-w-0 flex-1 text-slate-500 {% if front_page %}line-clamp-1 text-[10px] leading-[1.1rem] sm:line-clamp-2 sm:text-[11px] sm:leading-5 md:text-xs{% else %}text-[11px] md:text-xs truncate md:overflow-visible md:whitespace-normal md:leading-5{% endif %}">{{ item.feed.name|truncatechars:44 }}</p>
         {% if item.url %}
             <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="inline-flex w-full max-w-full items-center justify-center rounded-lg bg-sky-500 px-3 py-1.5 text-[11px] font-semibold text-slate-950 hover:bg-sky-400 sm:w-auto sm:px-2.5 sm:py-1.5 sm:text-xs">
-                Open Source
+                {% if front_page and mobile_dense %}
+                    <span class="sm:hidden">Open</span>
+                    <span class="hidden sm:inline">Open Source</span>
+                {% else %}
+                    Open Source
+                {% endif %}
             </a>
         {% endif %}
     </div>

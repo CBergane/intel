@@ -27,7 +27,7 @@ class DashboardViewTests(TestCase):
         )
         return feed
 
-    def _create_item(self, *, feed, title, summary="", age_hours=0, age_days=0):
+    def _create_item(self, *, feed, title, summary="", age_hours=0, age_days=0, published_at=None):
         self._idx += 1
         return Item.objects.create(
             source=feed.source,
@@ -36,7 +36,7 @@ class DashboardViewTests(TestCase):
             summary=summary,
             url=f"https://example.com/item-{self._idx}",
             stable_id="",
-            published_at=timezone.now() - timedelta(hours=age_hours, days=age_days),
+            published_at=published_at or (timezone.now() - timedelta(hours=age_hours, days=age_days)),
         )
 
     def test_trending_cve_extraction_and_counting(self):
@@ -186,8 +186,9 @@ class DashboardViewTests(TestCase):
             feed_type=Feed.FeedType.RSS,
             section=Feed.Section.ADVISORIES,
         )
-        self._create_item(feed=active_feed, title="Same time active", age_hours=2)
-        self._create_item(feed=advisories_feed, title="Same time advisory", age_hours=2)
+        same_time = timezone.now() - timedelta(hours=2)
+        self._create_item(feed=active_feed, title="Same time active", published_at=same_time)
+        self._create_item(feed=advisories_feed, title="Same time advisory", published_at=same_time)
 
         response = self.client.get("/")
 
@@ -226,7 +227,7 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'lg:grid-cols-3')
         self.assertContains(
             response,
-            'data-card-layout="front-page" class="group w-full min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-2.5 sm:p-4 shadow-glow flex flex-col xl:p-5"',
+            'data-card-layout="front-page" class="group w-full min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-2 sm:p-4 shadow-glow flex flex-col xl:p-5"',
             html=False,
         )
         self.assertNotContains(
@@ -345,8 +346,43 @@ class DashboardViewTests(TestCase):
 
         self.assertContains(response, 'class="space-y-3 sm:space-y-5 xl:space-y-7"', html=False)
         self.assertContains(response, 'class="grid grid-cols-2 gap-2"', html=False)
-        self.assertContains(response, '[-webkit-line-clamp:2] sm:[-webkit-line-clamp:3]', html=False)
-        self.assertContains(response, 'text-[13px] leading-5 sm:mt-2 sm:text-sm', html=False)
+        self.assertContains(response, '[-webkit-line-clamp:1] sm:[-webkit-line-clamp:3]', html=False)
+        self.assertContains(response, 'mt-1 text-[12px] leading-[1.1rem] sm:mt-2 sm:text-sm', html=False)
         self.assertContains(response, 'flex min-w-0 flex-wrap items-start gap-2', html=False)
         self.assertContains(response, 'class="inline-flex w-full max-w-full items-center justify-center rounded-lg bg-sky-500', html=False)
         self.assertContains(response, 'class="w-full max-w-full rounded-md border border-slate-700/80', html=False)
+
+    def test_dashboard_mobile_sections_use_compact_high_signal_feed_health_and_trending_layouts(self):
+        active_feed = self._create_feed(
+            source_name="Mobile Signals",
+            source_slug="mobile-signals",
+            section=Feed.Section.ACTIVE,
+        )
+        for idx in range(4):
+            self._create_item(
+                feed=active_feed,
+                title=f"High Signal Mobile {idx}",
+                summary="Actively exploited vulnerability with mobile preview trimming.",
+                age_hours=idx,
+            )
+
+        for idx in range(5):
+            feed = self._create_feed(
+                source_name=f"Trending Source {idx}",
+                source_slug=f"trending-source-{idx}",
+                section=Feed.Section.ADVISORIES,
+            )
+            self._create_item(
+                feed=feed,
+                title=f"Trending Item {idx}",
+                summary="Recent source activity.",
+                age_hours=idx,
+            )
+
+        response = self.client.get("/")
+
+        self.assertContains(response, 'data-mobile-trim="high-signal-overflow"', html=False)
+        self.assertContains(response, "Showing the top 3 curated items on mobile.")
+        self.assertContains(response, 'data-mobile-layout="feed-health-compact"', html=False)
+        self.assertContains(response, 'data-mobile-layout="trending-sources-compact"', html=False)
+        self.assertContains(response, "Top 4 shown on mobile.")

@@ -118,59 +118,121 @@
             </div>
             <div class="flex-1 space-y-2 sm:space-y-3">
                 {% for item in high_signal_items %}
-                    {% include "intel/_item_card.html" with compact=False front_page=True %}
+                    <div class="min-w-0 {% if forloop.counter > 3 %}hidden sm:block{% endif %}" {% if forloop.counter > 3 %}data-mobile-trim="high-signal-overflow"{% endif %}>
+                        {% include "intel/_item_card.html" with compact=False front_page=True mobile_dense=True %}
+                    </div>
                 {% empty %}
                     <p class="text-sm text-slate-400">No urgent high-signal items cleared the curated threshold yet. Use the section browse layer for the full recent intake.</p>
                 {% endfor %}
             </div>
+            {% if high_signal_items|length > 3 %}
+                <p class="text-[10px] text-slate-500 sm:hidden">Showing the top 3 curated items on mobile.</p>
+            {% endif %}
         </div>
 
         <aside id="trending-block" class="min-w-0 space-y-2.5 lg:col-span-4 lg:space-y-4 xl:sticky xl:top-36 xl:col-span-3 xl:space-y-3">
             <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
-                <div class="mb-3 flex items-center justify-between gap-3">
-                    <h2 class="text-sm font-semibold text-white sm:text-base">Feed Health</h2>
-                    <a href="/feed-health" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">Open panel</a>
+                <div data-mobile-layout="feed-health-compact" class="space-y-2.5 sm:hidden">
+                    <div class="flex items-center justify-between gap-2">
+                        <h2 class="text-sm font-semibold text-white">Feed Health</h2>
+                        <a href="/feed-health" class="text-[11px] font-medium text-sky-300 hover:text-sky-200">Open</a>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5 text-[10px]">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-slate-300">
+                            Enabled <span class="font-semibold text-white">{{ enabled_feed_count }}</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">
+                            OK <span class="font-semibold text-emerald-100">{{ feed_status_counts.ok }}</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-rose-200">
+                            Error <span class="font-semibold text-rose-100">{{ feed_status_counts.error }}</span>
+                        </span>
+                        <span class="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-amber-200">
+                            Never <span class="font-semibold text-amber-100">{{ feed_status_counts.never }}</span>
+                        </span>
+                    </div>
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2">
+                        <p class="text-[10px] uppercase tracking-[0.16em] text-slate-500">Last ingest</p>
+                        <p class="mt-1 text-sm font-semibold text-white">
+                            {% if last_ingest_finished_at %}
+                                <span title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
+                            {% else %}
+                                <span class="text-slate-400">never</span>
+                            {% endif %}
+                        </p>
+                    </div>
                 </div>
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                        Enabled
-                        <p class="mt-1 text-sm font-semibold text-white">{{ enabled_feed_count }}</p>
+
+                <div class="hidden sm:block">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <h2 class="text-sm font-semibold text-white sm:text-base">Feed Health</h2>
+                        <a href="/feed-health" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">Open panel</a>
                     </div>
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                        OK
-                        <p class="mt-1 text-sm font-semibold text-emerald-300">{{ feed_status_counts.ok }}</p>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                            Enabled
+                            <p class="mt-1 text-sm font-semibold text-white">{{ enabled_feed_count }}</p>
+                        </div>
+                        <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                            OK
+                            <p class="mt-1 text-sm font-semibold text-emerald-300">{{ feed_status_counts.ok }}</p>
+                        </div>
+                        <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                            Error
+                            <p class="mt-1 text-sm font-semibold text-rose-300">{{ feed_status_counts.error }}</p>
+                        </div>
+                        <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                            Never
+                            <p class="mt-1 text-sm font-semibold text-amber-300">{{ feed_status_counts.never }}</p>
+                        </div>
                     </div>
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                        Error
-                        <p class="mt-1 text-sm font-semibold text-rose-300">{{ feed_status_counts.error }}</p>
-                    </div>
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                        Never
-                        <p class="mt-1 text-sm font-semibold text-amber-300">{{ feed_status_counts.never }}</p>
-                    </div>
+                    <p class="mt-2.5 text-[11px] text-slate-400 sm:text-xs">
+                        Last ingest:
+                        {% if last_ingest_finished_at %}
+                            <span class="font-medium text-white" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
+                        {% else %}
+                            <span class="font-medium text-slate-400">never</span>
+                        {% endif %}
+                    </p>
                 </div>
-                <p class="mt-2.5 text-[11px] text-slate-400 sm:text-xs">
-                    Last ingest:
-                    {% if last_ingest_finished_at %}
-                        <span class="font-medium text-white" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
-                    {% else %}
-                        <span class="font-medium text-slate-400">never</span>
-                    {% endif %}
-                </p>
             </div>
 
             <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
-                <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending Sources (48h)</h2>
-                <ul class="space-y-2 text-sm text-slate-300">
-                    {% for row in trending_sources %}
-                        <li class="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
-                            <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
-                            <span class="rounded bg-slate-800 px-2 py-0.5 text-xs">{{ row.item_count }}</span>
-                        </li>
-                    {% empty %}
-                        <li class="text-slate-400">No recent source activity.</li>
-                    {% endfor %}
-                </ul>
+                <div data-mobile-layout="trending-sources-compact" class="sm:hidden">
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                        <h2 class="text-sm font-semibold text-white">Trending Sources</h2>
+                        <span class="text-[10px] text-slate-500">48h</span>
+                    </div>
+                    <ul class="space-y-1.5 text-slate-300">
+                        {% for row in trending_sources %}
+                            {% if forloop.counter <= 4 %}
+                                <li class="flex min-w-0 items-center gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
+                                    <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-[12px] hover:text-sky-300">{{ row.source__name }}</a>
+                                    <span class="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px]">{{ row.item_count }}</span>
+                                </li>
+                            {% endif %}
+                        {% empty %}
+                            <li class="text-sm text-slate-400">No recent source activity.</li>
+                        {% endfor %}
+                    </ul>
+                    {% if trending_sources|length > 4 %}
+                        <p class="mt-2 text-[10px] text-slate-500">Top 4 shown on mobile.</p>
+                    {% endif %}
+                </div>
+
+                <div class="hidden sm:block">
+                    <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending Sources (48h)</h2>
+                    <ul class="space-y-2 text-sm text-slate-300">
+                        {% for row in trending_sources %}
+                            <li class="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
+                                <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
+                                <span class="rounded bg-slate-800 px-2 py-0.5 text-xs">{{ row.item_count }}</span>
+                            </li>
+                        {% empty %}
+                            <li class="text-slate-400">No recent source activity.</li>
+                        {% endfor %}
+                    </ul>
+                </div>
             </div>
 
             <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
