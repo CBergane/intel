@@ -227,7 +227,7 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'lg:grid-cols-3')
         self.assertContains(
             response,
-            'data-card-layout="front-page" class="group w-full min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-2 sm:p-4 shadow-glow flex flex-col xl:p-5"',
+            'data-card-layout="front-page" class="group w-full min-w-0 overflow-hidden rounded-xl border border-line/90 bg-slate-900/70 p-2 max-[320px]:p-1.5 sm:p-4 shadow-glow flex flex-col xl:p-5"',
             html=False,
         )
         self.assertNotContains(
@@ -270,7 +270,7 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'data-card-layout="dashboard-active-preview"')
         self.assertContains(
             response,
-            'data-card-layout="dashboard-active-preview" class="group w-full min-w-0 overflow-hidden flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]"',
+            'data-card-layout="dashboard-active-preview" class="group w-full min-w-0 overflow-hidden flex flex-col rounded-xl border border-line/80 bg-slate-900/65 px-3 py-3 max-[320px]:px-2.5 max-[320px]:py-2.5 shadow-[inset_0_1px_0_rgba(148,163,184,0.04)] md:min-h-[14rem] xl:min-h-[14.5rem]"',
             html=False,
         )
 
@@ -345,9 +345,9 @@ class DashboardViewTests(TestCase):
         response = self.client.get("/")
 
         self.assertContains(response, 'class="space-y-3 sm:space-y-5 xl:space-y-7"', html=False)
-        self.assertContains(response, 'class="grid grid-cols-2 gap-2"', html=False)
+        self.assertContains(response, 'class="grid grid-cols-2 gap-2 max-[320px]:gap-1.5"', html=False)
         self.assertContains(response, '[-webkit-line-clamp:1] sm:[-webkit-line-clamp:3]', html=False)
-        self.assertContains(response, 'mt-1 text-[12px] leading-[1.1rem] sm:mt-2 sm:text-sm', html=False)
+        self.assertContains(response, 'mt-1 text-[12px] max-[320px]:text-[11px] leading-[1.1rem] sm:mt-2 sm:text-sm', html=False)
         self.assertContains(response, 'flex min-w-0 flex-wrap items-start gap-2', html=False)
         self.assertContains(response, 'class="inline-flex w-full max-w-full items-center justify-center rounded-lg bg-sky-500', html=False)
         self.assertContains(response, 'class="w-full max-w-full rounded-md border border-slate-700/80', html=False)
@@ -386,3 +386,57 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, 'data-mobile-layout="feed-health-compact"', html=False)
         self.assertContains(response, 'data-mobile-layout="trending-sources-compact"', html=False)
         self.assertContains(response, "Top 4 shown on mobile.")
+
+    def test_dashboard_ultra_narrow_layout_uses_max_320_compaction(self):
+        active_feed = self._create_feed(
+            source_name="Ultra Mobile Source",
+            source_slug="ultra-mobile-source",
+            section=Feed.Section.ACTIVE,
+        )
+        for idx in range(4):
+            self._create_item(
+                feed=active_feed,
+                title=f"Ultra Mobile High Signal {idx}",
+                summary="Actively exploited vulnerability with ultra narrow trimming.",
+                age_hours=idx,
+            )
+
+        for idx in range(4):
+            advisory_feed = self._create_feed(
+                source_name=f"Ultra Trending {idx}",
+                source_slug=f"ultra-trending-{idx}",
+                section=Feed.Section.ADVISORIES,
+            )
+            self._create_item(
+                feed=advisory_feed,
+                title=f"Ultra Trending Item {idx}",
+                summary="Recent source activity.",
+                age_hours=idx,
+            )
+
+        cve_feed = self._create_feed(
+            source_name="Ultra CVE Source",
+            source_slug="ultra-cve-source",
+            section=Feed.Section.ADVISORIES,
+        )
+        for idx in range(4):
+            self._create_item(
+                feed=cve_feed,
+                title=f"CVE-2026-100{idx} urgent advisory",
+                summary="Critical CVE-driven item for ultra narrow mobile compaction.",
+                age_hours=idx,
+            )
+
+        response = self.client.get("/")
+
+        self.assertContains(response, 'max-[320px]:gap-1.5', html=False)
+        self.assertContains(response, 'max-[320px]:text-lg', html=False)
+        self.assertContains(response, 'data-ultra-mobile-trim="high-signal-extra"', html=False)
+        self.assertContains(response, "Showing the top 2 curated items on very small screens.")
+        self.assertContains(response, 'data-ultra-mobile-trim="active-extra"', html=False)
+        self.assertContains(response, "Showing the top 2 active items on very small screens.")
+        self.assertContains(response, 'data-mobile-layout="trending-cves-compact"', html=False)
+        self.assertContains(response, 'data-ultra-mobile-trim="trending-cve-extra"', html=False)
+        self.assertContains(response, "Top 3 CVEs shown on very small screens.")
+        self.assertContains(response, 'data-ultra-mobile-trim="trending-source-extra"', html=False)
+        self.assertContains(response, "Top 3 shown on very small screens.")

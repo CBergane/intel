@@ -22,22 +22,22 @@
             </a>
         </div>
 
-        <div class="grid grid-cols-2 gap-2">
-            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 shadow-glow">
-                <p class="text-xl font-bold tabular-nums text-accent">{{ items_today_count }}</p>
-                <p class="mt-0.5 text-[10px] text-slate-400">Items today</p>
+        <div class="grid grid-cols-2 gap-2 max-[320px]:gap-1.5">
+            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 max-[320px]:px-2.5 max-[320px]:py-2 shadow-glow">
+                <p class="text-xl max-[320px]:text-lg font-bold tabular-nums text-accent">{{ items_today_count }}</p>
+                <p class="mt-0.5 text-[10px] max-[320px]:text-[9px] text-slate-400">Items today</p>
             </div>
-            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 shadow-glow">
-                <p class="text-xl font-bold tabular-nums text-accent">{{ items_week_count }}</p>
-                <p class="mt-0.5 text-[10px] text-slate-400">This week</p>
+            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 max-[320px]:px-2.5 max-[320px]:py-2 shadow-glow">
+                <p class="text-xl max-[320px]:text-lg font-bold tabular-nums text-accent">{{ items_week_count }}</p>
+                <p class="mt-0.5 text-[10px] max-[320px]:text-[9px] text-slate-400">This week</p>
             </div>
-            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 shadow-glow">
-                <p class="text-xl font-bold tabular-nums text-accent">{{ active_feeds_count }}</p>
-                <p class="mt-0.5 text-[10px] text-slate-400">Active feeds</p>
+            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 max-[320px]:px-2.5 max-[320px]:py-2 shadow-glow">
+                <p class="text-xl max-[320px]:text-lg font-bold tabular-nums text-accent">{{ active_feeds_count }}</p>
+                <p class="mt-0.5 text-[10px] max-[320px]:text-[9px] text-slate-400">Active feeds</p>
             </div>
-            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 shadow-glow">
-                <p class="text-xl font-bold tabular-nums text-accent">{{ dark_hits_30d_count }}</p>
-                <p class="mt-0.5 text-[10px] text-slate-400">Dark hits (30d)</p>
+            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 max-[320px]:px-2.5 max-[320px]:py-2 shadow-glow">
+                <p class="text-xl max-[320px]:text-lg font-bold tabular-nums text-accent">{{ dark_hits_30d_count }}</p>
+                <p class="mt-0.5 text-[10px] max-[320px]:text-[9px] text-slate-400">Dark hits (30d)</p>
             </div>
         </div>
     </div>
@@ -102,7 +102,7 @@
                         <h2 class="text-sm font-semibold text-white sm:text-base xl:text-lg">High Signal (Last 7 days)</h2>
                         <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ high_signal_items|length }} curated</span>
                     </div>
-                    <p class="text-[11px] leading-[1.15rem] text-slate-400 sm:text-xs sm:leading-5">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel. Routine release and maintenance notices are de-emphasized.</p>
+                    <p class="text-[11px] max-[320px]:hidden leading-[1.15rem] text-slate-400 sm:text-xs sm:leading-5">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel. Routine release and maintenance notices are de-emphasized.</p>
                     <div class="flex flex-wrap gap-1.5 text-[11px] sm:hidden">
                         <a href="#active-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Active</a>
                         <a href="#advisories-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Advisories</a>
@@ -118,7 +118,7 @@
             </div>
             <div class="flex-1 space-y-2 sm:space-y-3">
                 {% for item in high_signal_items %}
-                    <div class="min-w-0 {% if forloop.counter > 3 %}hidden sm:block{% endif %}" {% if forloop.counter > 3 %}data-mobile-trim="high-signal-overflow"{% endif %}>
+                    <div class="min-w-0 {% if forloop.counter > 3 %}hidden sm:block{% elif forloop.counter > 2 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-mobile-trim="high-signal-overflow"{% elif forloop.counter > 2 %}data-ultra-mobile-trim="high-signal-extra"{% endif %}>
                         {% include "intel/_item_card.html" with compact=False front_page=True mobile_dense=True %}
                     </div>
                 {% empty %}
@@ -128,31 +128,34 @@
             {% if high_signal_items|length > 3 %}
                 <p class="text-[10px] text-slate-500 sm:hidden">Showing the top 3 curated items on mobile.</p>
             {% endif %}
+            {% if high_signal_items|length > 2 %}
+                <p class="hidden max-[320px]:block text-[10px] text-slate-500">Showing the top 2 curated items on very small screens.</p>
+            {% endif %}
         </div>
 
         <aside id="trending-block" class="min-w-0 space-y-2.5 lg:col-span-4 lg:space-y-4 xl:sticky xl:top-36 xl:col-span-3 xl:space-y-3">
             <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
-                <div data-mobile-layout="feed-health-compact" class="space-y-2.5 sm:hidden">
+                <div data-mobile-layout="feed-health-compact" class="space-y-2.5 max-[320px]:space-y-2 sm:hidden">
                     <div class="flex items-center justify-between gap-2">
                         <h2 class="text-sm font-semibold text-white">Feed Health</h2>
-                        <a href="/feed-health" class="text-[11px] font-medium text-sky-300 hover:text-sky-200">Open</a>
+                        <a href="/feed-health" class="text-[11px] max-[320px]:text-[10px] font-medium text-sky-300 hover:text-sky-200">Open</a>
                     </div>
-                    <div class="flex flex-wrap gap-1.5 text-[10px]">
-                        <span class="inline-flex items-center gap-1 rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-slate-300">
+                    <div class="flex flex-wrap gap-1.5 max-[320px]:gap-1 text-[10px] max-[320px]:text-[9px]">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-slate-300">
                             Enabled <span class="font-semibold text-white">{{ enabled_feed_count }}</span>
                         </span>
-                        <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-emerald-200">
                             OK <span class="font-semibold text-emerald-100">{{ feed_status_counts.ok }}</span>
                         </span>
-                        <span class="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 text-rose-200">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-rose-200">
                             Error <span class="font-semibold text-rose-100">{{ feed_status_counts.error }}</span>
                         </span>
-                        <span class="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-amber-200">
+                        <span class="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-amber-200">
                             Never <span class="font-semibold text-amber-100">{{ feed_status_counts.never }}</span>
                         </span>
                     </div>
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2">
-                        <p class="text-[10px] uppercase tracking-[0.16em] text-slate-500">Last ingest</p>
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 max-[320px]:px-2 max-[320px]:py-1.5">
+                        <p class="text-[10px] max-[320px]:text-[9px] uppercase tracking-[0.16em] text-slate-500">Last ingest</p>
                         <p class="mt-1 text-sm font-semibold text-white">
                             {% if last_ingest_finished_at %}
                                 <span title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
@@ -206,9 +209,9 @@
                     <ul class="space-y-1.5 text-slate-300">
                         {% for row in trending_sources %}
                             {% if forloop.counter <= 4 %}
-                                <li class="flex min-w-0 items-center gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
-                                    <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-[12px] hover:text-sky-300">{{ row.source__name }}</a>
-                                    <span class="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px]">{{ row.item_count }}</span>
+                                <li class="flex min-w-0 items-center gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2 max-[320px]:px-2 max-[320px]:py-1.5 {% if forloop.counter > 3 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-ultra-mobile-trim="trending-source-extra"{% endif %}>
+                                    <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-[12px] max-[320px]:text-[11px] hover:text-sky-300">{{ row.source__name }}</a>
+                                    <span class="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] max-[320px]:text-[9px]">{{ row.item_count }}</span>
                                 </li>
                             {% endif %}
                         {% empty %}
@@ -217,6 +220,9 @@
                     </ul>
                     {% if trending_sources|length > 4 %}
                         <p class="mt-2 text-[10px] text-slate-500">Top 4 shown on mobile.</p>
+                    {% endif %}
+                    {% if trending_sources|length > 3 %}
+                        <p class="hidden max-[320px]:block mt-2 text-[10px] text-slate-500">Top 3 shown on very small screens.</p>
                     {% endif %}
                 </div>
 
@@ -235,11 +241,11 @@
                 </div>
             </div>
 
-            <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
+            <div data-mobile-layout="trending-cves-compact" class="rounded-xl border border-line bg-panel/80 p-3 max-[320px]:p-2.5 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
                 <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending CVEs (7d)</h2>
-                <div class="flex flex-wrap gap-2">
+                <div class="flex flex-wrap gap-2 max-[320px]:gap-1.5">
                     {% for cve, count in trending_cves %}
-                        <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/15 px-2.5 py-1.5 text-xs font-medium text-sky-200 hover:bg-sky-500/25">
+                        <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/15 px-2.5 py-1.5 max-[320px]:px-2 max-[320px]:py-1 max-[320px]:text-[10px] text-xs font-medium text-sky-200 hover:bg-sky-500/25 {% if forloop.counter > 3 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-ultra-mobile-trim="trending-cve-extra"{% endif %}>
                             <span>{{ cve }}</span>
                             <span class="text-sky-100/80">({{ count }})</span>
                         </a>
@@ -247,6 +253,9 @@
                         <span class="text-sm text-slate-400">No CVE activity in the last 7 days.</span>
                     {% endfor %}
                 </div>
+                {% if trending_cves|length > 3 %}
+                    <p class="hidden max-[320px]:block mt-2 text-[10px] text-slate-500">Top 3 CVEs shown on very small screens.</p>
+                {% endif %}
             </div>
         </aside>
     </div>
@@ -270,11 +279,16 @@
         </div>
         <div class="grid gap-2.5 md:grid-cols-2 md:items-start xl:grid-cols-3">
             {% for item in active_items %}
-                {% include "intel/_dashboard_active_preview_card.html" %}
+                <div class="min-w-0 {% if forloop.counter > 2 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 2 %}data-ultra-mobile-trim="active-extra"{% endif %}>
+                    {% include "intel/_dashboard_active_preview_card.html" %}
+                </div>
             {% empty %}
                 <p class="text-sm text-slate-400 md:col-span-2 xl:col-span-3">No recent active items found.</p>
             {% endfor %}
         </div>
+        {% if active_items|length > 2 %}
+            <p class="hidden max-[320px]:block text-[10px] text-slate-500">Showing the top 2 active items on very small screens.</p>
+        {% endif %}
     </section>
 
     <div class="grid gap-3 lg:grid-cols-3 lg:items-start lg:gap-5 xl:gap-6">
