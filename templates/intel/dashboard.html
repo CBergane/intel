@@ -79,18 +79,162 @@
 
     <nav class="sticky top-[3.25rem] z-30 hidden rounded-xl border border-line/80 bg-night/90 p-1.5 backdrop-blur sm:block lg:hidden">
         <div class="no-scrollbar flex gap-2 overflow-x-auto px-0.5 text-xs">
-            <a href="#high-signal" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">High Signal</a>
-            <a href="#active-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Active</a>
+            <a href="#high-signal-mobile" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">High Signal</a>
+            <a href="#active-block-mobile" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Active</a>
             <a href="#advisories-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Advisories</a>
             <a href="#research-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Research</a>
             <a href="#sweden-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Sweden</a>
-            <a href="#trending-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Trending</a>
+            <a href="#trending-block-mobile" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800">Trending</a>
         </div>
     </nav>
 
-    <div class="grid gap-4 lg:grid-cols-12 lg:items-start lg:gap-5 xl:gap-6">
-        <div id="high-signal" class="flex flex-col space-y-2.5 max-[430px]:space-y-2 rounded-xl border border-line bg-panel/80 p-2.5 max-[430px]:p-2 shadow-glow lg:col-span-8 sm:space-y-4 sm:p-4 xl:col-span-9 xl:rounded-2xl xl:p-6">
-            <div class="flex flex-col gap-2 max-[430px]:gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+    <section id="high-signal-mobile" data-mobile-section="high-signal" class="space-y-2 rounded-xl border border-line bg-panel/80 p-2.5 shadow-glow lg:hidden">
+        <div class="space-y-1.5">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-200">
+                    <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                        <path d="M10 2v4m0 8v4M2 10h4m8 0h4M5 5l2.5 2.5m5 5L15 15m0-10-2.5 2.5m-5 5L5 15" stroke-linecap="round" />
+                        <circle cx="10" cy="10" r="2.5" />
+                    </svg>
+                </span>
+                <h2 class="text-sm font-semibold text-white max-[430px]:text-[13px]">High Signal (Last 7 days)</h2>
+                <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ high_signal_items|length }} curated</span>
+            </div>
+            <p class="text-[11px] max-[430px]:text-[10px] leading-[1.15rem] max-[430px]:leading-[1rem] text-slate-400">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel.</p>
+            <a href="/sources" class="inline-flex text-[11px] font-medium text-sky-300 hover:text-sky-200">Browse layer</a>
+        </div>
+        <div class="space-y-1.5">
+            {% for item in high_signal_items %}
+                <div class="min-w-0 {% if forloop.counter > 3 %}hidden{% elif forloop.counter > 2 %}max-[430px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-mobile-trim="high-signal-overflow"{% elif forloop.counter > 2 %}data-iphone-mobile-trim="high-signal-extra"{% endif %}>
+                    {% include "intel/_item_card.html" with compact=False front_page=True mobile_dense=True %}
+                </div>
+            {% empty %}
+                <p class="text-sm text-slate-400">No urgent high-signal items cleared the curated threshold yet. Use the section browse layer for the full recent intake.</p>
+            {% endfor %}
+        </div>
+        {% if high_signal_items|length > 3 %}
+            <p class="text-[10px] text-slate-500 max-[430px]:hidden">Showing the top 3 curated items on mobile.</p>
+        {% endif %}
+        {% if high_signal_items|length > 2 %}
+            <p class="hidden max-[430px]:block text-[10px] text-slate-500">Showing the top 2 curated items on smaller phones.</p>
+        {% endif %}
+    </section>
+
+    <section id="active-block-mobile" data-mobile-section="active" class="space-y-2 rounded-xl border border-line bg-panel/80 p-2.5 shadow-glow lg:hidden">
+        <div class="space-y-1.5">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-500/25 bg-rose-500/10 text-rose-200">
+                    <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                        <path d="M4 10h3l1.4-3 2.4 6 1.7-3H16" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M10 18c4.2-2.8 6.5-5.6 6.5-8.7A3.8 3.8 0 0 0 12.7 5c-1.2 0-2.1.5-2.7 1.4C9.4 5.5 8.4 5 7.3 5A3.8 3.8 0 0 0 3.5 9.3c0 3.1 2.3 5.9 6.5 8.7Z" stroke-linejoin="round" />
+                    </svg>
+                </span>
+                <h2 class="text-sm font-semibold text-white max-[430px]:text-[13px]">Active</h2>
+                <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ active_items|length }} recent</span>
+            </div>
+            <p class="text-[11px] max-[430px]:text-[10px] leading-[1.15rem] max-[430px]:leading-[1rem] text-slate-400">Fast scan of recent exploitation and operational threat activity before dropping into the full Active view.</p>
+            <a href="/active" class="inline-flex text-[11px] font-medium text-sky-300 hover:text-sky-200">All active items</a>
+        </div>
+        <div class="space-y-2">
+            {% for item in active_items %}
+                <div class="min-w-0 {% if forloop.counter > 3 %}hidden{% elif forloop.counter > 2 %}max-[430px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-mobile-trim="active-overflow"{% elif forloop.counter > 2 %}data-iphone-mobile-trim="active-extra"{% endif %}>
+                    {% include "intel/_dashboard_active_preview_card.html" %}
+                </div>
+            {% empty %}
+                <p class="text-sm text-slate-400">No recent active items found.</p>
+            {% endfor %}
+        </div>
+        {% if active_items|length > 3 %}
+            <p class="text-[10px] text-slate-500 max-[430px]:hidden">Showing the top 3 active items on mobile.</p>
+        {% endif %}
+        {% if active_items|length > 2 %}
+            <p class="hidden max-[430px]:block text-[10px] text-slate-500">Showing the top 2 active items on smaller phones.</p>
+        {% endif %}
+    </section>
+
+    <div id="trending-block-mobile" data-mobile-stack="dashboard-secondary-mobile-stack" class="space-y-2.5 lg:hidden">
+        <section data-mobile-section="feed-health" class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow">
+            <div class="space-y-2.5 max-[320px]:space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                    <h2 class="text-sm font-semibold text-white">Feed Health</h2>
+                    <a href="/feed-health" class="text-[11px] max-[320px]:text-[10px] font-medium text-sky-300 hover:text-sky-200">Open</a>
+                </div>
+                <div class="flex flex-wrap gap-1.5 max-[320px]:gap-1 text-[10px] max-[320px]:text-[9px]">
+                    <span class="inline-flex items-center gap-1 rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-slate-300">
+                        Enabled <span class="font-semibold text-white">{{ enabled_feed_count }}</span>
+                    </span>
+                    <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-emerald-200">
+                        OK <span class="font-semibold text-emerald-100">{{ feed_status_counts.ok }}</span>
+                    </span>
+                    <span class="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-rose-200">
+                        Error <span class="font-semibold text-rose-100">{{ feed_status_counts.error }}</span>
+                    </span>
+                    <span class="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-amber-200">
+                        Never <span class="font-semibold text-amber-100">{{ feed_status_counts.never }}</span>
+                    </span>
+                </div>
+                <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 max-[320px]:px-2 max-[320px]:py-1.5">
+                    <p class="text-[10px] max-[320px]:text-[9px] uppercase tracking-[0.16em] text-slate-500">Last ingest</p>
+                    <p class="mt-1 text-sm font-semibold text-white">
+                        {% if last_ingest_finished_at %}
+                            <span title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
+                        {% else %}
+                            <span class="text-slate-400">never</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section data-mobile-section="trending-sources" class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow">
+            <div class="mb-2 flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold text-white">Trending Sources</h2>
+                <span class="text-[10px] text-slate-500">48h</span>
+            </div>
+            <ul class="space-y-1.5 text-slate-300">
+                {% for row in trending_sources %}
+                    {% if forloop.counter <= 4 %}
+                        <li class="flex min-w-0 items-center gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2 max-[320px]:px-2 max-[320px]:py-1.5 {% if forloop.counter > 3 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-ultra-mobile-trim="trending-source-extra"{% endif %}>
+                            <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-[12px] max-[320px]:text-[11px] hover:text-sky-300">{{ row.source__name }}</a>
+                            <span class="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] max-[320px]:text-[9px]">{{ row.item_count }}</span>
+                        </li>
+                    {% endif %}
+                {% empty %}
+                    <li class="text-sm text-slate-400">No recent source activity.</li>
+                {% endfor %}
+            </ul>
+            {% if trending_sources|length > 4 %}
+                <p class="mt-2 text-[10px] text-slate-500">Top 4 shown on mobile.</p>
+            {% endif %}
+            {% if trending_sources|length > 3 %}
+                <p class="hidden max-[320px]:block mt-2 text-[10px] text-slate-500">Top 3 shown on very small screens.</p>
+            {% endif %}
+        </section>
+
+        <section data-mobile-section="trending-cves" class="rounded-xl border border-line bg-panel/80 p-3 max-[430px]:p-2.5 max-[320px]:p-2.5 shadow-glow">
+            <h2 class="mb-3 text-sm font-semibold text-white">Trending CVEs (7d)</h2>
+            <div class="flex flex-wrap gap-2 max-[430px]:gap-1.5 max-[320px]:gap-1.5">
+                {% for cve, count in trending_cves %}
+                    <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/15 px-2.5 py-1.5 max-[430px]:px-2 max-[430px]:py-1 max-[430px]:text-[10px] max-[320px]:px-2 max-[320px]:py-1 max-[320px]:text-[10px] text-xs font-medium text-sky-200 hover:bg-sky-500/25 {% if forloop.counter > 4 %}max-[430px]:hidden{% elif forloop.counter > 3 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 4 %}data-iphone-mobile-trim="trending-cve-overflow"{% elif forloop.counter > 3 %}data-ultra-mobile-trim="trending-cve-extra"{% endif %}>
+                        <span>{{ cve }}</span>
+                        <span class="text-sky-100/80">({{ count }})</span>
+                    </a>
+                {% empty %}
+                    <span class="text-sm text-slate-400">No CVE activity in the last 7 days.</span>
+                {% endfor %}
+            </div>
+            {% if trending_cves|length > 4 %}
+                <p class="hidden max-[430px]:block max-[320px]:hidden mt-2 text-[10px] text-slate-500">Top 4 CVEs shown on smaller phones.</p>
+            {% endif %}
+            {% if trending_cves|length > 3 %}
+                <p class="hidden max-[320px]:block mt-2 text-[10px] text-slate-500">Top 3 CVEs shown on very small screens.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <div data-desktop-layout="dashboard-primary-grid" class="hidden lg:grid gap-4 lg:grid-cols-12 lg:items-start lg:gap-5 xl:gap-6">
+        <div id="high-signal" class="flex flex-col space-y-4 rounded-xl border border-line bg-panel/80 p-4 shadow-glow lg:col-span-8 xl:col-span-9 xl:rounded-2xl xl:p-6">
+            <div class="flex items-center justify-between gap-4">
                 <div class="space-y-1">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-200">
@@ -99,153 +243,80 @@
                                 <circle cx="10" cy="10" r="2.5" />
                             </svg>
                         </span>
-                        <h2 class="text-sm font-semibold text-white max-[430px]:text-[13px] sm:text-base xl:text-lg">High Signal (Last 7 days)</h2>
+                        <h2 class="text-base font-semibold text-white xl:text-lg">High Signal (Last 7 days)</h2>
                         <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ high_signal_items|length }} curated</span>
                     </div>
-                    <p class="text-[11px] max-[430px]:text-[10px] max-[320px]:hidden leading-[1.15rem] max-[430px]:leading-[1rem] text-slate-400 sm:text-xs sm:leading-5">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel. Routine release and maintenance notices are de-emphasized.</p>
-                    <div class="flex flex-wrap gap-1.5 text-[11px] sm:hidden">
-                        <a href="#active-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Active</a>
-                        <a href="#advisories-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Advisories</a>
-                        <a href="#research-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Research</a>
-                        <a href="#sweden-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Sweden</a>
-                        <a href="#trending-block" class="rounded-md border border-slate-700 px-2 py-1 text-slate-300 hover:bg-slate-800">Trending</a>
-                    </div>
+                    <p class="text-xs leading-5 text-slate-400">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel. Routine release and maintenance notices are de-emphasized.</p>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <a href="/sources" class="text-[11px] font-medium text-slate-300 hover:text-white sm:text-sm">Browse layer</a>
-                    <a href="/active" class="text-[11px] font-medium text-sky-300 hover:text-sky-200 sm:text-sm">View active page</a>
+                <div class="flex flex-wrap items-center gap-3">
+                    <a href="/sources" class="text-sm font-medium text-slate-300 hover:text-white">Browse layer</a>
+                    <a href="/active" class="text-sm font-medium text-sky-300 hover:text-sky-200">View active page</a>
                 </div>
             </div>
-            <div class="flex-1 space-y-2 max-[430px]:space-y-1.5 sm:space-y-3">
+            <div class="flex-1 space-y-3">
                 {% for item in high_signal_items %}
-                    <div class="min-w-0 {% if forloop.counter > 3 %}hidden sm:block{% elif forloop.counter > 2 %}max-[430px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-mobile-trim="high-signal-overflow"{% elif forloop.counter > 2 %}data-iphone-mobile-trim="high-signal-extra"{% endif %}>
+                    <div class="min-w-0">
                         {% include "intel/_item_card.html" with compact=False front_page=True mobile_dense=True %}
                     </div>
                 {% empty %}
                     <p class="text-sm text-slate-400">No urgent high-signal items cleared the curated threshold yet. Use the section browse layer for the full recent intake.</p>
                 {% endfor %}
             </div>
-            {% if high_signal_items|length > 3 %}
-                <p class="text-[10px] text-slate-500 max-[430px]:hidden sm:hidden">Showing the top 3 curated items on mobile.</p>
-            {% endif %}
-            {% if high_signal_items|length > 2 %}
-                <p class="hidden max-[430px]:block text-[10px] text-slate-500">Showing the top 2 curated items on smaller phones.</p>
-            {% endif %}
         </div>
 
         <aside id="trending-block" class="min-w-0 space-y-2.5 lg:col-span-4 lg:space-y-4 xl:sticky xl:top-36 xl:col-span-3 xl:space-y-3">
-            <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
-                <div data-mobile-layout="feed-health-compact" class="space-y-2.5 max-[320px]:space-y-2 sm:hidden">
-                    <div class="flex items-center justify-between gap-2">
-                        <h2 class="text-sm font-semibold text-white">Feed Health</h2>
-                        <a href="/feed-health" class="text-[11px] max-[320px]:text-[10px] font-medium text-sky-300 hover:text-sky-200">Open</a>
+            <div class="rounded-xl border border-line bg-panel/80 p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                    <h2 class="text-sm font-semibold text-white sm:text-base">Feed Health</h2>
+                    <a href="/feed-health" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">Open panel</a>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                        Enabled
+                        <p class="mt-1 text-sm font-semibold text-white">{{ enabled_feed_count }}</p>
                     </div>
-                    <div class="flex flex-wrap gap-1.5 max-[320px]:gap-1 text-[10px] max-[320px]:text-[9px]">
-                        <span class="inline-flex items-center gap-1 rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-slate-300">
-                            Enabled <span class="font-semibold text-white">{{ enabled_feed_count }}</span>
-                        </span>
-                        <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-emerald-200">
-                            OK <span class="font-semibold text-emerald-100">{{ feed_status_counts.ok }}</span>
-                        </span>
-                        <span class="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-rose-200">
-                            Error <span class="font-semibold text-rose-100">{{ feed_status_counts.error }}</span>
-                        </span>
-                        <span class="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-amber-200">
-                            Never <span class="font-semibold text-amber-100">{{ feed_status_counts.never }}</span>
-                        </span>
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                        OK
+                        <p class="mt-1 text-sm font-semibold text-emerald-300">{{ feed_status_counts.ok }}</p>
                     </div>
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 max-[320px]:px-2 max-[320px]:py-1.5">
-                        <p class="text-[10px] max-[320px]:text-[9px] uppercase tracking-[0.16em] text-slate-500">Last ingest</p>
-                        <p class="mt-1 text-sm font-semibold text-white">
-                            {% if last_ingest_finished_at %}
-                                <span title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
-                            {% else %}
-                                <span class="text-slate-400">never</span>
-                            {% endif %}
-                        </p>
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                        Error
+                        <p class="mt-1 text-sm font-semibold text-rose-300">{{ feed_status_counts.error }}</p>
+                    </div>
+                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
+                        Never
+                        <p class="mt-1 text-sm font-semibold text-amber-300">{{ feed_status_counts.never }}</p>
                     </div>
                 </div>
-
-                <div class="hidden sm:block">
-                    <div class="mb-3 flex items-center justify-between gap-3">
-                        <h2 class="text-sm font-semibold text-white sm:text-base">Feed Health</h2>
-                        <a href="/feed-health" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">Open panel</a>
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                        <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                            Enabled
-                            <p class="mt-1 text-sm font-semibold text-white">{{ enabled_feed_count }}</p>
-                        </div>
-                        <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                            OK
-                            <p class="mt-1 text-sm font-semibold text-emerald-300">{{ feed_status_counts.ok }}</p>
-                        </div>
-                        <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                            Error
-                            <p class="mt-1 text-sm font-semibold text-rose-300">{{ feed_status_counts.error }}</p>
-                        </div>
-                        <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                            Never
-                            <p class="mt-1 text-sm font-semibold text-amber-300">{{ feed_status_counts.never }}</p>
-                        </div>
-                    </div>
-                    <p class="mt-2.5 text-[11px] text-slate-400 sm:text-xs">
-                        Last ingest:
-                        {% if last_ingest_finished_at %}
-                            <span class="font-medium text-white" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
-                        {% else %}
-                            <span class="font-medium text-slate-400">never</span>
-                        {% endif %}
-                    </p>
-                </div>
+                <p class="mt-2.5 text-[11px] text-slate-400 sm:text-xs">
+                    Last ingest:
+                    {% if last_ingest_finished_at %}
+                        <span class="font-medium text-white" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
+                    {% else %}
+                        <span class="font-medium text-slate-400">never</span>
+                    {% endif %}
+                </p>
             </div>
 
-            <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
-                <div data-mobile-layout="trending-sources-compact" class="sm:hidden">
-                    <div class="mb-2 flex items-center justify-between gap-2">
-                        <h2 class="text-sm font-semibold text-white">Trending Sources</h2>
-                        <span class="text-[10px] text-slate-500">48h</span>
-                    </div>
-                    <ul class="space-y-1.5 text-slate-300">
-                        {% for row in trending_sources %}
-                            {% if forloop.counter <= 4 %}
-                                <li class="flex min-w-0 items-center gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2 max-[320px]:px-2 max-[320px]:py-1.5 {% if forloop.counter > 3 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-ultra-mobile-trim="trending-source-extra"{% endif %}>
-                                    <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-[12px] max-[320px]:text-[11px] hover:text-sky-300">{{ row.source__name }}</a>
-                                    <span class="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] max-[320px]:text-[9px]">{{ row.item_count }}</span>
-                                </li>
-                            {% endif %}
-                        {% empty %}
-                            <li class="text-sm text-slate-400">No recent source activity.</li>
-                        {% endfor %}
-                    </ul>
-                    {% if trending_sources|length > 4 %}
-                        <p class="mt-2 text-[10px] text-slate-500">Top 4 shown on mobile.</p>
-                    {% endif %}
-                    {% if trending_sources|length > 3 %}
-                        <p class="hidden max-[320px]:block mt-2 text-[10px] text-slate-500">Top 3 shown on very small screens.</p>
-                    {% endif %}
-                </div>
-
-                <div class="hidden sm:block">
-                    <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending Sources (48h)</h2>
-                    <ul class="space-y-2 text-sm text-slate-300">
-                        {% for row in trending_sources %}
-                            <li class="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
-                                <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
-                                <span class="rounded bg-slate-800 px-2 py-0.5 text-xs">{{ row.item_count }}</span>
-                            </li>
-                        {% empty %}
-                            <li class="text-slate-400">No recent source activity.</li>
-                        {% endfor %}
-                    </ul>
-                </div>
+            <div class="rounded-xl border border-line bg-panel/80 p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
+                <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending Sources (48h)</h2>
+                <ul class="space-y-2 text-sm text-slate-300">
+                    {% for row in trending_sources %}
+                        <li class="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
+                            <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
+                            <span class="rounded bg-slate-800 px-2 py-0.5 text-xs">{{ row.item_count }}</span>
+                        </li>
+                    {% empty %}
+                        <li class="text-slate-400">No recent source activity.</li>
+                    {% endfor %}
+                </ul>
             </div>
 
-            <div data-mobile-layout="trending-cves-compact" class="rounded-xl border border-line bg-panel/80 p-3 max-[430px]:p-2.5 max-[320px]:p-2.5 shadow-glow sm:p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
+            <div class="rounded-xl border border-line bg-panel/80 p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
                 <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending CVEs (7d)</h2>
-                <div class="flex flex-wrap gap-2 max-[430px]:gap-1.5 max-[320px]:gap-1.5">
+                <div class="flex flex-wrap gap-2">
                     {% for cve, count in trending_cves %}
-                        <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/15 px-2.5 py-1.5 max-[430px]:px-2 max-[430px]:py-1 max-[430px]:text-[10px] max-[320px]:px-2 max-[320px]:py-1 max-[320px]:text-[10px] text-xs font-medium text-sky-200 hover:bg-sky-500/25 {% if forloop.counter > 4 %}max-[430px]:hidden{% elif forloop.counter > 3 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 4 %}data-iphone-mobile-trim="trending-cve-overflow"{% elif forloop.counter > 3 %}data-ultra-mobile-trim="trending-cve-extra"{% endif %}>
+                        <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/15 px-2.5 py-1.5 text-xs font-medium text-sky-200 hover:bg-sky-500/25">
                             <span>{{ cve }}</span>
                             <span class="text-sky-100/80">({{ count }})</span>
                         </a>
@@ -253,18 +324,12 @@
                         <span class="text-sm text-slate-400">No CVE activity in the last 7 days.</span>
                     {% endfor %}
                 </div>
-                {% if trending_cves|length > 4 %}
-                    <p class="hidden max-[430px]:block max-[320px]:hidden mt-2 text-[10px] text-slate-500">Top 4 CVEs shown on smaller phones.</p>
-                {% endif %}
-                {% if trending_cves|length > 3 %}
-                    <p class="hidden max-[320px]:block mt-2 text-[10px] text-slate-500">Top 3 CVEs shown on very small screens.</p>
-                {% endif %}
             </div>
         </aside>
     </div>
 
-    <section id="active-block" class="space-y-2.5 max-[430px]:space-y-2 rounded-xl border border-line bg-panel/80 p-3 max-[430px]:p-2.5 shadow-glow sm:space-y-3.5 sm:p-4 xl:rounded-2xl xl:border-line/80 xl:bg-slate-900/55 xl:p-5">
-        <div class="flex flex-col gap-2 max-[430px]:gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+    <section id="active-block" data-desktop-section="active" class="hidden lg:block space-y-3.5 rounded-xl border border-line bg-panel/80 p-4 shadow-glow xl:rounded-2xl xl:border-line/80 xl:bg-slate-900/55 xl:p-5">
+        <div class="flex items-center justify-between gap-4">
             <div class="space-y-1">
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-500/25 bg-rose-500/10 text-rose-200">
@@ -273,25 +338,22 @@
                             <path d="M10 18c4.2-2.8 6.5-5.6 6.5-8.7A3.8 3.8 0 0 0 12.7 5c-1.2 0-2.1.5-2.7 1.4C9.4 5.5 8.4 5 7.3 5A3.8 3.8 0 0 0 3.5 9.3c0 3.1 2.3 5.9 6.5 8.7Z" stroke-linejoin="round" />
                         </svg>
                     </span>
-                    <h2 class="text-sm font-semibold text-white max-[430px]:text-[13px] sm:text-base">Active</h2>
+                    <h2 class="text-base font-semibold text-white">Active</h2>
                     <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ active_items|length }} recent</span>
                 </div>
-                <p class="text-[11px] max-[430px]:text-[10px] leading-[1.15rem] max-[430px]:leading-[1rem] text-slate-400 sm:text-xs sm:leading-5">Fast scan of recent exploitation and operational threat activity before dropping into the full Active view.</p>
+                <p class="text-xs leading-5 text-slate-400">Fast scan of recent exploitation and operational threat activity before dropping into the full Active view.</p>
             </div>
-            <a href="/active" class="text-[11px] font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All active items</a>
+            <a href="/active" class="text-sm font-medium text-sky-300 hover:text-sky-200">All active items</a>
         </div>
-        <div class="grid gap-2.5 max-[430px]:gap-2 md:grid-cols-2 md:items-start xl:grid-cols-3">
+        <div class="grid gap-2.5 md:grid-cols-2 md:items-start xl:grid-cols-3">
             {% for item in active_items %}
-                <div class="min-w-0 {% if forloop.counter > 2 %}max-[430px]:hidden{% endif %}" {% if forloop.counter > 2 %}data-iphone-mobile-trim="active-extra"{% endif %}>
+                <div class="min-w-0">
                     {% include "intel/_dashboard_active_preview_card.html" %}
                 </div>
             {% empty %}
                 <p class="text-sm text-slate-400 md:col-span-2 xl:col-span-3">No recent active items found.</p>
             {% endfor %}
         </div>
-        {% if active_items|length > 2 %}
-            <p class="hidden max-[430px]:block text-[10px] text-slate-500">Showing the top 2 active items on smaller phones.</p>
-        {% endif %}
     </section>
 
     <div class="grid gap-3 lg:grid-cols-3 lg:items-start lg:gap-5 xl:gap-6">

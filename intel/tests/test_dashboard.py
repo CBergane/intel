@@ -381,11 +381,24 @@ class DashboardViewTests(TestCase):
 
         response = self.client.get("/")
 
+        body = response.content.decode()
+
+        self.assertContains(response, 'data-mobile-section="high-signal"', html=False)
+        self.assertContains(response, 'data-mobile-section="active"', html=False)
+        self.assertContains(response, 'data-mobile-stack="dashboard-secondary-mobile-stack"', html=False)
+        self.assertContains(response, 'data-mobile-section="feed-health"', html=False)
+        self.assertContains(response, 'data-mobile-section="trending-sources"', html=False)
+        self.assertContains(response, 'data-mobile-section="trending-cves"', html=False)
+        self.assertContains(response, 'data-desktop-layout="dashboard-primary-grid" class="hidden lg:grid', html=False)
         self.assertContains(response, 'data-mobile-trim="high-signal-overflow"', html=False)
         self.assertContains(response, "Showing the top 3 curated items on mobile.")
-        self.assertContains(response, 'data-mobile-layout="feed-health-compact"', html=False)
-        self.assertContains(response, 'data-mobile-layout="trending-sources-compact"', html=False)
+        self.assertContains(response, 'data-mobile-trim="active-overflow"', html=False)
+        self.assertContains(response, "Showing the top 3 active items on mobile.")
         self.assertContains(response, "Top 4 shown on mobile.")
+        self.assertLess(body.index('data-mobile-section="high-signal"'), body.index('data-mobile-section="active"'))
+        self.assertLess(body.index('data-mobile-section="active"'), body.index('data-mobile-section="feed-health"'))
+        self.assertLess(body.index('data-mobile-section="feed-health"'), body.index('data-mobile-section="trending-sources"'))
+        self.assertLess(body.index('data-mobile-section="trending-sources"'), body.index('data-mobile-section="trending-cves"'))
 
     def test_dashboard_ultra_narrow_layout_uses_max_320_compaction(self):
         active_feed = self._create_feed(
@@ -435,7 +448,7 @@ class DashboardViewTests(TestCase):
         self.assertContains(response, "Showing the top 2 curated items on smaller phones.")
         self.assertContains(response, 'data-iphone-mobile-trim="active-extra"', html=False)
         self.assertContains(response, "Showing the top 2 active items on smaller phones.")
-        self.assertContains(response, 'data-mobile-layout="trending-cves-compact"', html=False)
+        self.assertContains(response, 'data-mobile-section="trending-cves"', html=False)
         self.assertContains(response, 'data-ultra-mobile-trim="trending-cve-extra"', html=False)
         self.assertContains(response, "Top 3 CVEs shown on very small screens.")
         self.assertContains(response, 'data-ultra-mobile-trim="trending-source-extra"', html=False)
@@ -470,11 +483,11 @@ class DashboardViewTests(TestCase):
 
         response = self.client.get("/")
 
-        self.assertContains(response, 'max-[430px]:space-y-2', html=False)
+        self.assertContains(response, 'id="high-signal-mobile"', html=False)
         self.assertContains(response, 'data-iphone-mobile-trim="high-signal-extra"', html=False)
         self.assertContains(response, "Showing the top 2 curated items on smaller phones.")
         self.assertContains(response, 'data-iphone-mobile-trim="active-extra"', html=False)
         self.assertContains(response, "Showing the top 2 active items on smaller phones.")
-        self.assertContains(response, 'data-mobile-layout="trending-cves-compact"', html=False)
+        self.assertContains(response, 'data-mobile-section="trending-cves"', html=False)
         self.assertContains(response, 'data-iphone-mobile-trim="trending-cve-overflow"', html=False)
         self.assertContains(response, "Top 4 CVEs shown on smaller phones.")
