@@ -30,15 +30,15 @@ PLAY_PAGE = {
 }
 
 FULL_API = [
-    {"name": "RansomHub", "slug": "ransomhub", "pages": [RANSOMHUB_PAGE]},
-    {"name": "Play", "slug": "play", "pages": [PLAY_PAGE]},
-    {"name": "Akira", "slug": "akira", "pages": [
+    {"name": "RansomHub", "slug": "ransomhub", "locations": [RANSOMHUB_PAGE]},
+    {"name": "Play", "slug": "play", "locations": [PLAY_PAGE]},
+    {"name": "Akira", "slug": "akira", "locations": [
         {"fqdn": "akirafjeowji98234kasdfj.onion", "available": True}
     ]},
-    {"name": "Medusa", "slug": "medusa", "pages": [
+    {"name": "Medusa", "slug": "medusa", "locations": [
         {"fqdn": "medusawlmjuqnfra32nkpn.onion", "available": True}
     ]},
-    {"name": "Cl0p", "slug": "clop", "pages": [
+    {"name": "Cl0p", "slug": "clop", "locations": [
         {"fqdn": "clopbcv7boh4mhnxkjgifaa.onion", "available": True}
     ]},
 ]
@@ -62,8 +62,8 @@ class SeedDarkSourcesCommandTests(TestCase):
 
     def test_creates_dark_sources(self):
         api = [
-            {"name": "RansomHub", "slug": "ransomhub", "pages": [RANSOMHUB_PAGE]},
-            {"name": "Play", "slug": "play", "pages": [PLAY_PAGE]},
+            {"name": "RansomHub", "slug": "ransomhub", "locations": [RANSOMHUB_PAGE]},
+            {"name": "Play", "slug": "play", "locations": [PLAY_PAGE]},
         ]
         self._run(api)
 
@@ -72,7 +72,7 @@ class SeedDarkSourcesCommandTests(TestCase):
         self.assertEqual(DarkSource.objects.count(), 2)
 
     def test_created_sources_have_use_tor_true(self):
-        api = [{"name": "RansomHub", "slug": "ransomhub", "pages": [RANSOMHUB_PAGE]}]
+        api = [{"name": "RansomHub", "slug": "ransomhub", "locations": [RANSOMHUB_PAGE]}]
         self._run(api)
         source = DarkSource.objects.get(slug="ransomhub")
         self.assertTrue(source.use_tor)
@@ -82,7 +82,7 @@ class SeedDarkSourcesCommandTests(TestCase):
             {
                 "name": "RansomHub",
                 "slug": "ransomhub",
-                "pages": [
+                "locations": [
                     {"fqdn": "oldaddress.onion", "available": False},
                 ],
             }
@@ -98,7 +98,7 @@ class SeedDarkSourcesCommandTests(TestCase):
             use_tor=True,
         )
         new_fqdn = RANSOMHUB_PAGE["fqdn"]
-        api = [{"name": "RansomHub", "slug": "ransomhub", "pages": [RANSOMHUB_PAGE]}]
+        api = [{"name": "RansomHub", "slug": "ransomhub", "locations": [RANSOMHUB_PAGE]}]
         self._run(api)
 
         source = DarkSource.objects.get(slug="ransomhub")
@@ -119,13 +119,13 @@ class SeedDarkSourcesCommandTests(TestCase):
 
     def test_skips_group_not_in_api(self):
         # lockbit3 is not in the API response → should be skipped
-        api = [{"name": "RansomHub", "slug": "ransomhub", "pages": [RANSOMHUB_PAGE]}]
+        api = [{"name": "RansomHub", "slug": "ransomhub", "locations": [RANSOMHUB_PAGE]}]
         out = self._run(api)
         self.assertIn("not found in API", out)
         self.assertFalse(DarkSource.objects.filter(slug="lockbit3").exists())
 
     def test_onion_url_stored_correctly(self):
-        api = [{"name": "RansomHub", "slug": "ransomhub", "pages": [RANSOMHUB_PAGE]}]
+        api = [{"name": "RansomHub", "slug": "ransomhub", "locations": [RANSOMHUB_PAGE]}]
         self._run(api)
         source = DarkSource.objects.get(slug="ransomhub")
         self.assertTrue(source.url.startswith("http://"))
