@@ -269,6 +269,36 @@ class IngestionGuardrailTests(TestCase):
             "active exploitation",
         )
 
+    @override_settings(
+        NOTIFICATIONS_ENABLED=False,
+        INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/token",
+    )
+    def test_disabled_notifications_do_not_abort_high_signal_ingestion(self):
+        self.feed.section = Feed.Section.RESEARCH
+        self.feed.save(update_fields=["section", "updated_at"])
+        entries = [
+            {
+                "title": "Critical CVE-2026-4444 authentication bypass under attack",
+                "link": "https://example.com/high-signal-disabled",
+                "summary": "Urgent advisory for an actively exploited authentication bypass vulnerability.",
+                "published": timezone.now().isoformat(),
+            }
+        ]
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            self._run_ingest_with_entries(entries)
+
+        mock_post.assert_not_called()
+        self.assertTrue(
+            Item.objects.filter(
+                feed=self.feed,
+                url="https://example.com/high-signal-disabled",
+            ).exists()
+        )
+        run = FetchRun.objects.get(feed=self.feed)
+        self.assertTrue(run.ok)
+        self.assertEqual(run.items_new, 1)
+
     def test_regular_low_signal_item_does_not_send_generic_intel_alert(self):
         self.feed.section = Feed.Section.RESEARCH
         self.feed.save(update_fields=["section", "updated_at"])

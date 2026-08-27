@@ -51,3 +51,12 @@ deduplicates and scores items, and presents them in a structured way (not an RSS
    - If something looks unused but is uncertain, identify it clearly instead of silently keeping it.
    - Prefer replacement over duplication.
    - If a new extractor/profile system makes old source-specific logic obsolete, remove the obsolete logic in the same change when safe.
+
+## Development workflow
+
+- `main` represents production-ready code.
+- `next` is the Intel v2 integration and staging branch.
+- Intel v2 work should use small feature branches created from `next`.
+- Staging must use `NOTIFICATIONS_ENABLED=false` unless deliberately testing with a non-production webhook.
+- Notification changes require tests.
+- Do not combine classification, UI, ingestion, and notification redesigns into one unrelated slice.

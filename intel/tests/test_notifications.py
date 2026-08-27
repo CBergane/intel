@@ -14,6 +14,7 @@ from intel.notifications import (
     send_dark_hit_alert,
     send_generic_intel_alert,
     send_high_epss_alert,
+    send_ransomware_victim_alert,
     should_emit_dark_hit_alert,
 )
 
@@ -122,9 +123,66 @@ def _make_generic_item(
 
 
 # ---------------------------------------------------------------------------
+# Global notification kill switch tests
+# ---------------------------------------------------------------------------
+
+class NotificationKillSwitchTests(TestCase):
+    @override_settings(
+        NOTIFICATIONS_ENABLED=False,
+        INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/token",
+    )
+    def test_generic_intel_alert_makes_no_request_when_notifications_disabled(self):
+        item = _make_generic_item(section=Feed.Section.SWEDEN)
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_generic_intel_alert(item, why_alerted="Sweden-relevant intel")
+
+        mock_post.assert_not_called()
+
+    @override_settings(
+        NOTIFICATIONS_ENABLED=False,
+        INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/epss/token",
+        EPSS_ALERT_THRESHOLD=0.7,
+    )
+    def test_epss_alert_makes_no_request_when_notifications_disabled(self):
+        item = _make_item(title="CVE-2024-1234 — EPSS 85.0%")
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_high_epss_alert(item)
+
+        mock_post.assert_not_called()
+
+    @override_settings(
+        NOTIFICATIONS_ENABLED=False,
+        INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/ransomware/token",
+    )
+    def test_ransomware_alert_makes_no_request_when_notifications_disabled(self):
+        item = _make_item(title="New ransomware victim")
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_ransomware_victim_alert(item)
+
+        mock_post.assert_not_called()
+
+    @override_settings(
+        NOTIFICATIONS_ENABLED=False,
+        DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/dark/token",
+    )
+    def test_dark_watch_alert_makes_no_request_when_notifications_disabled(self):
+        source = _make_dark_source()
+        hit = _make_dark_hit(source, record_type="incident")
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_dark_hit_alert(hit)
+
+        mock_post.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # DarkHit alert tests
 # ---------------------------------------------------------------------------
 
+@override_settings(NOTIFICATIONS_ENABLED=True)
 class DarkHitAlertTests(TestCase):
 
     @override_settings(DARK_DISCORD_WEBHOOK="")
@@ -273,6 +331,7 @@ class DarkHitAlertTests(TestCase):
 # EPSS alert tests
 # ---------------------------------------------------------------------------
 
+@override_settings(NOTIFICATIONS_ENABLED=True)
 class EPSSAlertTests(TestCase):
 
     @override_settings(INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/epss/token", EPSS_ALERT_THRESHOLD=0.7)
@@ -310,6 +369,7 @@ class EPSSAlertTests(TestCase):
             self.assertIn("fallback", call_url)
 
 
+@override_settings(NOTIFICATIONS_ENABLED=True)
 class GenericIntelAlertTests(TestCase):
     def test_generic_intel_alert_context_accepts_high_signal_active_item(self):
         item = _make_generic_item(

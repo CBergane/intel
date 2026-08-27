@@ -47,6 +47,10 @@ MATCH_FIELD_LABELS = {
 RELATIVE_TIME_RE = re.compile(r"\b\d+\s+(?:minute|minutes|hour|hours|day|days)\s+ago\b", re.IGNORECASE)
 
 
+def _notifications_enabled() -> bool:
+    return bool(getattr(settings, "NOTIFICATIONS_ENABLED", False))
+
+
 def _normalized_dark_alert_list(values) -> list[str]:
     normalized = []
     for value in values or []:
@@ -225,6 +229,9 @@ def send_dark_hit_alert(
     matched_fields: list[str] | None = None,
     why_alerted: str | None = None,
 ) -> None:
+    if not _notifications_enabled():
+        return
+
     webhook = getattr(settings, "DARK_DISCORD_WEBHOOK", "")
     if not webhook:
         logger.debug("DARK_DISCORD_WEBHOOK not configured, skipping dark hit alert.")
@@ -407,6 +414,9 @@ def send_generic_intel_alert(
     cves: list[str] | None = None,
     country: str = "",
 ) -> None:
+    if not _notifications_enabled():
+        return
+
     webhook = _intel_webhook()
     if not webhook:
         return
@@ -474,6 +484,9 @@ def send_generic_intel_alert(
 
 
 def send_high_epss_alert(item: Item) -> None:
+    if not _notifications_enabled():
+        return
+
     webhook = _intel_webhook()
     if not webhook:
         return
@@ -522,6 +535,9 @@ def send_high_epss_alert(item: Item) -> None:
 
 
 def send_ransomware_victim_alert(item: Item) -> None:
+    if not _notifications_enabled():
+        return
+
     # Primary: DARK_DISCORD_WEBHOOK (urgent intel); fallback: INTEL_DISCORD_WEBHOOK
     webhook = _intel_webhook()
     if not webhook:

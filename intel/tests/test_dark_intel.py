@@ -558,6 +558,7 @@ class DarkIngestionTests(TestCase):
     @override_settings(
         DARK_FETCH_RETRIES=1,
         DARK_MAX_BYTES=5000,
+        NOTIFICATIONS_ENABLED=True,
         DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
     )
     def test_watch_matched_incident_records_still_send_discord_alerts(self):
@@ -587,6 +588,7 @@ class DarkIngestionTests(TestCase):
     @override_settings(
         DARK_FETCH_RETRIES=1,
         DARK_MAX_BYTES=5000,
+        NOTIFICATIONS_ENABLED=True,
         DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
     )
     def test_same_live_updates_record_does_not_realert_on_unchanged_reingest(self):
@@ -631,6 +633,7 @@ class DarkIngestionTests(TestCase):
     @override_settings(
         DARK_FETCH_RETRIES=1,
         DARK_MAX_BYTES=5000,
+        NOTIFICATIONS_ENABLED=True,
         DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
     )
     def test_equivalent_new_dark_hit_row_is_suppressed_by_alert_identity(self):
@@ -743,6 +746,7 @@ class DarkIngestionTests(TestCase):
     @override_settings(
         DARK_FETCH_RETRIES=1,
         DARK_MAX_BYTES=5000,
+        NOTIFICATIONS_ENABLED=True,
         DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
     )
     def test_changed_watch_matched_record_still_alerts_when_meaningful_fields_change(self):
@@ -1059,6 +1063,7 @@ class DarkIngestionTests(TestCase):
     @override_settings(
         DARK_FETCH_RETRIES=1,
         DARK_MAX_BYTES=5000,
+        NOTIFICATIONS_ENABLED=True,
         DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token",
     )
     def test_group_cards_are_stored_without_sending_discord_alert(self):
