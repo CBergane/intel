@@ -266,7 +266,7 @@ class IngestionGuardrailTests(TestCase):
         self.assertEqual(alerted_item.title, "Critical CVE-2026-4444 authentication bypass under attack")
         self.assertEqual(
             mock_generic.call_args.kwargs["why_alerted"],
-            "active exploitation",
+            "Active exploitation in summary",
         )
 
     @override_settings(

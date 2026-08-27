@@ -22,6 +22,7 @@ from django.utils.text import slugify
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from .classification import classify_item
 from .dark_utils import (
     dark_source_suitability_warning,
     extract_links,
@@ -74,50 +75,6 @@ ITEM_SECTION_ROUTE_NAMES = {
 ITEM_SECTION_ROUTE_LABELS = {
     section: label for section, _route_name, label in ITEM_SECTION_ROUTE_ORDER
 }
-DASHBOARD_EXPLOIT_KEYWORDS = (
-    "actively exploited",
-    "exploited in the wild",
-    "in the wild",
-    "zero-day",
-    "0day",
-    "kev",
-    "authentication bypass",
-    "remote code execution",
-    "rce",
-)
-DASHBOARD_RANSOMWARE_KEYWORDS = (
-    "ransomware",
-    "extortion",
-    "leak site",
-    "data leak",
-    "victim listing",
-)
-DASHBOARD_LOW_SIGNAL_TITLE_HINTS = (
-    "release notes",
-    "release note",
-    "maintenance release",
-    "maintenance update",
-    "version ",
-    "version:",
-    "product update",
-    "feature update",
-    "service update",
-    "platform update",
-    "minor update",
-    "release announcement",
-    "now available",
-)
-CVE_RE = re.compile(r"\bCVE-\d{4}-\d+\b", re.IGNORECASE)
-HIGH_SIGNAL_KEYWORDS = (
-    "actively exploited",
-    "zero-day",
-    "0day",
-    "kev",
-    "rce",
-    "critical",
-    "remote code",
-    "authentication bypass",
-)
 
 DARK_SOURCE_PRESETS = (
     {
@@ -224,18 +181,6 @@ def _validated_next_url(request) -> str:
     return default_target
 
 
-def extract_cve_ids(text: str) -> list[str]:
-    seen = set()
-    cves = []
-    for match in CVE_RE.findall(text or ""):
-        cve = match.upper()
-        if cve in seen:
-            continue
-        seen.add(cve)
-        cves.append(cve)
-    return cves
-
-
 def _validated_redirect_target(request, default_target: str) -> str:
     raw = (request.POST.get("next") or request.GET.get("next") or "").strip()
     if not raw:
@@ -249,98 +194,9 @@ def _validated_redirect_target(request, default_target: str) -> str:
     return default_target
 
 
-def _item_text(item) -> str:
-    return f"{item.title or ''}\n{item.summary or ''}"
-
-
-def _item_cves(item) -> list[str]:
-    return extract_cve_ids(_item_text(item))
-
-
-def _dashboard_signal_profile(item, *, cves=None, now=None):
-    if cves is None:
-        cves = _item_cves(item)
-    if now is None:
-        now = timezone.now()
-
-    activity_at = getattr(item, "activity_at", None) or item.published_at or item.created_at or now
-    lowered_text = _item_text(item).lower()
-    lowered_title = (item.title or "").lower()
-
-    has_cves = bool(cves)
-    has_high_signal_keyword = any(keyword in lowered_text for keyword in HIGH_SIGNAL_KEYWORDS)
-    has_exploitation = item.feed.section == Feed.Section.ACTIVE or any(
-        keyword in lowered_text for keyword in DASHBOARD_EXPLOIT_KEYWORDS
-    )
-    has_ransomware = item.feed.adapter_key == "ransomware_live_victims" or any(
-        keyword in lowered_text for keyword in DASHBOARD_RANSOMWARE_KEYWORDS
-    )
-    has_urgent_wording = any(keyword in lowered_text for keyword in ("critical", "urgent", "emergency"))
-    is_low_signal_title = any(hint in lowered_title for hint in DASHBOARD_LOW_SIGNAL_TITLE_HINTS)
-
-    score = 0
-    if has_exploitation:
-        score += 24
-    if has_ransomware:
-        score += 20
-    if has_cves:
-        score += 18 + min(len(cves), 3) * 2
-    if has_high_signal_keyword:
-        score += 12
-    if has_urgent_wording:
-        score += 8
-
-    if item.feed.section == Feed.Section.ADVISORIES:
-        score += 8
-    elif item.feed.section == Feed.Section.SWEDEN:
-        score += 4
-    elif item.feed.section == Feed.Section.RESEARCH:
-        score += 3
-
-    age_hours = max((now - activity_at).total_seconds() / 3600, 0)
-    if age_hours <= 24:
-        score += 10
-    elif age_hours <= 72:
-        score += 6
-    else:
-        score += 3
-
-    if is_low_signal_title and not (has_cves or has_exploitation or has_ransomware or has_high_signal_keyword):
-        score -= 18
-
-    signal_label = ""
-    signal_tone = ""
-    if has_exploitation:
-        signal_label = "Active exploitation"
-        signal_tone = "amber"
-    elif has_ransomware:
-        signal_label = "Ransomware"
-        signal_tone = "rose"
-    elif has_cves and has_urgent_wording:
-        signal_label = "Critical CVE"
-        signal_tone = "sky"
-    elif has_cves:
-        signal_label = "CVE-driven"
-        signal_tone = "sky"
-    elif has_high_signal_keyword or has_urgent_wording:
-        signal_label = "Urgent"
-        signal_tone = "amber"
-
-    return {
-        "score": score,
-        "signal_label": signal_label,
-        "signal_tone": signal_tone,
-        "is_low_signal_title": is_low_signal_title,
-    }
-
-
-def score_dashboard_item(item, *, cves=None) -> int:
-    return _dashboard_signal_profile(item, cves=cves)["score"]
-
-
 def _attach_item_meta(items):
     for item in items:
-        item.cves = _item_cves(item)
+        item.cves = list(classify_item(item).cves)
         item.activity_at = getattr(item, "activity_at", None) or item.published_at or item.created_at
         item.source_browse_url = _source_destination(
             getattr(item.feed, "section", Feed.Section.ADVISORIES),
@@ -366,7 +222,7 @@ def _balanced_items(queryset, *, limit: int, per_source_max: int):
 def build_trending_cves(items, *, limit: int = 10):
     counts = Counter()
     for item in items:
-        for cve in _item_cves(item):
+        for cve in classify_item(item).cves:
             counts[cve] += 1
     return counts.most_common(limit)
 
@@ -378,7 +234,7 @@ def _validated_time_window(raw_value: str) -> str:
     return selected_time
 
 
-def _build_item_filter_state(request, *, section=None):
+def _build_item_filter_state(request, *, section=None, item_filter=None):
     queryset = Item.objects.select_related("source", "feed").annotate(
         activity_at=Coalesce("published_at", "created_at")
     )
@@ -391,11 +247,28 @@ def _build_item_filter_state(request, *, section=None):
 
     since = timezone.now() - TIME_RANGES[selected_time]
     window_queryset = queryset.filter(activity_at__gte=since)
-    source_rows = list(
-        window_queryset.values("source__slug", "source__name")
-        .annotate(item_count=Count("id"))
-        .order_by("source__name")
-    )
+    window_items = None
+    if item_filter is not None:
+        window_items = [item for item in window_queryset if item_filter(item)]
+        source_counts = Counter(
+            (item.source.slug, item.source.name) for item in window_items
+        )
+        source_rows = [
+            {
+                "source__slug": source_slug,
+                "source__name": source_name,
+                "item_count": item_count,
+            }
+            for (source_slug, source_name), item_count in sorted(
+                source_counts.items(), key=lambda row: row[0][1].lower()
+            )
+        ]
+    else:
+        source_rows = list(
+            window_queryset.values("source__slug", "source__name")
+            .annotate(item_count=Count("id"))
+            .order_by("source__name")
+        )
     sources = [
         {
             "slug": row["source__slug"],
@@ -420,19 +293,33 @@ def _build_item_filter_state(request, *, section=None):
         )
         sources.sort(key=lambda row: (row["name"].lower(), row["slug"]))
 
-    window_total = window_queryset.count()
-
-    filtered_queryset = window_queryset
-    if query:
-        filtered_queryset = filtered_queryset.filter(
-            Q(title__icontains=query)
-            | Q(summary__icontains=query)
-            | Q(source__name__icontains=query)
-        )
-
-    if source_slug:
-        filtered_queryset = filtered_queryset.filter(source__slug=source_slug)
-    filtered_total = filtered_queryset.count()
+    if window_items is not None:
+        window_total = len(window_items)
+        query_value = query.casefold()
+        filtered_items = [
+            item
+            for item in window_items
+            if (
+                not query_value
+                or query_value in (item.title or "").casefold()
+                or query_value in (item.summary or "").casefold()
+                or query_value in item.source.name.casefold()
+            )
+            and (not source_slug or item.source.slug == source_slug)
+        ]
+        filtered_total = len(filtered_items)
+    else:
+        window_total = window_queryset.count()
+        filtered_items = window_queryset
+        if query:
+            filtered_items = filtered_items.filter(
+                Q(title__icontains=query)
+                | Q(summary__icontains=query)
+                | Q(source__name__icontains=query)
+            )
+        if source_slug:
+            filtered_items = filtered_items.filter(source__slug=source_slug)
+        filtered_total = filtered_items.count()
     hidden_by_filters = max(0, window_total - filtered_total)
 
     return {
@@ -445,13 +332,25 @@ def _build_item_filter_state(request, *, section=None):
         "hidden_by_filters": hidden_by_filters,
         "sources": sources,
         "time_options": TIME_OPTIONS,
-        "filtered_queryset": filtered_queryset,
+        "filtered_items": filtered_items,
     }
 
 
-def _filtered_items(request, section=None, *, balance_per_source=False):
-    filter_state = _build_item_filter_state(request, section=section)
-    ordered = filter_state["filtered_queryset"].order_by("-activity_at", "-id")
+def _filtered_items(request, section=None, *, balance_per_source=False, item_filter=None):
+    filter_state = _build_item_filter_state(
+        request,
+        section=section,
+        item_filter=item_filter,
+    )
+    filtered_items = filter_state["filtered_items"]
+    if isinstance(filtered_items, list):
+        ordered = sorted(
+            filtered_items,
+            key=lambda item: (item.activity_at, item.id),
+            reverse=True,
+        )
+    else:
+        ordered = filtered_items.order_by("-activity_at", "-id")
 
     if balance_per_source and not filter_state["selected_source"]:
         source_counts = {}
@@ -469,7 +368,7 @@ def _filtered_items(request, section=None, *, balance_per_source=False):
     page_obj.object_list = _attach_item_meta(list(page_obj.object_list))
 
     return {
-        **{key: value for key, value in filter_state.items() if key != "filtered_queryset"},
+        **{key: value for key, value in filter_state.items() if key != "filtered_items"},
         "page_obj": page_obj,
         "balance_applied": balance_per_source and not filter_state["selected_source"],
     }
@@ -529,8 +428,8 @@ def _source_operational_status(*, feeds_total: int, feeds_error: int, feeds_neve
     return "Degraded"
 
 
-def _render_items_page(request, *, title, nav_key, section=None):
-    context = _filtered_items(request, section=section)
+def _render_items_page(request, *, title, nav_key, section=None, item_filter=None):
+    context = _filtered_items(request, section=section, item_filter=item_filter)
     context.update(
         {
             "page_title": title,
@@ -557,24 +456,28 @@ def now_view(request):
         ordered_by_activity.filter(activity_at__gte=now - timedelta(days=7))[:400]
     )
     for item in high_candidates:
-        item.cves = _item_cves(item)
         item.activity_at = item.activity_at or item.published_at or item.created_at
         item.source_browse_url = _source_destination(item.feed.section, source_slug=item.source.slug)
-        signal_profile = _dashboard_signal_profile(item, cves=item.cves, now=now)
-        item.dashboard_score = signal_profile["score"]
-        item.signal_label = signal_profile["signal_label"]
-        item.signal_tone = signal_profile["signal_tone"]
-        item.is_low_signal_title = signal_profile["is_low_signal_title"]
+        signal_profile = classify_item(item, now=now)
+        item.cves = list(signal_profile.cves)
+        item.dashboard_score = signal_profile.score
+        item.signal_label = signal_profile.signal_label
+        item.signal_tone = signal_profile.signal_tone
+        item.is_low_signal_title = signal_profile.is_low_signal_title
+        item.is_high_signal = signal_profile.high_signal
     high_candidates.sort(
         key=lambda item: (item.dashboard_score, item.activity_at, item.id),
         reverse=True,
     )
-    high_signal_items = [item for item in high_candidates if item.dashboard_score >= 20][:15]
+    high_signal_items = [item for item in high_candidates if item.is_high_signal][:15]
 
     active_items = _balanced_items(
-        ordered_by_activity.filter(
-            feed__section=Feed.Section.ACTIVE,
-            activity_at__gte=now - timedelta(days=14),
+        (
+            item
+            for item in ordered_by_activity.filter(
+                activity_at__gte=now - timedelta(days=14)
+            )
+            if classify_item(item, now=now).active_exploitation
         ),
         limit=6,
         per_source_max=4,
@@ -694,7 +597,7 @@ def active_view(request):
         request,
         title="Active Exploitation",
         nav_key="active",
-        section=Feed.Section.ACTIVE,
+        item_filter=lambda item: classify_item(item).active_exploitation,
     )
 
 

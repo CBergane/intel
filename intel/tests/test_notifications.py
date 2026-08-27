@@ -381,7 +381,10 @@ class GenericIntelAlertTests(TestCase):
         context = get_generic_intel_alert_context(item)
 
         self.assertIsNotNone(context)
-        self.assertEqual(context["why_alerted"], "active exploitation")
+        self.assertEqual(
+            context["why_alerted"],
+            "Active exploitation in summary",
+        )
 
     def test_generic_intel_alert_context_rejects_low_signal_release_notes(self):
         item = _make_generic_item(

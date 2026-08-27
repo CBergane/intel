@@ -10,6 +10,7 @@ import requests
 from django.conf import settings
 from django.utils import timezone
 
+from intel.classification import classify_item
 from intel.dark_utils import evaluate_record_watch_matches, normalize_text
 
 if TYPE_CHECKING:
@@ -17,22 +18,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 DARK_HIT_ALERT_COOLDOWN = timedelta(hours=24)
-GENERIC_INTEL_ALERT_MIN_SCORE = 20
-GENERIC_INTEL_ALERT_SECTIONS = {"active", "advisories", "research", "sweden"}
-NORDIC_SIGNAL_HINTS = (
-    "sweden",
-    "swedish",
-    "sverige",
-    "nordic",
-    "norway",
-    "norwegian",
-    "denmark",
-    "danish",
-    "finland",
-    "finnish",
-    "iceland",
-    "icelandic",
-)
 
 MATCH_FIELD_LABELS = {
     "title": "title",
@@ -339,61 +324,9 @@ def _truncate_alert_text(value: str, limit: int, *, fallback: str = "") -> str:
 def get_generic_intel_alert_context(item: Item) -> dict | None:
     if (item.feed.adapter_key or "").strip().lower() in {"epss", "ransomware_live_victims"}:
         return None
-    if (item.feed.section or "").strip().lower() not in GENERIC_INTEL_ALERT_SECTIONS:
-        return None
 
-    from intel.views import (
-        DASHBOARD_EXPLOIT_KEYWORDS,
-        DASHBOARD_RANSOMWARE_KEYWORDS,
-        HIGH_SIGNAL_KEYWORDS,
-        _dashboard_signal_profile,
-        _item_cves,
-        _item_text,
-    )
-
-    text = _item_text(item)
-    lowered_text = text.lower()
-    cves = _item_cves(item)
-    profile = _dashboard_signal_profile(item, cves=cves)
-
-    explicit_exploitation = any(keyword in lowered_text for keyword in DASHBOARD_EXPLOIT_KEYWORDS)
-    ransomware_signal = any(keyword in lowered_text for keyword in DASHBOARD_RANSOMWARE_KEYWORDS)
-    high_signal_keyword = any(keyword in lowered_text for keyword in HIGH_SIGNAL_KEYWORDS)
-    urgent_wording = any(keyword in lowered_text for keyword in ("critical", "urgent", "emergency"))
-    nordic_signal = any(keyword in lowered_text for keyword in NORDIC_SIGNAL_HINTS)
-    sweden_signal = (item.feed.section or "").strip().lower() == "sweden" or nordic_signal
-
-    if profile["score"] < GENERIC_INTEL_ALERT_MIN_SCORE:
-        return None
-    if profile["is_low_signal_title"] and not (
-        explicit_exploitation
-        or ransomware_signal
-        or high_signal_keyword
-        or urgent_wording
-        or cves
-        or sweden_signal
-    ):
-        return None
-
-    why_alerted = ""
-    if explicit_exploitation:
-        why_alerted = "active exploitation"
-    elif (item.feed.section or "").strip().lower() == "active":
-        why_alerted = "active-section high-signal item"
-    elif ransomware_signal:
-        why_alerted = "ransomware activity"
-    elif cves and (high_signal_keyword or urgent_wording):
-        why_alerted = "CVE-driven high-signal item"
-    elif cves:
-        why_alerted = "urgent advisory" if (item.feed.section or "").strip().lower() == "advisories" else "CVE-driven high-signal item"
-    elif sweden_signal:
-        why_alerted = "Sweden-relevant intel"
-    elif urgent_wording:
-        why_alerted = "urgent advisory"
-    elif profile["signal_label"]:
-        why_alerted = profile["signal_label"].lower()
-
-    if not why_alerted:
+    profile = classify_item(item)
+    if not profile.high_signal or not profile.primary_reason:
         return None
 
     raw_country = ""
@@ -401,8 +334,8 @@ def get_generic_intel_alert_context(item: Item) -> dict | None:
         raw_country = normalize_text(str(item.raw_payload.get("country") or ""))
 
     return {
-        "why_alerted": why_alerted,
-        "cves": cves[:3],
+        "why_alerted": profile.primary_reason,
+        "cves": list(profile.cves[:3]),
         "country": raw_country,
     }
 
