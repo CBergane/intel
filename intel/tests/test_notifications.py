@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -6,10 +7,12 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from intel.dark_models import DarkHit, DarkSource
+from intel.classification import classify_item
 from intel.models import Feed, Item, Source
 from intel.notifications import (
     build_dark_hit_alert_fingerprint,
     dark_hit_alert_reason,
+    discord_priority_presentation,
     get_generic_intel_alert_context,
     send_dark_hit_alert,
     send_generic_intel_alert,
@@ -76,6 +79,9 @@ def _make_item(title="CVE-2024-1234 \u2014 EPSS 85.0%", url="https://www.cve.org
         feed_type=Feed.FeedType.JSON,
         adapter_key="epss",
         section=Feed.Section.ACTIVE,
+        discord_enabled=True,
+        discord_min_priority=Feed.DiscordPriority.P3,
+        discord_mode=Feed.DiscordMode.IMMEDIATE,
         max_age_days=14,
         max_items_per_run=200,
     )
@@ -99,6 +105,9 @@ def _make_generic_item(
     summary="Urgent remote code execution issue under active investigation.",
     url="https://example.com/high-signal",
     raw_payload=None,
+    discord_enabled=True,
+    discord_min_priority=Feed.DiscordPriority.P3,
+    discord_mode=Feed.DiscordMode.IMMEDIATE,
 ):
     source = Source.objects.create(name=source_name, slug=source_slug)
     feed = Feed.objects.create(
@@ -108,6 +117,9 @@ def _make_generic_item(
         feed_type=Feed.FeedType.RSS,
         adapter_key=adapter_key,
         section=section,
+        discord_enabled=discord_enabled,
+        discord_min_priority=discord_min_priority,
+        discord_mode=discord_mode,
         max_age_days=14,
         max_items_per_run=200,
     )
@@ -123,6 +135,25 @@ def _make_generic_item(
 
 
 # ---------------------------------------------------------------------------
+# Feed notification policy tests
+# ---------------------------------------------------------------------------
+
+class FeedNotificationPolicyTests(TestCase):
+    def test_new_feed_defaults_to_explicitly_disabled_notifications(self):
+        source = Source.objects.create(name="Manual Source", slug="manual-source")
+        feed = Feed.objects.create(
+            source=source,
+            name="Manual Feed",
+            url="https://example.com/manual.xml",
+        )
+
+        self.assertFalse(feed.discord_enabled)
+        self.assertEqual(feed.discord_mode, Feed.DiscordMode.OFF)
+        self.assertEqual(feed.discord_min_priority, Feed.DiscordPriority.P3)
+        self.assertFalse(feed.allows_immediate_discord("P1"))
+
+
+# ---------------------------------------------------------------------------
 # Global notification kill switch tests
 # ---------------------------------------------------------------------------
 
@@ -133,11 +164,17 @@ class NotificationKillSwitchTests(TestCase):
     )
     def test_generic_intel_alert_makes_no_request_when_notifications_disabled(self):
         item = _make_generic_item(section=Feed.Section.SWEDEN)
+        context = get_generic_intel_alert_context(item)
+        self.assertIsNotNone(context)
 
-        with patch("intel.notifications.requests.post") as mock_post:
-            send_generic_intel_alert(item, why_alerted="Sweden-relevant intel")
+        with (
+            patch("intel.notifications._intel_webhook") as mock_webhook,
+            patch("intel.notifications.requests.post") as mock_post,
+        ):
+            send_generic_intel_alert(item, **context)
 
         mock_post.assert_not_called()
+        mock_webhook.assert_not_called()
 
     @override_settings(
         NOTIFICATIONS_ENABLED=False,
@@ -147,10 +184,14 @@ class NotificationKillSwitchTests(TestCase):
     def test_epss_alert_makes_no_request_when_notifications_disabled(self):
         item = _make_item(title="CVE-2024-1234 — EPSS 85.0%")
 
-        with patch("intel.notifications.requests.post") as mock_post:
+        with (
+            patch("intel.notifications._intel_webhook") as mock_webhook,
+            patch("intel.notifications.requests.post") as mock_post,
+        ):
             send_high_epss_alert(item)
 
         mock_post.assert_not_called()
+        mock_webhook.assert_not_called()
 
     @override_settings(
         NOTIFICATIONS_ENABLED=False,
@@ -159,10 +200,14 @@ class NotificationKillSwitchTests(TestCase):
     def test_ransomware_alert_makes_no_request_when_notifications_disabled(self):
         item = _make_item(title="New ransomware victim")
 
-        with patch("intel.notifications.requests.post") as mock_post:
+        with (
+            patch("intel.notifications._intel_webhook") as mock_webhook,
+            patch("intel.notifications.requests.post") as mock_post,
+        ):
             send_ransomware_victim_alert(item)
 
         mock_post.assert_not_called()
+        mock_webhook.assert_not_called()
 
     @override_settings(
         NOTIFICATIONS_ENABLED=False,
@@ -172,10 +217,14 @@ class NotificationKillSwitchTests(TestCase):
         source = _make_dark_source()
         hit = _make_dark_hit(source, record_type="incident")
 
-        with patch("intel.notifications.requests.post") as mock_post:
+        with (
+            patch("intel.notifications._dark_webhook") as mock_webhook,
+            patch("intel.notifications.requests.post") as mock_post,
+        ):
             send_dark_hit_alert(hit)
 
         mock_post.assert_not_called()
+        mock_webhook.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +241,19 @@ class DarkHitAlertTests(TestCase):
         with patch("intel.notifications.requests.post") as mock_post:
             send_dark_hit_alert(hit)
             mock_post.assert_not_called()
+
+    @override_settings(
+        DARK_DISCORD_WEBHOOK="",
+        INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/not-a-fallback",
+    )
+    def test_dark_hit_never_falls_back_to_intel_webhook(self):
+        source = _make_dark_source()
+        hit = _make_dark_hit(source, record_type="incident")
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_dark_hit_alert(hit)
+
+        mock_post.assert_not_called()
 
     @override_settings(DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/test/token")
     def test_incident_dark_hit_sends_correct_payload(self):
@@ -360,13 +422,11 @@ class EPSSAlertTests(TestCase):
         DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/dark/fallback",
         EPSS_ALERT_THRESHOLD=0.7,
     )
-    def test_intel_webhook_fallback(self):
+    def test_epss_never_falls_back_to_dark_webhook(self):
         item = _make_item(title="CVE-2024-9999 \u2014 EPSS 90.0%")
         with patch("intel.notifications.requests.post") as mock_post:
             send_high_epss_alert(item)
-            mock_post.assert_called_once()
-            call_url = mock_post.call_args.args[0]
-            self.assertIn("fallback", call_url)
+            mock_post.assert_not_called()
 
 
 @override_settings(NOTIFICATIONS_ENABLED=True)
@@ -382,9 +442,22 @@ class GenericIntelAlertTests(TestCase):
 
         self.assertIsNotNone(context)
         self.assertEqual(
-            context["why_alerted"],
+            context["profile"].primary_reason,
             "Active exploitation in summary",
         )
+
+    def test_generic_selection_consumes_classify_item_once(self):
+        item = _make_generic_item(
+            section=Feed.Section.ACTIVE,
+            title="CISA warns vulnerability is actively exploited",
+            summary="The vulnerability is actively exploited in the wild.",
+        )
+
+        with patch("intel.notifications.classify_item", wraps=classify_item) as mock_classify:
+            context = get_generic_intel_alert_context(item)
+
+        self.assertIsNotNone(context)
+        mock_classify.assert_called_once_with(item)
 
     def test_generic_intel_alert_context_rejects_low_signal_release_notes(self):
         item = _make_generic_item(
@@ -395,33 +468,80 @@ class GenericIntelAlertTests(TestCase):
 
         self.assertIsNone(get_generic_intel_alert_context(item))
 
+    def test_feed_notification_switch_disables_generic_selection(self):
+        item = _make_generic_item(
+            section=Feed.Section.ACTIVE,
+            title="CISA warns vulnerability is actively exploited",
+            summary="The vulnerability is actively exploited in the wild.",
+            discord_enabled=False,
+        )
+
+        self.assertIsNone(get_generic_intel_alert_context(item))
+
+    def test_feed_minimum_priority_suppresses_lower_priority(self):
+        item = _make_generic_item(section=Feed.Section.ACTIVE)
+        item.feed.discord_min_priority = Feed.DiscordPriority.P2
+        item.feed.save(update_fields=["discord_min_priority"])
+        profile = replace(classify_item(item), priority="P3")
+
+        with patch("intel.notifications.classify_item", return_value=profile):
+            self.assertIsNone(get_generic_intel_alert_context(item))
+
+        self.assertTrue(item.feed.allows_immediate_discord("P1"))
+        self.assertTrue(item.feed.allows_immediate_discord("P2"))
+        self.assertFalse(item.feed.allows_immediate_discord("P3"))
+        self.assertFalse(item.feed.allows_immediate_discord("P4"))
+
+    def test_immediate_mode_allows_eligible_generic_selection(self):
+        item = _make_generic_item(section=Feed.Section.ACTIVE)
+        profile = replace(classify_item(item), priority="P3")
+
+        with patch("intel.notifications.classify_item", return_value=profile):
+            self.assertIsNotNone(get_generic_intel_alert_context(item))
+
+    def test_off_and_digest_modes_suppress_immediate_delivery(self):
+        for mode in (Feed.DiscordMode.OFF, Feed.DiscordMode.DIGEST):
+            with self.subTest(mode=mode):
+                item = _make_generic_item(
+                    section=Feed.Section.ACTIVE,
+                    source_name=f"Intel {mode}",
+                    source_slug=f"intel-{mode}",
+                    url=f"https://example.com/{mode}",
+                    discord_mode=mode,
+                )
+                self.assertIsNone(get_generic_intel_alert_context(item))
+
     @override_settings(INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/token")
     def test_send_generic_intel_alert_includes_summary_and_reason(self):
         item = _make_generic_item(
             section=Feed.Section.SWEDEN,
-            title="Nordic CERT warns of credential theft campaign",
+            title="CVE-2026-2222: Nordic CERT warns of credential theft campaign",
             summary="Swedish organizations are targeted in a credential theft campaign.",
             raw_payload={"country": "Sweden"},
         )
 
+        context = get_generic_intel_alert_context(item)
+        self.assertIsNotNone(context)
+
         with patch("intel.notifications.requests.post") as mock_post:
-            send_generic_intel_alert(
-                item,
-                why_alerted="Sweden-relevant intel",
-                cves=["CVE-2026-2222"],
-                country="Sweden",
-            )
+            send_generic_intel_alert(item, **context)
 
         mock_post.assert_called_once()
         sent_json = mock_post.call_args.kwargs.get("json") or mock_post.call_args.args[1]
         embed = sent_json["embeds"][0]
-        self.assertEqual(embed["title"], "High-signal intel: Nordic CERT warns of credential theft campaign")
+        profile = context["profile"]
+        priority_label, expected_color = discord_priority_presentation(profile.priority)
+        self.assertEqual(
+            embed["title"],
+            f"{profile.priority} {priority_label} intel: {item.title}",
+        )
+        self.assertEqual(embed["color"], expected_color)
         self.assertEqual(
             embed["description"],
             "Swedish organizations are targeted in a credential theft campaign.",
         )
         self.assertIn(
-            {"name": "Why alerted", "value": "Sweden-relevant intel", "inline": True},
+            {"name": "Why alerted", "value": profile.primary_reason, "inline": True},
             embed["fields"],
         )
         self.assertIn(
@@ -432,3 +552,113 @@ class GenericIntelAlertTests(TestCase):
             {"name": "Country", "value": "Sweden", "inline": True},
             embed["fields"],
         )
+
+    @override_settings(
+        INTEL_DISCORD_WEBHOOK="",
+        DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/dark/not-a-fallback",
+    )
+    def test_generic_intel_never_falls_back_to_dark_webhook(self):
+        item = _make_generic_item(section=Feed.Section.SWEDEN)
+        context = get_generic_intel_alert_context(item)
+        self.assertIsNotNone(context)
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_generic_intel_alert(item, **context)
+
+        mock_post.assert_not_called()
+
+    def test_priority_colors_are_deterministic(self):
+        self.assertEqual(discord_priority_presentation("P1"), ("Critical", 0xDC2626))
+        self.assertEqual(discord_priority_presentation("P2"), ("High", 0xF97316))
+        self.assertEqual(discord_priority_presentation("P3"), ("Medium", 0xF59E0B))
+        self.assertEqual(
+            discord_priority_presentation("P4"),
+            ("Low / informational", 0x3B82F6),
+        )
+
+    @override_settings(INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/secret-token")
+    def test_non_2xx_response_is_safely_logged_without_webhook_secret(self):
+        item = _make_generic_item(section=Feed.Section.SWEDEN)
+        context = get_generic_intel_alert_context(item)
+        self.assertIsNotNone(context)
+        response = MagicMock(status_code=429)
+        error = requests.HTTPError(
+            "429 Client Error for url: https://discord.com/api/webhooks/intel/secret-token",
+            response=response,
+        )
+        response.raise_for_status.side_effect = error
+
+        with (
+            self.assertLogs("intel.notifications", level="WARNING") as captured,
+            patch("intel.notifications.requests.post", return_value=response),
+        ):
+            send_generic_intel_alert(item, **context)
+
+        log_output = " ".join(captured.output)
+        self.assertIn("HTTP status 429", log_output)
+        self.assertNotIn("secret-token", log_output)
+
+    @override_settings(INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/secret-token")
+    def test_redirect_response_is_treated_as_delivery_failure(self):
+        item = _make_generic_item(section=Feed.Section.SWEDEN)
+        context = get_generic_intel_alert_context(item)
+        self.assertIsNotNone(context)
+        response = MagicMock(status_code=302)
+
+        with (
+            self.assertLogs("intel.notifications", level="WARNING") as captured,
+            patch("intel.notifications.requests.post", return_value=response),
+        ):
+            send_generic_intel_alert(item, **context)
+
+        self.assertIn("HTTP status 302", " ".join(captured.output))
+
+
+@override_settings(NOTIFICATIONS_ENABLED=True)
+class RansomwareAlertTests(TestCase):
+    def _make_ransomware_item(self, *, mode=Feed.DiscordMode.IMMEDIATE):
+        return _make_generic_item(
+            adapter_key="ransomware_live_victims",
+            source_name="Ransomware.live",
+            source_slug=f"ransomware-live-{mode}",
+            title="Acme AB listed by Akira",
+            summary="Ransomware.live reports Acme AB as a new Akira victim.",
+            raw_payload={"victim": "Acme AB", "group": "akira", "country": "SE"},
+            discord_mode=mode,
+        )
+
+    @override_settings(INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/token")
+    def test_explicit_immediate_policy_uses_specialized_ransomware_path(self):
+        item = self._make_ransomware_item()
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_ransomware_victim_alert(item)
+
+        mock_post.assert_called_once()
+        self.assertEqual(
+            mock_post.call_args.args[0],
+            "https://discord.com/api/webhooks/intel/token",
+        )
+        embed = mock_post.call_args.kwargs["json"]["embeds"][0]
+        self.assertIn("Ransomware Victim", embed["title"])
+
+    @override_settings(INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/token")
+    def test_digest_policy_does_not_immediately_send_ransomware_victim(self):
+        item = self._make_ransomware_item(mode=Feed.DiscordMode.DIGEST)
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_ransomware_victim_alert(item)
+
+        mock_post.assert_not_called()
+
+    @override_settings(
+        INTEL_DISCORD_WEBHOOK="",
+        DARK_DISCORD_WEBHOOK="https://discord.com/api/webhooks/dark/not-a-fallback",
+    )
+    def test_ransomware_never_falls_back_to_dark_webhook(self):
+        item = self._make_ransomware_item()
+
+        with patch("intel.notifications.requests.post") as mock_post:
+            send_ransomware_victim_alert(item)
+
+        mock_post.assert_not_called()

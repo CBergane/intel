@@ -348,6 +348,9 @@ class SignalClassificationTests(TestCase):
             title="VPN campaign investigation",
             summary="The flaw is exploited in the wild against internet-facing systems.",
         )
+        item.feed.discord_enabled = True
+        item.feed.discord_mode = Feed.DiscordMode.IMMEDIATE
+        item.feed.save(update_fields=["discord_enabled", "discord_mode"])
 
         with patch(
             "intel.notifications.classify_item",
@@ -357,7 +360,7 @@ class SignalClassificationTests(TestCase):
 
         mock_classify.assert_called_once_with(item)
         self.assertEqual(
-            context["why_alerted"],
+            context["profile"].primary_reason,
             "Active exploitation in summary",
         )
 

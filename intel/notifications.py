@@ -14,10 +14,18 @@ from intel.classification import classify_item
 from intel.dark_utils import evaluate_record_watch_matches, normalize_text
 
 if TYPE_CHECKING:
+    from intel.classification import SignalProfile
     from intel.models import DarkHit, Item
 
 logger = logging.getLogger(__name__)
 DARK_HIT_ALERT_COOLDOWN = timedelta(hours=24)
+
+DISCORD_PRIORITY_PRESENTATION = {
+    "P1": ("Critical", 0xDC2626),
+    "P2": ("High", 0xF97316),
+    "P3": ("Medium", 0xF59E0B),
+    "P4": ("Low / informational", 0x3B82F6),
+}
 
 MATCH_FIELD_LABELS = {
     "title": "title",
@@ -34,6 +42,40 @@ RELATIVE_TIME_RE = re.compile(r"\b\d+\s+(?:minute|minutes|hour|hours|day|days)\s
 
 def _notifications_enabled() -> bool:
     return bool(getattr(settings, "NOTIFICATIONS_ENABLED", False))
+
+
+def discord_priority_presentation(priority: str) -> tuple[str, int]:
+    return DISCORD_PRIORITY_PRESENTATION.get(
+        (priority or "").upper(), DISCORD_PRIORITY_PRESENTATION["P4"]
+    )
+
+
+def _post_discord(webhook: str, payload: dict, *, alert_kind: str) -> bool:
+    try:
+        response = requests.post(webhook, json=payload, timeout=10)
+        response.raise_for_status()
+        status_code = getattr(response, "status_code", None)
+        if isinstance(status_code, int) and not 200 <= status_code < 300:
+            raise requests.HTTPError(
+                "Discord returned a non-success HTTP status.",
+                response=response,
+            )
+    except requests.RequestException as exc:
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        if status_code is None:
+            logger.warning(
+                "Discord %s delivery failed (%s).",
+                alert_kind,
+                type(exc).__name__,
+            )
+        else:
+            logger.warning(
+                "Discord %s delivery failed with HTTP status %s.",
+                alert_kind,
+                status_code,
+            )
+        return False
+    return True
 
 
 def _normalized_dark_alert_list(values) -> list[str]:
@@ -217,7 +259,7 @@ def send_dark_hit_alert(
     if not _notifications_enabled():
         return
 
-    webhook = getattr(settings, "DARK_DISCORD_WEBHOOK", "")
+    webhook = _dark_webhook()
     if not webhook:
         logger.debug("DARK_DISCORD_WEBHOOK not configured, skipping dark hit alert.")
         return
@@ -300,16 +342,17 @@ def send_dark_hit_alert(
     }
 
     logger.debug("Sending dark hit alert")
-    try:
-        requests.post(webhook, json=payload, timeout=10)
-    except requests.RequestException as e:
-        logger.warning("Discord alert failed: %s", e)
+    _post_discord(webhook, payload, alert_kind="dark alert")
+
+
+def _dark_webhook() -> str:
+    value = getattr(settings, "DARK_DISCORD_WEBHOOK", "")
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _intel_webhook() -> str:
-    return getattr(settings, "INTEL_DISCORD_WEBHOOK", "") or getattr(
-        settings, "DARK_DISCORD_WEBHOOK", ""
-    )
+    value = getattr(settings, "INTEL_DISCORD_WEBHOOK", "")
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _truncate_alert_text(value: str, limit: int, *, fallback: str = "") -> str:
@@ -326,7 +369,9 @@ def get_generic_intel_alert_context(item: Item) -> dict | None:
         return None
 
     profile = classify_item(item)
-    if not profile.high_signal or not profile.primary_reason:
+    if not profile.primary_reason or not item.feed.allows_immediate_discord(
+        profile.priority
+    ):
         return None
 
     raw_country = ""
@@ -334,8 +379,7 @@ def get_generic_intel_alert_context(item: Item) -> dict | None:
         raw_country = normalize_text(str(item.raw_payload.get("country") or ""))
 
     return {
-        "why_alerted": profile.primary_reason,
-        "cves": list(profile.cves[:3]),
+        "profile": profile,
         "country": raw_country,
     }
 
@@ -343,17 +387,21 @@ def get_generic_intel_alert_context(item: Item) -> dict | None:
 def send_generic_intel_alert(
     item: Item,
     *,
-    why_alerted: str,
-    cves: list[str] | None = None,
+    profile: SignalProfile,
     country: str = "",
 ) -> None:
     if not _notifications_enabled():
         return
 
-    webhook = _intel_webhook()
-    if not webhook:
+    if not item.feed.allows_immediate_discord(profile.priority):
         return
 
+    webhook = _intel_webhook()
+    if not webhook:
+        logger.debug("INTEL_DISCORD_WEBHOOK not configured, skipping Intel alert.")
+        return
+
+    priority_label, color = discord_priority_presentation(profile.priority)
     section_label = item.feed.get_section_display() if item.feed_id else (item.feed.section or "").title()
     summary_text = _truncate_alert_text(item.summary, 300, fallback="(no summary)")
 
@@ -369,16 +417,26 @@ def send_generic_intel_alert(
             "inline": True,
         },
         {
+            "name": "Priority",
+            "value": f"{profile.priority} - {priority_label}",
+            "inline": True,
+        },
+        {
+            "name": "Category",
+            "value": profile.primary_category.replace("_", " ").title()[:100],
+            "inline": True,
+        },
+        {
             "name": "Why alerted",
-            "value": why_alerted[:200],
+            "value": profile.primary_reason[:200],
             "inline": True,
         },
     ]
-    if cves:
+    if profile.cves:
         fields.append(
             {
                 "name": "CVE",
-                "value": ", ".join(cves)[:200],
+                "value": ", ".join(profile.cves[:3])[:200],
                 "inline": True,
             }
         )
@@ -401,27 +459,20 @@ def send_generic_intel_alert(
     payload = {
         "embeds": [
             {
-                "title": f"High-signal intel: {(item.title or '')[:220]}",
+                "title": f"{profile.priority} {priority_label} intel: {(item.title or '')[:200]}",
                 "description": summary_text,
-                "color": 0xF59E0B,
+                "color": color,
                 "fields": fields,
                 "footer": {"text": "borealsec-intel · intel stream"},
             }
         ]
     }
 
-    try:
-        requests.post(webhook, json=payload, timeout=10)
-    except requests.RequestException as e:
-        logger.warning("Discord alert failed: %s", e)
+    _post_discord(webhook, payload, alert_kind="Intel alert")
 
 
 def send_high_epss_alert(item: Item) -> None:
     if not _notifications_enabled():
-        return
-
-    webhook = _intel_webhook()
-    if not webhook:
         return
 
     match = re.search(r"EPSS (\d+\.?\d*)%", item.title or "")
@@ -433,13 +484,29 @@ def send_high_epss_alert(item: Item) -> None:
     if score < threshold:
         return
 
+    profile = classify_item(item)
+    if not item.feed.allows_immediate_discord(profile.priority):
+        return
+
+    webhook = _intel_webhook()
+    if not webhook:
+        logger.debug("INTEL_DISCORD_WEBHOOK not configured, skipping EPSS alert.")
+        return
+
+    priority_label, color = discord_priority_presentation(profile.priority)
+
     payload = {
         "embeds": [
             {
                 "title": f"High EPSS: {(item.title or '')[:200]}",
                 "description": (item.summary[:300] if item.summary else "(no summary)"),
-                "color": 0xFF8C00,
+                "color": color,
                 "fields": [
+                    {
+                        "name": "Priority",
+                        "value": f"{profile.priority} - {priority_label}",
+                        "inline": True,
+                    },
                     {
                         "name": "EPSS Score",
                         "value": f"{score:.1%}",
@@ -461,20 +528,25 @@ def send_high_epss_alert(item: Item) -> None:
         ]
     }
 
-    try:
-        requests.post(webhook, json=payload, timeout=10)
-    except requests.RequestException as e:
-        logger.warning("Discord alert failed: %s", e)
+    _post_discord(webhook, payload, alert_kind="EPSS alert")
 
 
 def send_ransomware_victim_alert(item: Item) -> None:
     if not _notifications_enabled():
         return
 
-    # Primary: DARK_DISCORD_WEBHOOK (urgent intel); fallback: INTEL_DISCORD_WEBHOOK
+    profile = classify_item(item)
+    if not item.feed.allows_immediate_discord(profile.priority):
+        return
+
     webhook = _intel_webhook()
     if not webhook:
+        logger.debug(
+            "INTEL_DISCORD_WEBHOOK not configured, skipping ransomware alert."
+        )
         return
+
+    priority_label, color = discord_priority_presentation(profile.priority)
 
     raw = item.raw_payload or {}
     victim = str(raw.get("victim") or item.title)
@@ -482,6 +554,11 @@ def send_ransomware_victim_alert(item: Item) -> None:
     country = str(raw.get("country") or "")
 
     fields = [
+        {
+            "name": "Priority",
+            "value": f"{profile.priority} - {priority_label}",
+            "inline": True,
+        },
         {"name": "Group", "value": group.title() or "(unknown)", "inline": True},
         {"name": "Victim", "value": victim[:200], "inline": True},
     ]
@@ -495,14 +572,11 @@ def send_ransomware_victim_alert(item: Item) -> None:
             {
                 "title": f"\U0001f6a8 Ransomware Victim: {item.title[:200]}",
                 "description": (item.summary[:300] if item.summary else "(no description)"),
-                "color": 0xFF4444,
+                "color": color,
                 "fields": fields,
                 "footer": {"text": "borealsec-intel \u00b7 ransomware.live"},
             }
         ]
     }
 
-    try:
-        requests.post(webhook, json=payload, timeout=10)
-    except requests.RequestException as e:
-        logger.warning("Discord alert failed: %s", e)
+    _post_discord(webhook, payload, alert_kind="ransomware alert")

@@ -124,6 +124,13 @@ class Command(BaseCommand):
             "section": feed_data["section"],
             "priority": feed_data.get("priority", 100),
             "enabled": feed_data.get("enabled", True),
+            "discord_enabled": feed_data.get("discord_enabled", True),
+            "discord_min_priority": feed_data.get(
+                "discord_min_priority", Feed.DiscordPriority.P3
+            ),
+            "discord_mode": feed_data.get(
+                "discord_mode", Feed.DiscordMode.IMMEDIATE
+            ),
             "expanded_collection": feed_data.get("expanded_collection", False),
             "expanded_max_items_per_run": feed_data.get("expanded_max_items_per_run"),
             "expanded_max_age_days": feed_data.get("expanded_max_age_days"),

@@ -34,6 +34,17 @@ class Feed(models.Model):
         RESEARCH = "research", "Research"
         SWEDEN = "sweden", "Sweden"
 
+    class DiscordMode(models.TextChoices):
+        IMMEDIATE = "immediate", "Immediate"
+        DIGEST = "digest", "Digest (reserved)"
+        OFF = "off", "Off"
+
+    class DiscordPriority(models.TextChoices):
+        P1 = "P1", "P1 - Critical"
+        P2 = "P2", "P2 - High"
+        P3 = "P3", "P3 - Medium"
+        P4 = "P4", "P4 - Low / informational"
+
     source = models.ForeignKey(Source, on_delete=models.CASCADE, related_name="feeds")
     name = models.CharField(max_length=160)
     url = models.URLField(unique=True)
@@ -46,6 +57,22 @@ class Feed(models.Model):
     )
     priority = models.PositiveSmallIntegerField(default=100)
     enabled = models.BooleanField(default=True)
+    discord_enabled = models.BooleanField(
+        default=False,
+        help_text="Allow this feed to participate in Discord notification policy.",
+    )
+    discord_min_priority = models.CharField(
+        max_length=2,
+        choices=DiscordPriority.choices,
+        default=DiscordPriority.P3,
+        help_text="Lowest-priority item eligible for Discord delivery.",
+    )
+    discord_mode = models.CharField(
+        max_length=16,
+        choices=DiscordMode.choices,
+        default=DiscordMode.OFF,
+        help_text="Digest is reserved for later and suppresses immediate delivery.",
+    )
     expanded_collection = models.BooleanField(default=False)
     expanded_max_items_per_run = models.PositiveIntegerField(null=True, blank=True)
     expanded_max_age_days = models.PositiveIntegerField(null=True, blank=True)
@@ -63,6 +90,14 @@ class Feed(models.Model):
 
     def __str__(self) -> str:
         return f"{self.source.name} / {self.name}"
+
+    def allows_immediate_discord(self, priority: str) -> bool:
+        if not self.discord_enabled or self.discord_mode != self.DiscordMode.IMMEDIATE:
+            return False
+        priority_rank = {"P1": 1, "P2": 2, "P3": 3, "P4": 4}
+        item_rank = priority_rank.get((priority or "").upper())
+        minimum_rank = priority_rank.get(self.discord_min_priority)
+        return bool(item_rank and minimum_rank and item_rank <= minimum_rank)
 
 
 class Item(models.Model):

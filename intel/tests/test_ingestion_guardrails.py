@@ -1,8 +1,9 @@
 import json
 from datetime import timedelta
 from io import StringIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import requests
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -21,6 +22,9 @@ class IngestionGuardrailTests(TestCase):
             url="https://example.com/guard-feed.xml",
             feed_type=Feed.FeedType.RSS,
             section=Feed.Section.ADVISORIES,
+            discord_enabled=True,
+            discord_min_priority=Feed.DiscordPriority.P3,
+            discord_mode=Feed.DiscordMode.IMMEDIATE,
         )
 
     def _run_ingest_with_entries(self, entries):
@@ -265,7 +269,7 @@ class IngestionGuardrailTests(TestCase):
         alerted_item = mock_generic.call_args.args[0]
         self.assertEqual(alerted_item.title, "Critical CVE-2026-4444 authentication bypass under attack")
         self.assertEqual(
-            mock_generic.call_args.kwargs["why_alerted"],
+            mock_generic.call_args.kwargs["profile"].primary_reason,
             "Active exploitation in summary",
         )
 
@@ -293,6 +297,41 @@ class IngestionGuardrailTests(TestCase):
             Item.objects.filter(
                 feed=self.feed,
                 url="https://example.com/high-signal-disabled",
+            ).exists()
+        )
+        run = FetchRun.objects.get(feed=self.feed)
+        self.assertTrue(run.ok)
+        self.assertEqual(run.items_new, 1)
+
+    @override_settings(
+        NOTIFICATIONS_ENABLED=True,
+        INTEL_DISCORD_WEBHOOK="https://discord.com/api/webhooks/intel/secret-token",
+    )
+    def test_discord_non_2xx_does_not_abort_high_signal_ingestion(self):
+        self.feed.section = Feed.Section.RESEARCH
+        self.feed.save(update_fields=["section", "updated_at"])
+        entries = [
+            {
+                "title": "Critical CVE-2026-5555 gateway flaw under attack",
+                "link": "https://example.com/high-signal-delivery-failure",
+                "summary": "The vulnerability is actively exploited in the wild.",
+                "published": timezone.now().isoformat(),
+            }
+        ]
+        response = MagicMock(status_code=500)
+        response.raise_for_status.side_effect = requests.HTTPError(
+            "500 Server Error containing secret-token",
+            response=response,
+        )
+
+        with patch("intel.notifications.requests.post", return_value=response) as mock_post:
+            self._run_ingest_with_entries(entries)
+
+        mock_post.assert_called_once()
+        self.assertTrue(
+            Item.objects.filter(
+                feed=self.feed,
+                url="https://example.com/high-signal-delivery-failure",
             ).exists()
         )
         run = FetchRun.objects.get(feed=self.feed)
