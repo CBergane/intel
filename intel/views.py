@@ -12,8 +12,8 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.paginator import Paginator
-from django.db.models import Count, Max, OuterRef, Q, Subquery
-from django.db.models.functions import Coalesce
+from django.db.models import Count, F, Max, OuterRef, Q, Subquery, Window
+from django.db.models.functions import Coalesce, RowNumber
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
@@ -64,6 +64,7 @@ TIME_OPTIONS = [
 ]
 LIST_CANDIDATE_LIMIT = 1000
 LIST_PAGE_SIZE = 25
+SOURCES_PREVIEW_LIMIT = 3
 ITEM_SECTION_ROUTE_ORDER = (
     (Feed.Section.ADVISORIES, "advisories", "Vulnerabilities"),
     (Feed.Section.ACTIVE, "active", "Active Exploitation"),
@@ -799,13 +800,22 @@ def sources_view(request):
 
     recent_items_by_key = {}
     recent_items = _attach_item_meta(
-        list(item_base.filter(activity_at__gte=since_30d).order_by("-activity_at", "-id"))
+        list(
+            item_base.filter(activity_at__gte=since_30d)
+            .annotate(
+                source_section_rank=Window(
+                    expression=RowNumber(),
+                    partition_by=[F("source_id"), F("feed__section")],
+                    order_by=[F("activity_at").desc(), F("id").desc()],
+                )
+            )
+            .filter(source_section_rank__lte=SOURCES_PREVIEW_LIMIT)
+            .order_by("-activity_at", "-id")
+        )
     )
     for item in recent_items:
         key = (item.source_id, item.feed.section)
-        bucket = recent_items_by_key.setdefault(key, [])
-        if len(bucket) < 3:
-            bucket.append(item)
+        recent_items_by_key.setdefault(key, []).append(item)
 
     enabled_feeds = list(
         _with_latest_fetch_run_id(
