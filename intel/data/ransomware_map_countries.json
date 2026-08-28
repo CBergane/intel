@@ -1,0 +1,2000 @@
+{
+  "dataset": {
+    "source": "Natural Earth vector 4.1.0 via world-atlas 2.0.2",
+    "scale": "1:110m",
+    "license": "Public domain geography; world-atlas redistribution is ISC"
+  },
+  "countries": [
+    {
+      "country_id": "AFG",
+      "name": "Afghanistan",
+      "geometry_name": "Afghanistan",
+      "iso_a2": "AF",
+      "iso_a3": "AFG",
+      "iso_n3": "004",
+      "aliases": [
+        "Afghanistan"
+      ]
+    },
+    {
+      "country_id": "ALB",
+      "name": "Albania",
+      "geometry_name": "Albania",
+      "iso_a2": "AL",
+      "iso_a3": "ALB",
+      "iso_n3": "008",
+      "aliases": [
+        "Albania"
+      ]
+    },
+    {
+      "country_id": "DZA",
+      "name": "Algeria",
+      "geometry_name": "Algeria",
+      "iso_a2": "DZ",
+      "iso_a3": "DZA",
+      "iso_n3": "012",
+      "aliases": [
+        "Algeria"
+      ]
+    },
+    {
+      "country_id": "AGO",
+      "name": "Angola",
+      "geometry_name": "Angola",
+      "iso_a2": "AO",
+      "iso_a3": "AGO",
+      "iso_n3": "024",
+      "aliases": [
+        "Angola"
+      ]
+    },
+    {
+      "country_id": "ATA",
+      "name": "Antarctica",
+      "geometry_name": "Antarctica",
+      "iso_a2": "AQ",
+      "iso_a3": "ATA",
+      "iso_n3": "010",
+      "aliases": [
+        "Antarctica"
+      ]
+    },
+    {
+      "country_id": "ARG",
+      "name": "Argentina",
+      "geometry_name": "Argentina",
+      "iso_a2": "AR",
+      "iso_a3": "ARG",
+      "iso_n3": "032",
+      "aliases": [
+        "Argentina"
+      ]
+    },
+    {
+      "country_id": "ARM",
+      "name": "Armenia",
+      "geometry_name": "Armenia",
+      "iso_a2": "AM",
+      "iso_a3": "ARM",
+      "iso_n3": "051",
+      "aliases": [
+        "Armenia"
+      ]
+    },
+    {
+      "country_id": "AUS",
+      "name": "Australia",
+      "geometry_name": "Australia",
+      "iso_a2": "AU",
+      "iso_a3": "AUS",
+      "iso_n3": "036",
+      "aliases": [
+        "Australia"
+      ]
+    },
+    {
+      "country_id": "AUT",
+      "name": "Austria",
+      "geometry_name": "Austria",
+      "iso_a2": "AT",
+      "iso_a3": "AUT",
+      "iso_n3": "040",
+      "aliases": [
+        "Austria"
+      ]
+    },
+    {
+      "country_id": "AZE",
+      "name": "Azerbaijan",
+      "geometry_name": "Azerbaijan",
+      "iso_a2": "AZ",
+      "iso_a3": "AZE",
+      "iso_n3": "031",
+      "aliases": [
+        "Azerbaijan"
+      ]
+    },
+    {
+      "country_id": "BHS",
+      "name": "Bahamas",
+      "geometry_name": "Bahamas",
+      "iso_a2": "BS",
+      "iso_a3": "BHS",
+      "iso_n3": "044",
+      "aliases": [
+        "Bahamas"
+      ]
+    },
+    {
+      "country_id": "BGD",
+      "name": "Bangladesh",
+      "geometry_name": "Bangladesh",
+      "iso_a2": "BD",
+      "iso_a3": "BGD",
+      "iso_n3": "050",
+      "aliases": [
+        "Bangladesh"
+      ]
+    },
+    {
+      "country_id": "BLR",
+      "name": "Belarus",
+      "geometry_name": "Belarus",
+      "iso_a2": "BY",
+      "iso_a3": "BLR",
+      "iso_n3": "112",
+      "aliases": [
+        "Belarus"
+      ]
+    },
+    {
+      "country_id": "BEL",
+      "name": "Belgium",
+      "geometry_name": "Belgium",
+      "iso_a2": "BE",
+      "iso_a3": "BEL",
+      "iso_n3": "056",
+      "aliases": [
+        "Belgium"
+      ]
+    },
+    {
+      "country_id": "BLZ",
+      "name": "Belize",
+      "geometry_name": "Belize",
+      "iso_a2": "BZ",
+      "iso_a3": "BLZ",
+      "iso_n3": "084",
+      "aliases": [
+        "Belize"
+      ]
+    },
+    {
+      "country_id": "BEN",
+      "name": "Benin",
+      "geometry_name": "Benin",
+      "iso_a2": "BJ",
+      "iso_a3": "BEN",
+      "iso_n3": "204",
+      "aliases": [
+        "Benin"
+      ]
+    },
+    {
+      "country_id": "BTN",
+      "name": "Bhutan",
+      "geometry_name": "Bhutan",
+      "iso_a2": "BT",
+      "iso_a3": "BTN",
+      "iso_n3": "064",
+      "aliases": [
+        "Bhutan"
+      ]
+    },
+    {
+      "country_id": "BOL",
+      "name": "Bolivia",
+      "geometry_name": "Bolivia",
+      "iso_a2": "BO",
+      "iso_a3": "BOL",
+      "iso_n3": "068",
+      "aliases": [
+        "Bolivia"
+      ]
+    },
+    {
+      "country_id": "BIH",
+      "name": "Bosnia and Herzegovina",
+      "geometry_name": "Bosnia and Herz.",
+      "iso_a2": "BA",
+      "iso_a3": "BIH",
+      "iso_n3": "070",
+      "aliases": [
+        "Bosnia and Herzegovina",
+        "Bosnia and Herz."
+      ]
+    },
+    {
+      "country_id": "BWA",
+      "name": "Botswana",
+      "geometry_name": "Botswana",
+      "iso_a2": "BW",
+      "iso_a3": "BWA",
+      "iso_n3": "072",
+      "aliases": [
+        "Botswana"
+      ]
+    },
+    {
+      "country_id": "BRA",
+      "name": "Brazil",
+      "geometry_name": "Brazil",
+      "iso_a2": "BR",
+      "iso_a3": "BRA",
+      "iso_n3": "076",
+      "aliases": [
+        "Brazil"
+      ]
+    },
+    {
+      "country_id": "BRN",
+      "name": "Brunei Darussalam",
+      "geometry_name": "Brunei",
+      "iso_a2": "BN",
+      "iso_a3": "BRN",
+      "iso_n3": "096",
+      "aliases": [
+        "Brunei Darussalam",
+        "Brunei"
+      ]
+    },
+    {
+      "country_id": "BGR",
+      "name": "Bulgaria",
+      "geometry_name": "Bulgaria",
+      "iso_a2": "BG",
+      "iso_a3": "BGR",
+      "iso_n3": "100",
+      "aliases": [
+        "Bulgaria"
+      ]
+    },
+    {
+      "country_id": "BFA",
+      "name": "Burkina Faso",
+      "geometry_name": "Burkina Faso",
+      "iso_a2": "BF",
+      "iso_a3": "BFA",
+      "iso_n3": "854",
+      "aliases": [
+        "Burkina Faso"
+      ]
+    },
+    {
+      "country_id": "BDI",
+      "name": "Burundi",
+      "geometry_name": "Burundi",
+      "iso_a2": "BI",
+      "iso_a3": "BDI",
+      "iso_n3": "108",
+      "aliases": [
+        "Burundi"
+      ]
+    },
+    {
+      "country_id": "KHM",
+      "name": "Cambodia",
+      "geometry_name": "Cambodia",
+      "iso_a2": "KH",
+      "iso_a3": "KHM",
+      "iso_n3": "116",
+      "aliases": [
+        "Cambodia"
+      ]
+    },
+    {
+      "country_id": "CMR",
+      "name": "Cameroon",
+      "geometry_name": "Cameroon",
+      "iso_a2": "CM",
+      "iso_a3": "CMR",
+      "iso_n3": "120",
+      "aliases": [
+        "Cameroon"
+      ]
+    },
+    {
+      "country_id": "CAN",
+      "name": "Canada",
+      "geometry_name": "Canada",
+      "iso_a2": "CA",
+      "iso_a3": "CAN",
+      "iso_n3": "124",
+      "aliases": [
+        "Canada"
+      ]
+    },
+    {
+      "country_id": "CAF",
+      "name": "Central African Republic",
+      "geometry_name": "Central African Rep.",
+      "iso_a2": "CF",
+      "iso_a3": "CAF",
+      "iso_n3": "140",
+      "aliases": [
+        "Central African Republic",
+        "Central African Rep."
+      ]
+    },
+    {
+      "country_id": "TCD",
+      "name": "Chad",
+      "geometry_name": "Chad",
+      "iso_a2": "TD",
+      "iso_a3": "TCD",
+      "iso_n3": "148",
+      "aliases": [
+        "Chad"
+      ]
+    },
+    {
+      "country_id": "CHL",
+      "name": "Chile",
+      "geometry_name": "Chile",
+      "iso_a2": "CL",
+      "iso_a3": "CHL",
+      "iso_n3": "152",
+      "aliases": [
+        "Chile"
+      ]
+    },
+    {
+      "country_id": "COL",
+      "name": "Colombia",
+      "geometry_name": "Colombia",
+      "iso_a2": "CO",
+      "iso_a3": "COL",
+      "iso_n3": "170",
+      "aliases": [
+        "Colombia"
+      ]
+    },
+    {
+      "country_id": "CRI",
+      "name": "Costa Rica",
+      "geometry_name": "Costa Rica",
+      "iso_a2": "CR",
+      "iso_a3": "CRI",
+      "iso_n3": "188",
+      "aliases": [
+        "Costa Rica"
+      ]
+    },
+    {
+      "country_id": "CIV",
+      "name": "Cote d'Ivoire",
+      "geometry_name": "Côte d'Ivoire",
+      "iso_a2": "CI",
+      "iso_a3": "CIV",
+      "iso_n3": "384",
+      "aliases": [
+        "Cote d'Ivoire",
+        "Côte d'Ivoire",
+        "Ivory Coast"
+      ]
+    },
+    {
+      "country_id": "HRV",
+      "name": "Croatia",
+      "geometry_name": "Croatia",
+      "iso_a2": "HR",
+      "iso_a3": "HRV",
+      "iso_n3": "191",
+      "aliases": [
+        "Croatia"
+      ]
+    },
+    {
+      "country_id": "CUB",
+      "name": "Cuba",
+      "geometry_name": "Cuba",
+      "iso_a2": "CU",
+      "iso_a3": "CUB",
+      "iso_n3": "192",
+      "aliases": [
+        "Cuba"
+      ]
+    },
+    {
+      "country_id": "CYP",
+      "name": "Cyprus",
+      "geometry_name": "Cyprus",
+      "iso_a2": "CY",
+      "iso_a3": "CYP",
+      "iso_n3": "196",
+      "aliases": [
+        "Cyprus"
+      ]
+    },
+    {
+      "country_id": "CZE",
+      "name": "Czechia",
+      "geometry_name": "Czechia",
+      "iso_a2": "CZ",
+      "iso_a3": "CZE",
+      "iso_n3": "203",
+      "aliases": [
+        "Czechia",
+        "Czech Republic"
+      ]
+    },
+    {
+      "country_id": "DNK",
+      "name": "Denmark",
+      "geometry_name": "Denmark",
+      "iso_a2": "DK",
+      "iso_a3": "DNK",
+      "iso_n3": "208",
+      "aliases": [
+        "Denmark"
+      ]
+    },
+    {
+      "country_id": "DJI",
+      "name": "Djibouti",
+      "geometry_name": "Djibouti",
+      "iso_a2": "DJ",
+      "iso_a3": "DJI",
+      "iso_n3": "262",
+      "aliases": [
+        "Djibouti"
+      ]
+    },
+    {
+      "country_id": "DOM",
+      "name": "Dominican Republic",
+      "geometry_name": "Dominican Rep.",
+      "iso_a2": "DO",
+      "iso_a3": "DOM",
+      "iso_n3": "214",
+      "aliases": [
+        "Dominican Republic",
+        "Dominican Rep."
+      ]
+    },
+    {
+      "country_id": "COD",
+      "name": "DR Congo",
+      "geometry_name": "Dem. Rep. Congo",
+      "iso_a2": "CD",
+      "iso_a3": "COD",
+      "iso_n3": "180",
+      "aliases": [
+        "DR Congo",
+        "Dem. Rep. Congo",
+        "Democratic Republic of the Congo",
+        "Congo"
+      ]
+    },
+    {
+      "country_id": "ECU",
+      "name": "Ecuador",
+      "geometry_name": "Ecuador",
+      "iso_a2": "EC",
+      "iso_a3": "ECU",
+      "iso_n3": "218",
+      "aliases": [
+        "Ecuador"
+      ]
+    },
+    {
+      "country_id": "EGY",
+      "name": "Egypt",
+      "geometry_name": "Egypt",
+      "iso_a2": "EG",
+      "iso_a3": "EGY",
+      "iso_n3": "818",
+      "aliases": [
+        "Egypt"
+      ]
+    },
+    {
+      "country_id": "SLV",
+      "name": "El Salvador",
+      "geometry_name": "El Salvador",
+      "iso_a2": "SV",
+      "iso_a3": "SLV",
+      "iso_n3": "222",
+      "aliases": [
+        "El Salvador"
+      ]
+    },
+    {
+      "country_id": "GNQ",
+      "name": "Equatorial Guinea",
+      "geometry_name": "Eq. Guinea",
+      "iso_a2": "GQ",
+      "iso_a3": "GNQ",
+      "iso_n3": "226",
+      "aliases": [
+        "Equatorial Guinea",
+        "Eq. Guinea"
+      ]
+    },
+    {
+      "country_id": "ERI",
+      "name": "Eritrea",
+      "geometry_name": "Eritrea",
+      "iso_a2": "ER",
+      "iso_a3": "ERI",
+      "iso_n3": "232",
+      "aliases": [
+        "Eritrea"
+      ]
+    },
+    {
+      "country_id": "EST",
+      "name": "Estonia",
+      "geometry_name": "Estonia",
+      "iso_a2": "EE",
+      "iso_a3": "EST",
+      "iso_n3": "233",
+      "aliases": [
+        "Estonia"
+      ]
+    },
+    {
+      "country_id": "SWZ",
+      "name": "Eswatini",
+      "geometry_name": "eSwatini",
+      "iso_a2": "SZ",
+      "iso_a3": "SWZ",
+      "iso_n3": "748",
+      "aliases": [
+        "Eswatini",
+        "eSwatini"
+      ]
+    },
+    {
+      "country_id": "ETH",
+      "name": "Ethiopia",
+      "geometry_name": "Ethiopia",
+      "iso_a2": "ET",
+      "iso_a3": "ETH",
+      "iso_n3": "231",
+      "aliases": [
+        "Ethiopia"
+      ]
+    },
+    {
+      "country_id": "FLK",
+      "name": "Falkland Islands (Malvinas)",
+      "geometry_name": "Falkland Is.",
+      "iso_a2": "FK",
+      "iso_a3": "FLK",
+      "iso_n3": "238",
+      "aliases": [
+        "Falkland Islands (Malvinas)",
+        "Falkland Is."
+      ]
+    },
+    {
+      "country_id": "FJI",
+      "name": "Fiji",
+      "geometry_name": "Fiji",
+      "iso_a2": "FJ",
+      "iso_a3": "FJI",
+      "iso_n3": "242",
+      "aliases": [
+        "Fiji"
+      ]
+    },
+    {
+      "country_id": "FIN",
+      "name": "Finland",
+      "geometry_name": "Finland",
+      "iso_a2": "FI",
+      "iso_a3": "FIN",
+      "iso_n3": "246",
+      "aliases": [
+        "Finland"
+      ]
+    },
+    {
+      "country_id": "FRA",
+      "name": "France",
+      "geometry_name": "France",
+      "iso_a2": "FR",
+      "iso_a3": "FRA",
+      "iso_n3": "250",
+      "aliases": [
+        "France"
+      ]
+    },
+    {
+      "country_id": "ATF",
+      "name": "French Southern Territories",
+      "geometry_name": "Fr. S. Antarctic Lands",
+      "iso_a2": "TF",
+      "iso_a3": "ATF",
+      "iso_n3": "260",
+      "aliases": [
+        "French Southern Territories",
+        "Fr. S. Antarctic Lands"
+      ]
+    },
+    {
+      "country_id": "GAB",
+      "name": "Gabon",
+      "geometry_name": "Gabon",
+      "iso_a2": "GA",
+      "iso_a3": "GAB",
+      "iso_n3": "266",
+      "aliases": [
+        "Gabon"
+      ]
+    },
+    {
+      "country_id": "GEO",
+      "name": "Georgia",
+      "geometry_name": "Georgia",
+      "iso_a2": "GE",
+      "iso_a3": "GEO",
+      "iso_n3": "268",
+      "aliases": [
+        "Georgia"
+      ]
+    },
+    {
+      "country_id": "DEU",
+      "name": "Germany",
+      "geometry_name": "Germany",
+      "iso_a2": "DE",
+      "iso_a3": "DEU",
+      "iso_n3": "276",
+      "aliases": [
+        "Germany"
+      ]
+    },
+    {
+      "country_id": "GHA",
+      "name": "Ghana",
+      "geometry_name": "Ghana",
+      "iso_a2": "GH",
+      "iso_a3": "GHA",
+      "iso_n3": "288",
+      "aliases": [
+        "Ghana"
+      ]
+    },
+    {
+      "country_id": "GRC",
+      "name": "Greece",
+      "geometry_name": "Greece",
+      "iso_a2": "GR",
+      "iso_a3": "GRC",
+      "iso_n3": "300",
+      "aliases": [
+        "Greece"
+      ]
+    },
+    {
+      "country_id": "GRL",
+      "name": "Greenland",
+      "geometry_name": "Greenland",
+      "iso_a2": "GL",
+      "iso_a3": "GRL",
+      "iso_n3": "304",
+      "aliases": [
+        "Greenland"
+      ]
+    },
+    {
+      "country_id": "GTM",
+      "name": "Guatemala",
+      "geometry_name": "Guatemala",
+      "iso_a2": "GT",
+      "iso_a3": "GTM",
+      "iso_n3": "320",
+      "aliases": [
+        "Guatemala"
+      ]
+    },
+    {
+      "country_id": "GIN",
+      "name": "Guinea",
+      "geometry_name": "Guinea",
+      "iso_a2": "GN",
+      "iso_a3": "GIN",
+      "iso_n3": "324",
+      "aliases": [
+        "Guinea"
+      ]
+    },
+    {
+      "country_id": "GNB",
+      "name": "Guinea-Bissau",
+      "geometry_name": "Guinea-Bissau",
+      "iso_a2": "GW",
+      "iso_a3": "GNB",
+      "iso_n3": "624",
+      "aliases": [
+        "Guinea-Bissau"
+      ]
+    },
+    {
+      "country_id": "GUY",
+      "name": "Guyana",
+      "geometry_name": "Guyana",
+      "iso_a2": "GY",
+      "iso_a3": "GUY",
+      "iso_n3": "328",
+      "aliases": [
+        "Guyana"
+      ]
+    },
+    {
+      "country_id": "HTI",
+      "name": "Haiti",
+      "geometry_name": "Haiti",
+      "iso_a2": "HT",
+      "iso_a3": "HTI",
+      "iso_n3": "332",
+      "aliases": [
+        "Haiti"
+      ]
+    },
+    {
+      "country_id": "HND",
+      "name": "Honduras",
+      "geometry_name": "Honduras",
+      "iso_a2": "HN",
+      "iso_a3": "HND",
+      "iso_n3": "340",
+      "aliases": [
+        "Honduras"
+      ]
+    },
+    {
+      "country_id": "HUN",
+      "name": "Hungary",
+      "geometry_name": "Hungary",
+      "iso_a2": "HU",
+      "iso_a3": "HUN",
+      "iso_n3": "348",
+      "aliases": [
+        "Hungary"
+      ]
+    },
+    {
+      "country_id": "ISL",
+      "name": "Iceland",
+      "geometry_name": "Iceland",
+      "iso_a2": "IS",
+      "iso_a3": "ISL",
+      "iso_n3": "352",
+      "aliases": [
+        "Iceland"
+      ]
+    },
+    {
+      "country_id": "IND",
+      "name": "India",
+      "geometry_name": "India",
+      "iso_a2": "IN",
+      "iso_a3": "IND",
+      "iso_n3": "356",
+      "aliases": [
+        "India"
+      ]
+    },
+    {
+      "country_id": "IDN",
+      "name": "Indonesia",
+      "geometry_name": "Indonesia",
+      "iso_a2": "ID",
+      "iso_a3": "IDN",
+      "iso_n3": "360",
+      "aliases": [
+        "Indonesia"
+      ]
+    },
+    {
+      "country_id": "IRQ",
+      "name": "Iraq",
+      "geometry_name": "Iraq",
+      "iso_a2": "IQ",
+      "iso_a3": "IRQ",
+      "iso_n3": "368",
+      "aliases": [
+        "Iraq"
+      ]
+    },
+    {
+      "country_id": "IRL",
+      "name": "Ireland",
+      "geometry_name": "Ireland",
+      "iso_a2": "IE",
+      "iso_a3": "IRL",
+      "iso_n3": "372",
+      "aliases": [
+        "Ireland"
+      ]
+    },
+    {
+      "country_id": "IRN",
+      "name": "Islamic Republic of Iran",
+      "geometry_name": "Iran",
+      "iso_a2": "IR",
+      "iso_a3": "IRN",
+      "iso_n3": "364",
+      "aliases": [
+        "Islamic Republic of Iran",
+        "Iran"
+      ]
+    },
+    {
+      "country_id": "ISR",
+      "name": "Israel",
+      "geometry_name": "Israel",
+      "iso_a2": "IL",
+      "iso_a3": "ISR",
+      "iso_n3": "376",
+      "aliases": [
+        "Israel"
+      ]
+    },
+    {
+      "country_id": "ITA",
+      "name": "Italy",
+      "geometry_name": "Italy",
+      "iso_a2": "IT",
+      "iso_a3": "ITA",
+      "iso_n3": "380",
+      "aliases": [
+        "Italy"
+      ]
+    },
+    {
+      "country_id": "JAM",
+      "name": "Jamaica",
+      "geometry_name": "Jamaica",
+      "iso_a2": "JM",
+      "iso_a3": "JAM",
+      "iso_n3": "388",
+      "aliases": [
+        "Jamaica"
+      ]
+    },
+    {
+      "country_id": "JPN",
+      "name": "Japan",
+      "geometry_name": "Japan",
+      "iso_a2": "JP",
+      "iso_a3": "JPN",
+      "iso_n3": "392",
+      "aliases": [
+        "Japan"
+      ]
+    },
+    {
+      "country_id": "JOR",
+      "name": "Jordan",
+      "geometry_name": "Jordan",
+      "iso_a2": "JO",
+      "iso_a3": "JOR",
+      "iso_n3": "400",
+      "aliases": [
+        "Jordan"
+      ]
+    },
+    {
+      "country_id": "KAZ",
+      "name": "Kazakhstan",
+      "geometry_name": "Kazakhstan",
+      "iso_a2": "KZ",
+      "iso_a3": "KAZ",
+      "iso_n3": "398",
+      "aliases": [
+        "Kazakhstan"
+      ]
+    },
+    {
+      "country_id": "KEN",
+      "name": "Kenya",
+      "geometry_name": "Kenya",
+      "iso_a2": "KE",
+      "iso_a3": "KEN",
+      "iso_n3": "404",
+      "aliases": [
+        "Kenya"
+      ]
+    },
+    {
+      "country_id": "XKX",
+      "name": "Kosovo",
+      "geometry_name": "Kosovo",
+      "iso_a2": "",
+      "iso_a3": "",
+      "iso_n3": "",
+      "aliases": [
+        "Kosovo"
+      ]
+    },
+    {
+      "country_id": "KWT",
+      "name": "Kuwait",
+      "geometry_name": "Kuwait",
+      "iso_a2": "KW",
+      "iso_a3": "KWT",
+      "iso_n3": "414",
+      "aliases": [
+        "Kuwait"
+      ]
+    },
+    {
+      "country_id": "KGZ",
+      "name": "Kyrgyzstan",
+      "geometry_name": "Kyrgyzstan",
+      "iso_a2": "KG",
+      "iso_a3": "KGZ",
+      "iso_n3": "417",
+      "aliases": [
+        "Kyrgyzstan"
+      ]
+    },
+    {
+      "country_id": "LAO",
+      "name": "Laos",
+      "geometry_name": "Laos",
+      "iso_a2": "LA",
+      "iso_a3": "LAO",
+      "iso_n3": "418",
+      "aliases": [
+        "Laos",
+        "Lao People's Democratic Republic"
+      ]
+    },
+    {
+      "country_id": "LVA",
+      "name": "Latvia",
+      "geometry_name": "Latvia",
+      "iso_a2": "LV",
+      "iso_a3": "LVA",
+      "iso_n3": "428",
+      "aliases": [
+        "Latvia"
+      ]
+    },
+    {
+      "country_id": "LBN",
+      "name": "Lebanon",
+      "geometry_name": "Lebanon",
+      "iso_a2": "LB",
+      "iso_a3": "LBN",
+      "iso_n3": "422",
+      "aliases": [
+        "Lebanon"
+      ]
+    },
+    {
+      "country_id": "LSO",
+      "name": "Lesotho",
+      "geometry_name": "Lesotho",
+      "iso_a2": "LS",
+      "iso_a3": "LSO",
+      "iso_n3": "426",
+      "aliases": [
+        "Lesotho"
+      ]
+    },
+    {
+      "country_id": "LBR",
+      "name": "Liberia",
+      "geometry_name": "Liberia",
+      "iso_a2": "LR",
+      "iso_a3": "LBR",
+      "iso_n3": "430",
+      "aliases": [
+        "Liberia"
+      ]
+    },
+    {
+      "country_id": "LBY",
+      "name": "Libya",
+      "geometry_name": "Libya",
+      "iso_a2": "LY",
+      "iso_a3": "LBY",
+      "iso_n3": "434",
+      "aliases": [
+        "Libya"
+      ]
+    },
+    {
+      "country_id": "LTU",
+      "name": "Lithuania",
+      "geometry_name": "Lithuania",
+      "iso_a2": "LT",
+      "iso_a3": "LTU",
+      "iso_n3": "440",
+      "aliases": [
+        "Lithuania"
+      ]
+    },
+    {
+      "country_id": "LUX",
+      "name": "Luxembourg",
+      "geometry_name": "Luxembourg",
+      "iso_a2": "LU",
+      "iso_a3": "LUX",
+      "iso_n3": "442",
+      "aliases": [
+        "Luxembourg"
+      ]
+    },
+    {
+      "country_id": "MDG",
+      "name": "Madagascar",
+      "geometry_name": "Madagascar",
+      "iso_a2": "MG",
+      "iso_a3": "MDG",
+      "iso_n3": "450",
+      "aliases": [
+        "Madagascar"
+      ]
+    },
+    {
+      "country_id": "MWI",
+      "name": "Malawi",
+      "geometry_name": "Malawi",
+      "iso_a2": "MW",
+      "iso_a3": "MWI",
+      "iso_n3": "454",
+      "aliases": [
+        "Malawi"
+      ]
+    },
+    {
+      "country_id": "MYS",
+      "name": "Malaysia",
+      "geometry_name": "Malaysia",
+      "iso_a2": "MY",
+      "iso_a3": "MYS",
+      "iso_n3": "458",
+      "aliases": [
+        "Malaysia"
+      ]
+    },
+    {
+      "country_id": "MLI",
+      "name": "Mali",
+      "geometry_name": "Mali",
+      "iso_a2": "ML",
+      "iso_a3": "MLI",
+      "iso_n3": "466",
+      "aliases": [
+        "Mali"
+      ]
+    },
+    {
+      "country_id": "MRT",
+      "name": "Mauritania",
+      "geometry_name": "Mauritania",
+      "iso_a2": "MR",
+      "iso_a3": "MRT",
+      "iso_n3": "478",
+      "aliases": [
+        "Mauritania"
+      ]
+    },
+    {
+      "country_id": "MEX",
+      "name": "Mexico",
+      "geometry_name": "Mexico",
+      "iso_a2": "MX",
+      "iso_a3": "MEX",
+      "iso_n3": "484",
+      "aliases": [
+        "Mexico"
+      ]
+    },
+    {
+      "country_id": "MDA",
+      "name": "Moldova, Republic of",
+      "geometry_name": "Moldova",
+      "iso_a2": "MD",
+      "iso_a3": "MDA",
+      "iso_n3": "498",
+      "aliases": [
+        "Moldova, Republic of",
+        "Moldova"
+      ]
+    },
+    {
+      "country_id": "MNG",
+      "name": "Mongolia",
+      "geometry_name": "Mongolia",
+      "iso_a2": "MN",
+      "iso_a3": "MNG",
+      "iso_n3": "496",
+      "aliases": [
+        "Mongolia"
+      ]
+    },
+    {
+      "country_id": "MNE",
+      "name": "Montenegro",
+      "geometry_name": "Montenegro",
+      "iso_a2": "ME",
+      "iso_a3": "MNE",
+      "iso_n3": "499",
+      "aliases": [
+        "Montenegro"
+      ]
+    },
+    {
+      "country_id": "MAR",
+      "name": "Morocco",
+      "geometry_name": "Morocco",
+      "iso_a2": "MA",
+      "iso_a3": "MAR",
+      "iso_n3": "504",
+      "aliases": [
+        "Morocco"
+      ]
+    },
+    {
+      "country_id": "MOZ",
+      "name": "Mozambique",
+      "geometry_name": "Mozambique",
+      "iso_a2": "MZ",
+      "iso_a3": "MOZ",
+      "iso_n3": "508",
+      "aliases": [
+        "Mozambique"
+      ]
+    },
+    {
+      "country_id": "MMR",
+      "name": "Myanmar",
+      "geometry_name": "Myanmar",
+      "iso_a2": "MM",
+      "iso_a3": "MMR",
+      "iso_n3": "104",
+      "aliases": [
+        "Myanmar"
+      ]
+    },
+    {
+      "country_id": "NE-NORTHERN-CYPRUS",
+      "name": "N. Cyprus",
+      "geometry_name": "N. Cyprus",
+      "iso_a2": "",
+      "iso_a3": "",
+      "iso_n3": "",
+      "aliases": [
+        "N. Cyprus"
+      ]
+    },
+    {
+      "country_id": "NAM",
+      "name": "Namibia",
+      "geometry_name": "Namibia",
+      "iso_a2": "NA",
+      "iso_a3": "NAM",
+      "iso_n3": "516",
+      "aliases": [
+        "Namibia"
+      ]
+    },
+    {
+      "country_id": "NPL",
+      "name": "Nepal",
+      "geometry_name": "Nepal",
+      "iso_a2": "NP",
+      "iso_a3": "NPL",
+      "iso_n3": "524",
+      "aliases": [
+        "Nepal"
+      ]
+    },
+    {
+      "country_id": "NLD",
+      "name": "Netherlands",
+      "geometry_name": "Netherlands",
+      "iso_a2": "NL",
+      "iso_a3": "NLD",
+      "iso_n3": "528",
+      "aliases": [
+        "Netherlands",
+        "The Netherlands",
+        "Netherlands (Kingdom of the)"
+      ]
+    },
+    {
+      "country_id": "NCL",
+      "name": "New Caledonia",
+      "geometry_name": "New Caledonia",
+      "iso_a2": "NC",
+      "iso_a3": "NCL",
+      "iso_n3": "540",
+      "aliases": [
+        "New Caledonia"
+      ]
+    },
+    {
+      "country_id": "NZL",
+      "name": "New Zealand",
+      "geometry_name": "New Zealand",
+      "iso_a2": "NZ",
+      "iso_a3": "NZL",
+      "iso_n3": "554",
+      "aliases": [
+        "New Zealand"
+      ]
+    },
+    {
+      "country_id": "NIC",
+      "name": "Nicaragua",
+      "geometry_name": "Nicaragua",
+      "iso_a2": "NI",
+      "iso_a3": "NIC",
+      "iso_n3": "558",
+      "aliases": [
+        "Nicaragua"
+      ]
+    },
+    {
+      "country_id": "NER",
+      "name": "Niger",
+      "geometry_name": "Niger",
+      "iso_a2": "NE",
+      "iso_a3": "NER",
+      "iso_n3": "562",
+      "aliases": [
+        "Niger"
+      ]
+    },
+    {
+      "country_id": "NGA",
+      "name": "Nigeria",
+      "geometry_name": "Nigeria",
+      "iso_a2": "NG",
+      "iso_a3": "NGA",
+      "iso_n3": "566",
+      "aliases": [
+        "Nigeria"
+      ]
+    },
+    {
+      "country_id": "PRK",
+      "name": "North Korea",
+      "geometry_name": "North Korea",
+      "iso_a2": "KP",
+      "iso_a3": "PRK",
+      "iso_n3": "408",
+      "aliases": [
+        "North Korea"
+      ]
+    },
+    {
+      "country_id": "MKD",
+      "name": "North Macedonia",
+      "geometry_name": "Macedonia",
+      "iso_a2": "MK",
+      "iso_a3": "MKD",
+      "iso_n3": "807",
+      "aliases": [
+        "North Macedonia",
+        "Macedonia",
+        "The Republic of North Macedonia"
+      ]
+    },
+    {
+      "country_id": "NOR",
+      "name": "Norway",
+      "geometry_name": "Norway",
+      "iso_a2": "NO",
+      "iso_a3": "NOR",
+      "iso_n3": "578",
+      "aliases": [
+        "Norway"
+      ]
+    },
+    {
+      "country_id": "OMN",
+      "name": "Oman",
+      "geometry_name": "Oman",
+      "iso_a2": "OM",
+      "iso_a3": "OMN",
+      "iso_n3": "512",
+      "aliases": [
+        "Oman"
+      ]
+    },
+    {
+      "country_id": "PAK",
+      "name": "Pakistan",
+      "geometry_name": "Pakistan",
+      "iso_a2": "PK",
+      "iso_a3": "PAK",
+      "iso_n3": "586",
+      "aliases": [
+        "Pakistan"
+      ]
+    },
+    {
+      "country_id": "PAN",
+      "name": "Panama",
+      "geometry_name": "Panama",
+      "iso_a2": "PA",
+      "iso_a3": "PAN",
+      "iso_n3": "591",
+      "aliases": [
+        "Panama"
+      ]
+    },
+    {
+      "country_id": "PNG",
+      "name": "Papua New Guinea",
+      "geometry_name": "Papua New Guinea",
+      "iso_a2": "PG",
+      "iso_a3": "PNG",
+      "iso_n3": "598",
+      "aliases": [
+        "Papua New Guinea"
+      ]
+    },
+    {
+      "country_id": "PRY",
+      "name": "Paraguay",
+      "geometry_name": "Paraguay",
+      "iso_a2": "PY",
+      "iso_a3": "PRY",
+      "iso_n3": "600",
+      "aliases": [
+        "Paraguay"
+      ]
+    },
+    {
+      "country_id": "CHN",
+      "name": "People's Republic of China",
+      "geometry_name": "China",
+      "iso_a2": "CN",
+      "iso_a3": "CHN",
+      "iso_n3": "156",
+      "aliases": [
+        "People's Republic of China",
+        "China"
+      ]
+    },
+    {
+      "country_id": "PER",
+      "name": "Peru",
+      "geometry_name": "Peru",
+      "iso_a2": "PE",
+      "iso_a3": "PER",
+      "iso_n3": "604",
+      "aliases": [
+        "Peru"
+      ]
+    },
+    {
+      "country_id": "PHL",
+      "name": "Philippines",
+      "geometry_name": "Philippines",
+      "iso_a2": "PH",
+      "iso_a3": "PHL",
+      "iso_n3": "608",
+      "aliases": [
+        "Philippines"
+      ]
+    },
+    {
+      "country_id": "POL",
+      "name": "Poland",
+      "geometry_name": "Poland",
+      "iso_a2": "PL",
+      "iso_a3": "POL",
+      "iso_n3": "616",
+      "aliases": [
+        "Poland"
+      ]
+    },
+    {
+      "country_id": "PRT",
+      "name": "Portugal",
+      "geometry_name": "Portugal",
+      "iso_a2": "PT",
+      "iso_a3": "PRT",
+      "iso_n3": "620",
+      "aliases": [
+        "Portugal"
+      ]
+    },
+    {
+      "country_id": "PRI",
+      "name": "Puerto Rico",
+      "geometry_name": "Puerto Rico",
+      "iso_a2": "PR",
+      "iso_a3": "PRI",
+      "iso_n3": "630",
+      "aliases": [
+        "Puerto Rico"
+      ]
+    },
+    {
+      "country_id": "QAT",
+      "name": "Qatar",
+      "geometry_name": "Qatar",
+      "iso_a2": "QA",
+      "iso_a3": "QAT",
+      "iso_n3": "634",
+      "aliases": [
+        "Qatar"
+      ]
+    },
+    {
+      "country_id": "COG",
+      "name": "Republic of the Congo",
+      "geometry_name": "Congo",
+      "iso_a2": "CG",
+      "iso_a3": "COG",
+      "iso_n3": "178",
+      "aliases": [
+        "Republic of the Congo",
+        "Congo"
+      ]
+    },
+    {
+      "country_id": "GMB",
+      "name": "Republic of The Gambia",
+      "geometry_name": "Gambia",
+      "iso_a2": "GM",
+      "iso_a3": "GMB",
+      "iso_n3": "270",
+      "aliases": [
+        "Republic of The Gambia",
+        "Gambia",
+        "The Gambia"
+      ]
+    },
+    {
+      "country_id": "ROU",
+      "name": "Romania",
+      "geometry_name": "Romania",
+      "iso_a2": "RO",
+      "iso_a3": "ROU",
+      "iso_n3": "642",
+      "aliases": [
+        "Romania"
+      ]
+    },
+    {
+      "country_id": "RUS",
+      "name": "Russia",
+      "geometry_name": "Russia",
+      "iso_a2": "RU",
+      "iso_a3": "RUS",
+      "iso_n3": "643",
+      "aliases": [
+        "Russia",
+        "Russian Federation"
+      ]
+    },
+    {
+      "country_id": "RWA",
+      "name": "Rwanda",
+      "geometry_name": "Rwanda",
+      "iso_a2": "RW",
+      "iso_a3": "RWA",
+      "iso_n3": "646",
+      "aliases": [
+        "Rwanda"
+      ]
+    },
+    {
+      "country_id": "SAU",
+      "name": "Saudi Arabia",
+      "geometry_name": "Saudi Arabia",
+      "iso_a2": "SA",
+      "iso_a3": "SAU",
+      "iso_n3": "682",
+      "aliases": [
+        "Saudi Arabia"
+      ]
+    },
+    {
+      "country_id": "SEN",
+      "name": "Senegal",
+      "geometry_name": "Senegal",
+      "iso_a2": "SN",
+      "iso_a3": "SEN",
+      "iso_n3": "686",
+      "aliases": [
+        "Senegal"
+      ]
+    },
+    {
+      "country_id": "SRB",
+      "name": "Serbia",
+      "geometry_name": "Serbia",
+      "iso_a2": "RS",
+      "iso_a3": "SRB",
+      "iso_n3": "688",
+      "aliases": [
+        "Serbia"
+      ]
+    },
+    {
+      "country_id": "SLE",
+      "name": "Sierra Leone",
+      "geometry_name": "Sierra Leone",
+      "iso_a2": "SL",
+      "iso_a3": "SLE",
+      "iso_n3": "694",
+      "aliases": [
+        "Sierra Leone"
+      ]
+    },
+    {
+      "country_id": "SVK",
+      "name": "Slovakia",
+      "geometry_name": "Slovakia",
+      "iso_a2": "SK",
+      "iso_a3": "SVK",
+      "iso_n3": "703",
+      "aliases": [
+        "Slovakia"
+      ]
+    },
+    {
+      "country_id": "SVN",
+      "name": "Slovenia",
+      "geometry_name": "Slovenia",
+      "iso_a2": "SI",
+      "iso_a3": "SVN",
+      "iso_n3": "705",
+      "aliases": [
+        "Slovenia"
+      ]
+    },
+    {
+      "country_id": "SLB",
+      "name": "Solomon Islands",
+      "geometry_name": "Solomon Is.",
+      "iso_a2": "SB",
+      "iso_a3": "SLB",
+      "iso_n3": "090",
+      "aliases": [
+        "Solomon Islands",
+        "Solomon Is."
+      ]
+    },
+    {
+      "country_id": "SOM",
+      "name": "Somalia",
+      "geometry_name": "Somalia",
+      "iso_a2": "SO",
+      "iso_a3": "SOM",
+      "iso_n3": "706",
+      "aliases": [
+        "Somalia"
+      ]
+    },
+    {
+      "country_id": "NE-SOMALILAND",
+      "name": "Somaliland",
+      "geometry_name": "Somaliland",
+      "iso_a2": "",
+      "iso_a3": "",
+      "iso_n3": "",
+      "aliases": [
+        "Somaliland"
+      ]
+    },
+    {
+      "country_id": "ZAF",
+      "name": "South Africa",
+      "geometry_name": "South Africa",
+      "iso_a2": "ZA",
+      "iso_a3": "ZAF",
+      "iso_n3": "710",
+      "aliases": [
+        "South Africa"
+      ]
+    },
+    {
+      "country_id": "KOR",
+      "name": "South Korea",
+      "geometry_name": "South Korea",
+      "iso_a2": "KR",
+      "iso_a3": "KOR",
+      "iso_n3": "410",
+      "aliases": [
+        "South Korea",
+        "Korea, Republic of",
+        "Republic of Korea"
+      ]
+    },
+    {
+      "country_id": "SSD",
+      "name": "South Sudan",
+      "geometry_name": "S. Sudan",
+      "iso_a2": "SS",
+      "iso_a3": "SSD",
+      "iso_n3": "728",
+      "aliases": [
+        "South Sudan",
+        "S. Sudan"
+      ]
+    },
+    {
+      "country_id": "ESP",
+      "name": "Spain",
+      "geometry_name": "Spain",
+      "iso_a2": "ES",
+      "iso_a3": "ESP",
+      "iso_n3": "724",
+      "aliases": [
+        "Spain"
+      ]
+    },
+    {
+      "country_id": "LKA",
+      "name": "Sri Lanka",
+      "geometry_name": "Sri Lanka",
+      "iso_a2": "LK",
+      "iso_a3": "LKA",
+      "iso_n3": "144",
+      "aliases": [
+        "Sri Lanka"
+      ]
+    },
+    {
+      "country_id": "PSE",
+      "name": "State of Palestine",
+      "geometry_name": "Palestine",
+      "iso_a2": "PS",
+      "iso_a3": "PSE",
+      "iso_n3": "275",
+      "aliases": [
+        "State of Palestine",
+        "Palestine"
+      ]
+    },
+    {
+      "country_id": "SDN",
+      "name": "Sudan",
+      "geometry_name": "Sudan",
+      "iso_a2": "SD",
+      "iso_a3": "SDN",
+      "iso_n3": "729",
+      "aliases": [
+        "Sudan"
+      ]
+    },
+    {
+      "country_id": "SUR",
+      "name": "Suriname",
+      "geometry_name": "Suriname",
+      "iso_a2": "SR",
+      "iso_a3": "SUR",
+      "iso_n3": "740",
+      "aliases": [
+        "Suriname"
+      ]
+    },
+    {
+      "country_id": "SWE",
+      "name": "Sweden",
+      "geometry_name": "Sweden",
+      "iso_a2": "SE",
+      "iso_a3": "SWE",
+      "iso_n3": "752",
+      "aliases": [
+        "Sweden"
+      ]
+    },
+    {
+      "country_id": "CHE",
+      "name": "Switzerland",
+      "geometry_name": "Switzerland",
+      "iso_a2": "CH",
+      "iso_a3": "CHE",
+      "iso_n3": "756",
+      "aliases": [
+        "Switzerland"
+      ]
+    },
+    {
+      "country_id": "SYR",
+      "name": "Syrian Arab Republic",
+      "geometry_name": "Syria",
+      "iso_a2": "SY",
+      "iso_a3": "SYR",
+      "iso_n3": "760",
+      "aliases": [
+        "Syrian Arab Republic",
+        "Syria"
+      ]
+    },
+    {
+      "country_id": "TWN",
+      "name": "Taiwan, Province of China",
+      "geometry_name": "Taiwan",
+      "iso_a2": "TW",
+      "iso_a3": "TWN",
+      "iso_n3": "158",
+      "aliases": [
+        "Taiwan, Province of China",
+        "Taiwan"
+      ]
+    },
+    {
+      "country_id": "TJK",
+      "name": "Tajikistan",
+      "geometry_name": "Tajikistan",
+      "iso_a2": "TJ",
+      "iso_a3": "TJK",
+      "iso_n3": "762",
+      "aliases": [
+        "Tajikistan"
+      ]
+    },
+    {
+      "country_id": "THA",
+      "name": "Thailand",
+      "geometry_name": "Thailand",
+      "iso_a2": "TH",
+      "iso_a3": "THA",
+      "iso_n3": "764",
+      "aliases": [
+        "Thailand"
+      ]
+    },
+    {
+      "country_id": "TLS",
+      "name": "Timor-Leste",
+      "geometry_name": "Timor-Leste",
+      "iso_a2": "TL",
+      "iso_a3": "TLS",
+      "iso_n3": "626",
+      "aliases": [
+        "Timor-Leste"
+      ]
+    },
+    {
+      "country_id": "TGO",
+      "name": "Togo",
+      "geometry_name": "Togo",
+      "iso_a2": "TG",
+      "iso_a3": "TGO",
+      "iso_n3": "768",
+      "aliases": [
+        "Togo"
+      ]
+    },
+    {
+      "country_id": "TTO",
+      "name": "Trinidad and Tobago",
+      "geometry_name": "Trinidad and Tobago",
+      "iso_a2": "TT",
+      "iso_a3": "TTO",
+      "iso_n3": "780",
+      "aliases": [
+        "Trinidad and Tobago"
+      ]
+    },
+    {
+      "country_id": "TUN",
+      "name": "Tunisia",
+      "geometry_name": "Tunisia",
+      "iso_a2": "TN",
+      "iso_a3": "TUN",
+      "iso_n3": "788",
+      "aliases": [
+        "Tunisia"
+      ]
+    },
+    {
+      "country_id": "TUR",
+      "name": "Turkey",
+      "geometry_name": "Turkey",
+      "iso_a2": "TR",
+      "iso_a3": "TUR",
+      "iso_n3": "792",
+      "aliases": [
+        "Turkey",
+        "Türkiye"
+      ]
+    },
+    {
+      "country_id": "TKM",
+      "name": "Turkmenistan",
+      "geometry_name": "Turkmenistan",
+      "iso_a2": "TM",
+      "iso_a3": "TKM",
+      "iso_n3": "795",
+      "aliases": [
+        "Turkmenistan"
+      ]
+    },
+    {
+      "country_id": "UGA",
+      "name": "Uganda",
+      "geometry_name": "Uganda",
+      "iso_a2": "UG",
+      "iso_a3": "UGA",
+      "iso_n3": "800",
+      "aliases": [
+        "Uganda"
+      ]
+    },
+    {
+      "country_id": "UKR",
+      "name": "Ukraine",
+      "geometry_name": "Ukraine",
+      "iso_a2": "UA",
+      "iso_a3": "UKR",
+      "iso_n3": "804",
+      "aliases": [
+        "Ukraine"
+      ]
+    },
+    {
+      "country_id": "ARE",
+      "name": "United Arab Emirates",
+      "geometry_name": "United Arab Emirates",
+      "iso_a2": "AE",
+      "iso_a3": "ARE",
+      "iso_n3": "784",
+      "aliases": [
+        "United Arab Emirates",
+        "UAE"
+      ]
+    },
+    {
+      "country_id": "GBR",
+      "name": "United Kingdom",
+      "geometry_name": "United Kingdom",
+      "iso_a2": "GB",
+      "iso_a3": "GBR",
+      "iso_n3": "826",
+      "aliases": [
+        "United Kingdom",
+        "UK",
+        "Great Britain"
+      ]
+    },
+    {
+      "country_id": "TZA",
+      "name": "United Republic of Tanzania",
+      "geometry_name": "Tanzania",
+      "iso_a2": "TZ",
+      "iso_a3": "TZA",
+      "iso_n3": "834",
+      "aliases": [
+        "United Republic of Tanzania",
+        "Tanzania"
+      ]
+    },
+    {
+      "country_id": "USA",
+      "name": "United States",
+      "geometry_name": "United States of America",
+      "iso_a2": "US",
+      "iso_a3": "USA",
+      "iso_n3": "840",
+      "aliases": [
+        "United States",
+        "United States of America",
+        "USA",
+        "U.S.A.",
+        "US",
+        "U.S."
+      ]
+    },
+    {
+      "country_id": "URY",
+      "name": "Uruguay",
+      "geometry_name": "Uruguay",
+      "iso_a2": "UY",
+      "iso_a3": "URY",
+      "iso_n3": "858",
+      "aliases": [
+        "Uruguay"
+      ]
+    },
+    {
+      "country_id": "UZB",
+      "name": "Uzbekistan",
+      "geometry_name": "Uzbekistan",
+      "iso_a2": "UZ",
+      "iso_a3": "UZB",
+      "iso_n3": "860",
+      "aliases": [
+        "Uzbekistan"
+      ]
+    },
+    {
+      "country_id": "VUT",
+      "name": "Vanuatu",
+      "geometry_name": "Vanuatu",
+      "iso_a2": "VU",
+      "iso_a3": "VUT",
+      "iso_n3": "548",
+      "aliases": [
+        "Vanuatu"
+      ]
+    },
+    {
+      "country_id": "VEN",
+      "name": "Venezuela",
+      "geometry_name": "Venezuela",
+      "iso_a2": "VE",
+      "iso_a3": "VEN",
+      "iso_n3": "862",
+      "aliases": [
+        "Venezuela"
+      ]
+    },
+    {
+      "country_id": "VNM",
+      "name": "Vietnam",
+      "geometry_name": "Vietnam",
+      "iso_a2": "VN",
+      "iso_a3": "VNM",
+      "iso_n3": "704",
+      "aliases": [
+        "Vietnam"
+      ]
+    },
+    {
+      "country_id": "ESH",
+      "name": "Western Sahara",
+      "geometry_name": "W. Sahara",
+      "iso_a2": "EH",
+      "iso_a3": "ESH",
+      "iso_n3": "732",
+      "aliases": [
+        "Western Sahara",
+        "W. Sahara"
+      ]
+    },
+    {
+      "country_id": "YEM",
+      "name": "Yemen",
+      "geometry_name": "Yemen",
+      "iso_a2": "YE",
+      "iso_a3": "YEM",
+      "iso_n3": "887",
+      "aliases": [
+        "Yemen"
+      ]
+    },
+    {
+      "country_id": "ZMB",
+      "name": "Zambia",
+      "geometry_name": "Zambia",
+      "iso_a2": "ZM",
+      "iso_a3": "ZMB",
+      "iso_n3": "894",
+      "aliases": [
+        "Zambia"
+      ]
+    },
+    {
+      "country_id": "ZWE",
+      "name": "Zimbabwe",
+      "geometry_name": "Zimbabwe",
+      "iso_a2": "ZW",
+      "iso_a3": "ZWE",
+      "iso_n3": "716",
+      "aliases": [
+        "Zimbabwe"
+      ]
+    }
+  ]
+}

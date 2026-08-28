@@ -11,6 +11,10 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY . /app
 RUN test -s /app/static/css/tailwind.css \
+    && test -s /app/static/vendor/maplibre/maplibre-gl.js \
+    && test -s /app/static/vendor/maplibre/maplibre-gl.css \
+    && test -s /app/static/intel/maps/world-countries-110m.geojson \
+    && test -s /app/static/intel/js/ransomware-map.js \
     && DJANGO_ENV=prod SECRET_KEY=collectstatic-build-secret-key-please-change \
     python manage.py collectstatic --noinput \
     && mkdir -p /app/staticfiles /app/media \

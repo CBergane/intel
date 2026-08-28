@@ -2,10 +2,17 @@
   "name": "borealsec-intel-tailwind",
   "private": true,
   "scripts": {
+    "build": "npm run build:static && npm run build:css",
+    "build:static": "node ./scripts/build-ransomware-map-assets.mjs",
     "build:css": "tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.css --minify",
     "watch:css": "tailwindcss -i ./static/css/input.css -o ./static/css/tailwind.css --watch"
   },
   "devDependencies": {
-    "tailwindcss": "^3.4.17"
+    "htmx.org": "1.9.12",
+    "i18n-iso-countries": "7.14.0",
+    "maplibre-gl": "4.7.1",
+    "tailwindcss": "^3.4.17",
+    "topojson-client": "3.1.0",
+    "world-atlas": "2.0.2"
   }
 }

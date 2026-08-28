@@ -49,6 +49,7 @@ from .models import (
     Source,
 )
 from .ops_jobs import OPS_ACTIONS, launch_ops_job_subprocess, queue_ops_job
+from .ransomware_countries import normalize_ransomware_country
 
 TIME_RANGES = {
     "24h": timedelta(hours=24),
@@ -950,52 +951,6 @@ RANSOMWARE_MAP_WINDOW_RANGES = {
 }
 RANSOMWARE_MAP_WINDOW_OPTIONS = [("24h", "24h"), ("7d", "7d"), ("30d", "30d")]
 RANSOMWARE_MAP_ADAPTER_KEY = "ransomware_live_victims"
-RANSOMWARE_ECHARTS_MAP_NAMES = {
-    "United States": "United States of America",
-    "Czechia": "Czech Republic",
-}
-RANSOMWARE_MAP_COORDINATES = {
-    "Canada": (-106.0, 56.0),
-    "United States": (-98.0, 38.0),
-    "Mexico": (-102.0, 23.0),
-    "Brazil": (-52.0, -10.0),
-    "Argentina": (-64.0, -34.0),
-    "Iceland": (-19.0, 65.0),
-    "Ireland": (-8.0, 53.0),
-    "United Kingdom": (-2.0, 54.0),
-    "Portugal": (-8.0, 39.5),
-    "Spain": (-3.5, 40.3),
-    "France": (2.2, 46.2),
-    "Belgium": (4.7, 50.8),
-    "Netherlands": (5.3, 52.2),
-    "Switzerland": (8.2, 46.8),
-    "Germany": (10.4, 51.2),
-    "Denmark": (9.5, 56.1),
-    "Norway": (8.5, 61.5),
-    "Sweden": (15.0, 62.0),
-    "Finland": (26.0, 64.0),
-    "Estonia": (25.0, 58.7),
-    "Latvia": (24.6, 56.9),
-    "Lithuania": (23.9, 55.3),
-    "Poland": (19.1, 52.1),
-    "Czechia": (15.5, 49.8),
-    "Austria": (14.2, 47.5),
-    "Italy": (12.8, 42.8),
-    "Romania": (24.9, 45.9),
-    "Ukraine": (31.2, 49.0),
-    "Greece": (22.0, 39.0),
-    "Turkey": (35.0, 39.0),
-    "Israel": (35.0, 31.0),
-    "Saudi Arabia": (45.0, 24.0),
-    "United Arab Emirates": (54.3, 24.4),
-    "South Africa": (24.0, -29.0),
-    "India": (78.0, 22.0),
-    "China": (103.0, 35.0),
-    "South Korea": (127.8, 36.3),
-    "Japan": (138.0, 37.0),
-    "Australia": (134.0, -25.0),
-    "New Zealand": (172.0, -41.0),
-}
 
 
 def _ransomware_group_name(item) -> str:
@@ -1028,7 +983,7 @@ def _serialize_ransomware_item(item):
     group_name = _ransomware_group_name(item)
     victim_name = _ransomware_victim_name(item)
     raw_country = str(raw.get("country") or "").strip()
-    country_display, country_code = normalize_dark_country(raw_country)
+    country_identity = normalize_ransomware_country(raw_country)
     activity_at = getattr(item, "activity_at", None) or item.published_at or item.created_at
     return {
         "id": item.id,
@@ -1038,9 +993,11 @@ def _serialize_ransomware_item(item):
         "group_name": group_name,
         "group_key": slugify(group_name),
         "victim_name": victim_name,
-        "country": country_display,
-        "country_code": country_code,
-        "country_key": _normalized_country_key(country_display),
+        "country": country_identity.display_name,
+        "country_code": country_identity.iso_alpha2,
+        "country_id": country_identity.country_id,
+        "country_key": country_identity.country_id
+        or _normalized_country_key(country_identity.display_name),
         "activity_at": activity_at,
         "excerpt": item.summary or str(raw.get("description") or "").strip(),
     }
@@ -1067,8 +1024,8 @@ def _ransomware_group_rows(records):
             grouped[record["group_key"]] = row
 
         row["record_count"] += 1
-        if record["country"] and record["country_key"] not in row["country_keys"]:
-            row["country_keys"].add(record["country_key"])
+        if record["country_id"] and record["country_id"] not in row["country_keys"]:
+            row["country_keys"].add(record["country_id"])
             row["countries"].append(record["country"])
         if record["activity_at"] >= row["latest_activity_at"]:
             row["latest_activity_at"] = record["activity_at"]
@@ -1094,21 +1051,22 @@ def _ransomware_group_rows(records):
 def _ransomware_country_rows(records):
     grouped = {}
     for record in records:
-        if not record["country"]:
+        if not record["country_id"]:
             continue
-        row = grouped.get(record["country_key"])
+        row = grouped.get(record["country_id"])
         if row is None:
             row = {
                 "country": record["country"],
                 "country_code": record["country_code"],
-                "country_key": record["country_key"],
+                "country_id": record["country_id"],
+                "country_key": record["country_id"],
                 "record_count": 0,
                 "group_keys": set(),
                 "latest_activity_at": record["activity_at"],
                 "latest_group_name": "",
                 "latest_victim_name": "",
             }
-            grouped[record["country_key"]] = row
+            grouped[record["country_id"]] = row
 
         row["record_count"] += 1
         if record["group_name"]:
@@ -1153,68 +1111,36 @@ def _ransomware_map_live_url(*, window: str, selected_group: str = "", country: 
 
 
 def _ransomware_map_data(country_rows, *, selected_country: str, window: str, selected_group: str):
-    unmapped_rows = []
     country_data = []
-    marker_data = []
     max_record_count = max((row["record_count"] for row in country_rows), default=0)
-    selected_country_key = _normalized_country_key(selected_country)
+    selected_country_id = normalize_ransomware_country(selected_country).country_id
 
     for row in country_rows:
+        is_selected = row["country_id"] == selected_country_id
         row["url"] = _ransomware_map_url(
             window=window,
             selected_group=selected_group,
-            country="" if row["country_key"] == selected_country_key else row["country"],
+            country="" if is_selected else row["country"],
         )
-        coordinates = RANSOMWARE_MAP_COORDINATES.get(row["country"])
-        if coordinates is None:
-            unmapped_rows.append(row)
-            continue
-
-        map_name = RANSOMWARE_ECHARTS_MAP_NAMES.get(row["country"], row["country"])
         intensity_level = _dark_map_intensity_level(
             row["record_count"],
             max_record_count,
         )
-        marker_size = {1: 18, 2: 23, 3: 28, 4: 34}[intensity_level]
-        if row["country_key"] == selected_country_key:
-            marker_size += 4
-
         country_data.append(
             {
-                "name": map_name,
-                "display_name": row["country"],
-                "value": row["record_count"],
-                "country_key": row["country_key"],
-                "url": row["url"],
-                "is_selected": row["country_key"] == selected_country_key,
-                "intensity_level": intensity_level,
-            }
-        )
-        marker_data.append(
-            {
                 "name": row["country"],
-                "country_key": row["country_key"],
-                "value": [coordinates[0], coordinates[1], row["record_count"]],
+                "country_id": row["country_id"],
+                "country_key": row["country_id"],
                 "record_count": row["record_count"],
                 "group_count": row["group_count"],
                 "latest_group_name": row["latest_group_name"],
                 "latest_victim_name": row["latest_victim_name"],
                 "url": row["url"],
-                "is_selected": row["country_key"] == selected_country_key,
-                "symbol_size": marker_size,
+                "is_selected": is_selected,
                 "intensity_level": intensity_level,
             }
         )
-
-    unmapped_rows.sort(
-        key=lambda row: (
-            row["record_count"],
-            row["latest_activity_at"],
-            row["country"].lower(),
-        ),
-        reverse=True,
-    )
-    return country_data, marker_data, unmapped_rows
+    return country_data
 
 
 def _ransomware_map_empty_state(records, country_rows):
@@ -1228,9 +1154,9 @@ def _ransomware_map_empty_state(records, country_rows):
     return {
         "title": "Victim activity found, geography still sparse",
         "message": (
-            "Victim records matched the current filters, but they do not yet carry enough "
-            "plot-ready country data to light up the map. Latest victims and top groups "
-            "remain actionable while geography fills in."
+            "Victim records matched the current filters, but their country values are "
+            "missing or not recognized by the bundled world geometry. Latest victims "
+            "and top groups remain available without guessing a location."
         ),
     }
 
@@ -1333,17 +1259,24 @@ def _build_ransomware_map_state(*, window: str, selected_group: str = "", reques
     selected_country = ""
     requested_country = (requested_country or "").strip()
     if requested_country:
-        requested_country_key = _normalized_country_key(requested_country)
+        requested_identity = normalize_ransomware_country(requested_country)
+        requested_country_key = (
+            requested_identity.country_id
+            or _normalized_country_key(requested_identity.display_name)
+        )
         for row in scope_country_rows:
             if row["country_key"] == requested_country_key:
                 selected_country = row["country"]
                 break
         if not selected_country:
-            normalized_country, _country_code = normalize_dark_country(requested_country)
-            selected_country = normalized_country or requested_country
+            selected_country = requested_identity.display_name or requested_country
 
     focused_records = group_records
-    selected_country_key = _normalized_country_key(selected_country)
+    selected_identity = normalize_ransomware_country(selected_country)
+    selected_country_key = (
+        selected_identity.country_id
+        or _normalized_country_key(selected_identity.display_name)
+    )
     if selected_country_key:
         focused_records = [
             record for record in focused_records if record["country_key"] == selected_country_key
@@ -1356,7 +1289,7 @@ def _build_ransomware_map_state(*, window: str, selected_group: str = "", reques
     top_groups = _ransomware_group_rows(focused_records)[:8]
     top_countries = country_rows[:8]
     latest_victims = focused_records[:10]
-    map_country_data, map_marker_data, unmapped_country_rows = _ransomware_map_data(
+    map_country_data = _ransomware_map_data(
         country_rows,
         selected_country=selected_country,
         window=window,
@@ -1388,7 +1321,7 @@ def _build_ransomware_map_state(*, window: str, selected_group: str = "", reques
                 selected_group=selected_group,
                 country=record["country"],
             )
-            if record["country"]
+            if record["country_id"]
             else ""
         )
 
@@ -1412,10 +1345,11 @@ def _build_ransomware_map_state(*, window: str, selected_group: str = "", reques
         "top_countries": top_countries,
         "country_rows": country_rows,
         "map_country_data": map_country_data,
-        "map_marker_data": map_marker_data,
-        "unmapped_country_rows": unmapped_country_rows,
+        "map_marker_data": map_country_data,
         "map_empty_state": map_empty_state,
-        "selected_country_on_map": any(point["is_selected"] for point in map_country_data),
+        "selected_country_on_map": any(
+            country["is_selected"] for country in map_country_data
+        ),
         "clear_country_url": _ransomware_map_url(
             window=window,
             selected_group=selected_group,
@@ -1484,6 +1418,7 @@ def ransomware_map_live_view(request):
                 _serialize_ransomware_group_row(row)
                 for row in state["top_groups"]
             ],
+            "map_country_data": state["map_country_data"],
             "map_marker_data": state["map_marker_data"],
             "selected_country": state["selected_country"],
         },
