@@ -23,6 +23,7 @@ class AdminSecurityTests(TestCase):
         self.ops_url = reverse("intel_admin:ops")
         self.panel_url = reverse("intel_admin:panel")
         self.login_url = reverse("intel_admin:login")
+        self.logout_url = reverse("intel_admin:logout")
 
     def test_non_authenticated_user_cannot_access_panel_or_ops(self):
         ops_response = self.client.get(self.ops_url)
@@ -65,6 +66,24 @@ class AdminSecurityTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, self.ops_url)
+
+    def test_logout_requires_post_and_csrf(self):
+        self.client.force_login(self.superuser)
+        self.assertEqual(self.client.get(self.logout_url).status_code, 405)
+
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.superuser)
+        self.assertEqual(csrf_client.post(self.logout_url).status_code, 403)
+
+        shell_response = csrf_client.get(reverse("about"))
+        self.assertEqual(shell_response.status_code, 200)
+        token = csrf_client.cookies["csrftoken"].value
+        response = csrf_client.post(
+            self.logout_url,
+            {"csrfmiddlewaretoken": token},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, self.login_url)
 
 
 class AdminPanelFeedCrudTests(TestCase):

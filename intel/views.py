@@ -75,6 +75,22 @@ ITEM_SECTION_ROUTE_NAMES = {
 ITEM_SECTION_ROUTE_LABELS = {
     section: label for section, _route_name, label in ITEM_SECTION_ROUTE_ORDER
 }
+PRIORITY_DISPLAY_LABELS = {
+    "P1": "Critical",
+    "P2": "High",
+    "P3": "Medium",
+    "P4": "Informational",
+}
+SIGNAL_LABEL_CATEGORIES = {
+    "Active exploitation": "active_exploitation",
+    "Ransomware": "ransomware",
+    "Critical CVE": "vulnerability",
+    "CVE-driven": "vulnerability",
+    "Vulnerability": "vulnerability",
+    "Threat news": "threat_news",
+    "Research": "research",
+    "Nordic": "nordic",
+}
 
 DARK_SOURCE_PRESETS = (
     {
@@ -194,9 +210,22 @@ def _validated_redirect_target(request, default_target: str) -> str:
     return default_target
 
 
+def _attach_item_signal_ui(item, signal_profile=None):
+    signal_profile = signal_profile or classify_item(item)
+    item.cves = list(signal_profile.cves)
+    item.priority = signal_profile.priority
+    item.priority_label = PRIORITY_DISPLAY_LABELS[signal_profile.priority]
+    item.signal_label = signal_profile.signal_label
+    item.signal_category = SIGNAL_LABEL_CATEGORIES.get(
+        item.signal_label,
+        signal_profile.primary_category,
+    )
+    return signal_profile
+
+
 def _attach_item_meta(items):
     for item in items:
-        item.cves = list(classify_item(item).cves)
+        _attach_item_signal_ui(item)
         item.activity_at = getattr(item, "activity_at", None) or item.published_at or item.created_at
         item.source_browse_url = _source_destination(
             getattr(item.feed, "section", Feed.Section.ADVISORIES),
@@ -458,11 +487,8 @@ def now_view(request):
     for item in high_candidates:
         item.activity_at = item.activity_at or item.published_at or item.created_at
         item.source_browse_url = _source_destination(item.feed.section, source_slug=item.source.slug)
-        signal_profile = classify_item(item, now=now)
-        item.cves = list(signal_profile.cves)
+        signal_profile = _attach_item_signal_ui(item, classify_item(item, now=now))
         item.dashboard_score = signal_profile.score
-        item.signal_label = signal_profile.signal_label
-        item.signal_tone = signal_profile.signal_tone
         item.is_low_signal_title = signal_profile.is_low_signal_title
         item.is_high_signal = signal_profile.high_signal
     high_candidates.sort(

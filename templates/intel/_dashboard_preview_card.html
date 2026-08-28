@@ -1,12 +1,19 @@
 {% load humanize %}
-<article data-card-layout="dashboard-preview" class="group w-full min-w-0 overflow-hidden flex flex-col rounded-xl border border-line/80 bg-slate-900/60 px-2.5 py-2.5 md:min-h-[11.5rem] sm:px-3 sm:py-3">
+<article data-card-layout="dashboard-preview" data-priority="{{ item.priority }}" class="intel-record group flex flex-col px-2.5 py-2.5 md:min-h-[11.5rem] sm:px-3 sm:py-3">
     <div class="flex min-w-0 flex-wrap items-start gap-2">
-        <a href="{{ item.source_browse_url }}" class="min-w-0 flex-1 truncate text-[10px] font-medium text-slate-300 transition hover:text-white sm:text-[11px]">{{ item.source.name }}</a>
-        <time class="max-w-full text-[9px] text-slate-500 sm:ml-auto sm:text-[10px]" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            <span class="priority-marker" data-priority="{{ item.priority }}" title="Priority: {{ item.priority }} {{ item.priority_label }}">
+                <span class="priority-marker__level">{{ item.priority }}</span>
+                <span class="priority-marker__label">{{ item.priority_label }}</span>
+            </span>
+            {% if item.signal_label %}<span class="signal-badge" data-signal-category="{{ item.signal_category }}">{{ item.signal_label }}</span>{% endif %}
+            <a href="{{ item.source_browse_url }}" class="min-w-0 max-w-[10rem] truncate text-[10px] font-medium text-slate-300 transition hover:text-white sm:text-[11px]">{{ item.source.name }}</a>
+        </div>
+        <time class="intel-timestamp max-w-full sm:ml-auto sm:text-[10px]" datetime="{{ item.activity_at|date:'c' }}" title="{{ item.activity_at|date:'Y-m-d H:i' }} UTC">
             {{ item.activity_at|naturaltime }}
         </time>
     </div>
-    <h3 class="mt-1.5 text-[13px] font-medium leading-snug text-white sm:mt-2 sm:text-sm">
+    <h3 class="intel-title mt-1.5 text-[13px] leading-snug sm:mt-2 sm:text-sm">
         {% if item.url %}
             <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="block hover:text-accent">
                 <span class="block overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">

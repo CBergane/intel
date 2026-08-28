@@ -1,81 +1,54 @@
+{% load static %}
 <!doctype html>
-<html lang="en" class="h-full bg-slate-950">
+<html lang="en" class="h-full bg-night">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}BorealSec Intel{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
     <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js" defer></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        night: "#070a11",
-                        panel: "#0f172a",
-                        line: "#1e293b",
-                        accent: "#38bdf8",
-                        accent2: "#22d3ee"
-                    },
-                    boxShadow: {
-                        glow: "0 0 0 1px rgba(34,211,238,0.18), 0 10px 30px rgba(2,8,23,0.8)"
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        .summary-no-marker::-webkit-details-marker {
-            display: none;
-        }
-    </style>
 </head>
-<body class="min-h-full overflow-x-hidden bg-gradient-to-b from-night via-slate-950 to-slate-900 text-slate-100">
+<body class="app-body">
     <a href="#main-content" class="fixed left-3 top-3 z-[100] -translate-y-20 rounded-md bg-cyan-300 px-3 py-2 text-sm font-semibold text-slate-950 transition focus:translate-y-0 focus:outline-none">Skip to content</a>
 
     {% include "intel/components/app_sidebar.html" %}
 
-    <div class="min-h-screen lg:pl-64">
-        <header class="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md supports-[backdrop-filter]:bg-slate-950/75">
-            <div class="flex h-12 items-center gap-3 px-3 sm:px-6 lg:h-14 lg:px-8">
-                <a href="{% url 'now' %}" class="text-sm font-semibold tracking-tight text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 lg:hidden">BorealSec Intel</a>
+    <div class="app-frame">
+        <header class="app-topbar">
+            <div class="app-topbar__inner">
+                <a href="{% url 'now' %}" class="app-mobile-brand">
+                    <span class="app-mobile-brand__mark" aria-hidden="true"></span>
+                    BorealSec Intel
+                </a>
                 <button
                     id="mobile-nav-toggle"
                     type="button"
-                    class="ml-auto inline-flex h-9 items-center rounded-md border border-slate-700/80 px-3 text-xs text-slate-200 transition hover:bg-slate-800/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 lg:hidden"
+                    class="app-mobile-menu"
                     aria-expanded="false"
                     aria-controls="mobile-nav-shell"
                     aria-label="Open navigation"
                 >Menu</button>
 
-                <div class="hidden min-w-0 items-center gap-3 lg:flex">
-                    <span class="h-1.5 w-1.5 rounded-full bg-cyan-300" aria-hidden="true"></span>
+                <div class="app-context">
+                    <span class="app-context__mark" aria-hidden="true"></span>
                     {% if active_navigation_item %}
-                        <p class="truncate text-xs text-slate-400">
-                            {% if page_group %}<span class="uppercase tracking-[0.16em] text-slate-600">{{ page_group }}</span><span class="mx-2 text-slate-700" aria-hidden="true">/</span>{% endif %}
-                            <span class="text-slate-300">{{ active_navigation_item.label }}</span>
+                        <p class="flex min-w-0 items-center gap-2 truncate">
+                            {% if page_group %}<span class="app-context__group">{{ page_group }}</span><span class="text-slate-700" aria-hidden="true">/</span>{% endif %}
+                            <span class="app-context__page">{{ active_navigation_item.label }}</span>
                         </p>
                     {% else %}
-                        <p class="text-xs uppercase tracking-[0.16em] text-slate-600">Northern Intelligence Console</p>
+                        <p class="app-context__group">Northern Intelligence Console</p>
                     {% endif %}
                 </div>
-                <p class="ml-auto hidden items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-slate-600 lg:flex">
-                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
-                    Intelligence online
+                <p class="app-session-state">
+                    {% if request.user.is_superuser %}Staff session{% else %}Public console{% endif %}
                 </p>
             </div>
         </header>
 
         {% include "intel/components/mobile_navigation.html" %}
 
-        <div class="mx-auto max-w-7xl px-3 pb-[max(2.75rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:px-8">
+        <div class="app-content">
             <main id="main-content" tabindex="-1">
                 {% block content %}{% endblock %}
             </main>
@@ -84,96 +57,6 @@
 
     <div id="toast-container" class="pointer-events-none fixed bottom-5 right-4 z-[200] flex flex-col items-end gap-2"></div>
 
-    <script>
-        document.body.addEventListener("showToast", (event) => {
-            const message = typeof event.detail === "string"
-                ? event.detail
-                : (event.detail?.value ?? JSON.stringify(event.detail));
-            const container = document.getElementById("toast-container");
-            if (!container || !message) return;
-            const toast = document.createElement("div");
-            toast.className = [
-                "pointer-events-auto",
-                "rounded-lg",
-                "border", "border-slate-700/90",
-                "bg-slate-900/95",
-                "px-4", "py-2.5",
-                "text-sm", "text-slate-100",
-                "shadow-glow",
-                "opacity-0",
-                "transition-opacity", "duration-200",
-            ].join(" ");
-            toast.textContent = message;
-            container.appendChild(toast);
-            requestAnimationFrame(() => { toast.style.opacity = "1"; });
-            setTimeout(() => { toast.style.opacity = "0"; }, 1800);
-            setTimeout(() => { toast.remove(); }, 2050);
-        });
-    </script>
-
-    <script>
-        (() => {
-            const shell = document.getElementById("mobile-nav-shell");
-            const panel = document.getElementById("mobile-nav-panel");
-            const toggle = document.getElementById("mobile-nav-toggle");
-            const close = document.getElementById("mobile-nav-close");
-            const backdrop = document.getElementById("mobile-nav-backdrop");
-            if (!shell || !panel || !toggle || !close || !backdrop) return;
-
-            const openNav = () => {
-                shell.classList.remove("hidden", "pointer-events-none");
-                shell.setAttribute("aria-hidden", "false");
-                requestAnimationFrame(() => {
-                    panel.classList.remove("translate-x-full");
-                    backdrop.classList.remove("opacity-0");
-                });
-                toggle.setAttribute("aria-expanded", "true");
-                document.body.classList.add("overflow-hidden");
-                close.focus();
-            };
-
-            const closeNav = () => {
-                if (shell.getAttribute("aria-hidden") === "true") return;
-                panel.classList.add("translate-x-full");
-                backdrop.classList.add("opacity-0");
-                toggle.setAttribute("aria-expanded", "false");
-                shell.setAttribute("aria-hidden", "true");
-                document.body.classList.remove("overflow-hidden");
-                toggle.focus();
-                setTimeout(() => {
-                    if (panel.classList.contains("translate-x-full")) {
-                        shell.classList.add("hidden", "pointer-events-none");
-                    }
-                }, 200);
-            };
-
-            toggle.addEventListener("click", openNav);
-            close.addEventListener("click", closeNav);
-            backdrop.addEventListener("click", closeNav);
-            shell.querySelectorAll("a").forEach((link) => link.addEventListener("click", closeNav));
-            document.addEventListener("keydown", (event) => {
-                const navIsOpen = shell.getAttribute("aria-hidden") === "false";
-                if (event.key === "Escape" && navIsOpen) {
-                    closeNav();
-                    return;
-                }
-                if (event.key !== "Tab" || !navIsOpen) return;
-
-                const focusable = Array.from(
-                    panel.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')
-                ).filter((element) => element.offsetParent !== null);
-                if (!focusable.length) return;
-                const first = focusable[0];
-                const last = focusable[focusable.length - 1];
-                if (event.shiftKey && document.activeElement === first) {
-                    event.preventDefault();
-                    last.focus();
-                } else if (!event.shiftKey && document.activeElement === last) {
-                    event.preventDefault();
-                    first.focus();
-                }
-            });
-        })();
-    </script>
+    <script src="{% static 'js/app-shell.js' %}" defer></script>
 </body>
 </html>

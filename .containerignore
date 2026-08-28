@@ -1,0 +1,11 @@
+.git/
+.venv/
+node_modules/
+staticfiles/
+media/
+mediafiles/
+__pycache__/
+*.py[cod]
+*.sqlite3
+.env
+ui-shell-v2-wip.patch

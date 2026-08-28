@@ -12,6 +12,8 @@ Public, read-only cybersecurity intelligence dashboard built with Django.
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
+   npm ci
+   npm run build:css
    ```
 3. Create env file:
    ```bash
@@ -29,6 +31,12 @@ Public, read-only cybersecurity intelligence dashboard built with Django.
    ```bash
    python manage.py runserver
    ```
+
+Tailwind is compiled from `static/css/input.css` into
+`static/css/tailwind.css`. Rebuild it after changing templates, frontend
+JavaScript, Python-rendered class names, or the Tailwind configuration. The
+production container checks that this compiled artifact exists before running
+`collectstatic`.
 
 Main pages:
 - `/`

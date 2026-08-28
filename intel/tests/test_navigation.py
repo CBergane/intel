@@ -1,9 +1,17 @@
 from django.contrib.auth import get_user_model
+from django.templatetags.static import static
 from django.test import TestCase
 from django.urls import reverse
 
 
 class NavigationTemplateTests(TestCase):
+    def test_shell_loads_compiled_assets_without_tailwind_cdn(self):
+        response = self.client.get(reverse("about"))
+
+        self.assertContains(response, f'href="{static("css/tailwind.css")}"', html=False)
+        self.assertContains(response, f'src="{static("js/app-shell.js")}"', html=False)
+        self.assertNotContains(response, "cdn.tailwindcss.com")
+
     def test_desktop_navigation_is_single_grouped_structure(self):
         response = self.client.get(reverse("about"))
         html = response.content.decode()
@@ -65,6 +73,16 @@ class NavigationTemplateTests(TestCase):
         self.assertNotIn(f'href="{reverse("dark-dashboard")}"', html)
         self.assertEqual(self.client.get(reverse("dark-dashboard")).status_code, 302)
 
+    def test_anonymous_utility_navigation_exposes_staff_login_only(self):
+        response = self.client.get(reverse("about"))
+        html = response.content.decode()
+
+        self.assertEqual(html.count('data-staff-access="anonymous"'), 2)
+        self.assertEqual(html.count(f'href="{reverse("intel_admin:login")}"'), 2)
+        self.assertEqual(html.count("Staff login"), 2)
+        self.assertNotIn('href="/signup', html)
+        self.assertNotIn('href="/register', html)
+
     def test_superuser_navigation_links_and_activates_threat_watch(self):
         user = get_user_model().objects.create_superuser(
             username="navigation-admin",
@@ -86,6 +104,27 @@ class NavigationTemplateTests(TestCase):
             restricted_response.context["active_navigation_item"]["key"],
             "threat-watch",
         )
+
+    def test_superuser_utility_navigation_has_admin_ops_and_post_logout(self):
+        user = get_user_model().objects.create_superuser(
+            username="shell-admin",
+            email="shell-admin@example.com",
+            password="test-password",
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("about"))
+        html = response.content.decode()
+
+        self.assertEqual(html.count('data-staff-access="authenticated"'), 2)
+        self.assertEqual(html.count(f'href="{reverse("intel_admin:panel")}"'), 2)
+        self.assertEqual(html.count(f'href="{reverse("intel_admin:ops")}"'), 2)
+        self.assertEqual(
+            html.count(f'<form method="post" action="{reverse("intel_admin:logout")}"'),
+            2,
+        )
+        self.assertEqual(html.count("Sign out"), 2)
+        self.assertNotIn("Staff login", html)
 
     def test_mobile_controls_have_accessible_labels(self):
         response = self.client.get(reverse("about"))

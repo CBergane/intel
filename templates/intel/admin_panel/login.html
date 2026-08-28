@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Admin Login | BorealSec Intel{% endblock %}
+{% block title %}Staff login | BorealSec Intel{% endblock %}
 
 {% block content %}
 <section class="mx-auto max-w-md space-y-5">
-    <div class="rounded-2xl border border-line bg-panel/80 p-5 shadow-glow">
-        <h1 class="text-xl font-semibold text-white">Admin Login</h1>
-        <p class="mt-1 text-sm text-slate-400">Superuser access only.</p>
+    <div class="border-b border-slate-800/60 pb-4">
+        <p class="page-eyebrow">Restricted access</p>
+        <h1 class="page-title">Staff login</h1>
+        <p class="page-description">Superuser access only. There is no public account registration.</p>
     </div>
 
     {% if messages %}

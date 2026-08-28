@@ -10,7 +10,8 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY . /app
-RUN DJANGO_ENV=prod SECRET_KEY=collectstatic-build-secret-key-please-change \
+RUN test -s /app/static/css/tailwind.css \
+    && DJANGO_ENV=prod SECRET_KEY=collectstatic-build-secret-key-please-change \
     python manage.py collectstatic --noinput \
     && mkdir -p /app/staticfiles /app/media \
     && chown -R appuser:appuser /app/staticfiles /app/media
