@@ -56,6 +56,24 @@ const topologyPath = path.join(
 );
 const topology = JSON.parse(await readFile(topologyPath, "utf8"));
 const worldCountries = topojsonFeature(topology, topology.objects.countries);
+const maplibreSourcePath = path.join(
+    repositoryRoot,
+    "node_modules",
+    "maplibre-gl",
+    "dist",
+    "maplibre-gl.js",
+);
+const maplibreSource = await readFile(maplibreSourcePath, "utf8");
+const maplibreBrowserBundle = maplibreSource.replace(
+    /(?:\r?\n)?\/\/# sourceMappingURL=maplibre-gl\.js\.map\s*$/u,
+    "",
+);
+if (
+    maplibreBrowserBundle.includes("sourceMappingURL") ||
+    maplibreBrowserBundle.includes("maplibre-gl.js.map")
+) {
+    throw new Error("Generated MapLibre bundle still references its source map.");
+}
 
 const manifestCountries = worldCountries.features.map((countryFeature) => {
     const geometryName = String(countryFeature.properties?.name || "").trim();
@@ -129,9 +147,10 @@ await Promise.all([
         `${JSON.stringify(manifest, null, 2)}\n`,
         "utf8",
     ),
-    copyFile(
-        path.join(repositoryRoot, "node_modules", "maplibre-gl", "dist", "maplibre-gl.js"),
+    writeFile(
         path.join(maplibreDirectory, "maplibre-gl.js"),
+        maplibreBrowserBundle,
+        "utf8",
     ),
     copyFile(
         path.join(repositoryRoot, "node_modules", "maplibre-gl", "dist", "maplibre-gl.css"),
