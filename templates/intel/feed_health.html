@@ -5,15 +5,13 @@
 
 {% block content %}
 <section class="space-y-4 sm:space-y-5">
-    <div class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:p-4">
-        <h1 class="text-base font-semibold text-white sm:text-lg">Feed Health</h1>
-        <p class="mt-1 text-xs leading-5 text-slate-400 sm:text-sm">Monitor freshness, ingest outcomes, and feed-level errors.</p>
-        <div class="no-scrollbar mt-3 flex gap-1.5 overflow-x-auto pb-0.5 text-[11px] text-slate-300">
-            <span class="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-1 text-emerald-200">ok</span>
-            <span class="shrink-0 rounded-md border border-rose-500/40 bg-rose-500/15 px-2 py-1 text-rose-200">error</span>
-            <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/70 px-2 py-1">unknown</span>
-            <span class="shrink-0 rounded-md border border-amber-500/40 bg-amber-500/15 px-2 py-1 text-amber-200">expanded</span>
-        </div>
+    {% include "intel/components/page_header.html" %}
+
+    <div class="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5 text-[11px] text-slate-300" aria-label="Feed status legend">
+        <span class="shrink-0 rounded-md border border-emerald-500/40 bg-emerald-500/15 px-2 py-1 text-emerald-200">ok</span>
+        <span class="shrink-0 rounded-md border border-rose-500/40 bg-rose-500/15 px-2 py-1 text-rose-200">error</span>
+        <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/70 px-2 py-1">unknown</span>
+        <span class="shrink-0 rounded-md border border-amber-500/40 bg-amber-500/15 px-2 py-1 text-amber-200">expanded</span>
     </div>
 
     <div class="space-y-2.5 md:hidden">

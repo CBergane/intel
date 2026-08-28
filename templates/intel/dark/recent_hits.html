@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Dark Intel | BorealSec Intel{% endblock %}
+{% block title %}{{ page_title }} | BorealSec Intel{% endblock %}
 
 {% block content %}
 <section class="space-y-4 sm:space-y-5">
+    {% include "intel/components/page_header.html" %}
+
     <div class="rounded-2xl border border-line bg-panel/80 p-4 shadow-glow sm:p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
-                <p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Dark Intel</p>
-                <h1 class="mt-1 text-xl font-semibold text-white sm:text-2xl">Recent Hits</h1>
+                <h2 class="text-lg font-semibold text-white sm:text-xl">Recent Hits</h2>
                 <p class="mt-2 max-w-3xl text-sm text-slate-400">
                     Raw recent dark hits for analyst verification and debugging. Active Groups remains the primary grouped view.
                 </p>

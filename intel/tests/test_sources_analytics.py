@@ -105,7 +105,7 @@ class SourcesAnalyticsViewTests(TestCase):
         alpha = next(row for row in advisories["sources"] if row["source"].slug == "alpha-source")
         beta = next(row for row in research["sources"] if row["source"].slug == "beta-source")
 
-        self.assertEqual(response.context["page_title"], "Browse Intel")
+        self.assertEqual(response.context["page_title"], "Sources")
         self.assertEqual(response.context["section_count"], 2)
         self.assertEqual(response.context["active_sources_7d_count"], 1)
         self.assertEqual(response.context["items_7d_count"], 2)
@@ -128,7 +128,8 @@ class SourcesAnalyticsViewTests(TestCase):
         self.assertEqual(beta["recent_items"], [])
         self.assertEqual(beta["open_url"], reverse("research") + "?source=beta-source")
 
-        self.assertContains(response, "Section → Source → Recent Items")
+        self.assertContains(response, "Coverage, provenance, and recent intelligence by source.")
+        self.assertContains(response, "Vulnerabilities")
         self.assertContains(response, "Browse source")
         self.assertContains(response, "Open Research")
         self.assertContains(response, "No recent items in the last 30 days for this source and section.")

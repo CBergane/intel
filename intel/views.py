@@ -64,10 +64,10 @@ TIME_OPTIONS = [
 ]
 NOW_MAX_PER_SOURCE = 10
 ITEM_SECTION_ROUTE_ORDER = (
-    (Feed.Section.ADVISORIES, "advisories", "Advisories"),
-    (Feed.Section.ACTIVE, "active", "Active"),
+    (Feed.Section.ADVISORIES, "advisories", "Vulnerabilities"),
+    (Feed.Section.ACTIVE, "active", "Active Exploitation"),
     (Feed.Section.RESEARCH, "research", "Research"),
-    (Feed.Section.SWEDEN, "sweden", "Sweden"),
+    (Feed.Section.SWEDEN, "sweden", "Nordics"),
 )
 ITEM_SECTION_ROUTE_NAMES = {
     section: route_name for section, route_name, _label in ITEM_SECTION_ROUTE_ORDER
@@ -604,16 +604,25 @@ def active_view(request):
 def advisories_view(request):
     return _render_items_page(
         request,
-        title="Vendor Advisories",
+        title="Vulnerabilities",
         nav_key="advisories",
         section=Feed.Section.ADVISORIES,
+    )
+
+
+def threat_news_view(request):
+    return _render_items_page(
+        request,
+        title="Threat News",
+        nav_key="threat-news",
+        item_filter=lambda item: classify_item(item).threat_news,
     )
 
 
 def research_view(request):
     return _render_items_page(
         request,
-        title="Research & Writeups",
+        title="Research",
         nav_key="research",
         section=Feed.Section.RESEARCH,
     )
@@ -622,7 +631,7 @@ def research_view(request):
 def sweden_view(request):
     return _render_items_page(
         request,
-        title="Sweden / Nordics",
+        title="Nordics",
         nav_key="sweden",
         section=Feed.Section.SWEDEN,
     )
@@ -794,9 +803,7 @@ def sources_view(request):
         section_groups.append(
             {
                 "key": section,
-                "title": "Active Exploitation" if section == Feed.Section.ACTIVE else (
-                    "Sweden / Nordics" if section == Feed.Section.SWEDEN else label
-                ),
+                "title": label,
                 "label": label,
                 "section_url": reverse(route_name),
                 "source_count": len(source_rows),
@@ -815,7 +822,7 @@ def sources_view(request):
             "active_sources_7d_count": len(active_sources_7d),
             "items_7d_count": total_items_7d,
             "current_page": "sources",
-            "page_title": "Browse Intel",
+            "page_title": "Sources",
         },
     )
 
@@ -1318,7 +1325,7 @@ def ransomware_map_view(request):
         request,
         "intel/ransomware_map.html",
         {
-            "page_title": "Ransomware Incident Map",
+            "page_title": "Ransomware",
             "current_page": "ransomware-map",
             "window_options": RANSOMWARE_MAP_WINDOW_OPTIONS,
             "reset_url": reverse("ransomware-map"),
@@ -2277,7 +2284,7 @@ def dark_dashboard_view(request):
         request,
         "intel/dark/dashboard.html",
         {
-            "page_title": "Dark Intel",
+            "page_title": "Threat Watch",
             "current_page": "dark",
             "group_rows": groups_page,
             "page_obj": groups_page,
@@ -2308,7 +2315,7 @@ def dark_map_view(request):
         request,
         "intel/dark/map.html",
         {
-            "page_title": "Dark Intel Threat Map",
+            "page_title": "Threat Watch Map",
             "current_page": "dark",
             "map_region_labels": DARK_MAP_REGION_LABELS,
             "dashboard_url": reverse("dark-dashboard"),
@@ -2382,7 +2389,7 @@ def dark_recent_hits_view(request):
         request,
         "intel/dark/recent_hits.html",
         {
-            "page_title": "Dark Intel",
+            "page_title": "Threat Watch Recent Hits",
             "current_page": "dark",
             "hits": page_obj,
             "page_obj": page_obj,

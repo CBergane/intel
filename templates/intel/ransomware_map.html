@@ -5,21 +5,13 @@
 
 {% block content %}
 <section id="ransomware-map-page" data-live-url="{{ live_poll_url }}" data-live-cursor="{{ live_cursor }}" data-live-interval="25000" class="space-y-5 xl:space-y-6">
-    <div class="rounded-2xl border border-line bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.13),_transparent_42%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] p-4 shadow-glow sm:p-5 xl:p-6">
-        <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div class="max-w-3xl">
-                <div class="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-sky-300/80">
-                    <span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1">Normal Intel Flow</span>
-                    <span class="rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1">Ransomware.live Victims</span>
-                </div>
-                <h1 class="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl xl:text-[2.35rem]">{{ page_title }}</h1>
-                <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-[15px]">Concrete victim activity from the normal intel pipeline. Countries are only plotted when the item carries usable geography, while countryless victims stay visible in the activity and group panels.</p>
-            </div>
-            <div class="flex flex-wrap gap-2 text-xs">
-                <a href="{% url 'dark-map' %}" class="rounded-lg border border-line/80 bg-slate-900/70 px-3 py-2 text-slate-200 transition hover:border-sky-400/40 hover:text-white">Dark Group Map</a>
-                <a href="{{ reset_url }}" class="rounded-lg border border-line/80 bg-slate-900/70 px-3 py-2 text-slate-200 transition hover:border-sky-400/40 hover:text-white">Reset View</a>
-            </div>
-        </div>
+    {% include "intel/components/page_header.html" %}
+
+    <div class="flex flex-wrap justify-end gap-2 text-xs">
+        {% if request.user.is_superuser %}
+            <a href="{% url 'dark-map' %}" class="rounded-lg border border-line/80 bg-slate-900/70 px-3 py-2 text-slate-200 transition hover:border-sky-400/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Threat Watch Map</a>
+        {% endif %}
+        <a href="{{ reset_url }}" class="rounded-lg border border-line/80 bg-slate-900/70 px-3 py-2 text-slate-200 transition hover:border-sky-400/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Reset View</a>
     </div>
 
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

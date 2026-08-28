@@ -76,7 +76,7 @@ class RansomwareMapViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["current_page"], "ransomware-map")
-        self.assertContains(response, "Ransomware Incident Map")
+        self.assertContains(response, "Victim, group, and geography intelligence.")
         self.assertContains(response, 'id="ransomware-map-view"')
         self.assertContains(response, 'data-style-url="/static/intel/maps/ransomware_map_style.json"')
         self.assertContains(response, 'data-live-url="/ransomware/map/live/?window=7d"')
@@ -104,8 +104,8 @@ class RansomwareMapViewTests(TestCase):
         response = self.client.get(RANSOMWARE_MAP_URL)
 
         self.assertGreaterEqual(response.content.decode().count('href="/ransomware/map/"'), 2)
-        self.assertContains(response, "bg-rose-500/20 text-rose-100 ring-1 ring-rose-400/30")
-        self.assertContains(response, "bg-rose-500/10 text-rose-100")
+        self.assertEqual(response.content.decode().count('data-navigation-key="ransomware"'), 2)
+        self.assertEqual(response.content.decode().count('aria-current="page"'), 2)
 
     def test_window_filtering_changes_victim_scope(self):
         self._create_victim(victim="Fresh Victim", group="Akira", country="Sweden", hours_ago=6)

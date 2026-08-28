@@ -5,6 +5,7 @@ urlpatterns = [
     path("", views.now_view, name="now"),
     path("active/", views.active_view, name="active"),
     path("advisories/", views.advisories_view, name="advisories"),
+    path("threat-news/", views.threat_news_view, name="threat-news"),
     path("research/", views.research_view, name="research"),
     path("sweden/", views.sweden_view, name="sweden"),
     path("ransomware/map/", views.ransomware_map_view, name="ransomware-map"),

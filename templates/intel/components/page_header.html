@@ -1,0 +1,14 @@
+<header data-page-header="true" class="flex flex-col gap-3 border-b border-slate-800/80 pb-4 sm:flex-row sm:items-end sm:justify-between">
+    <div class="min-w-0">
+        {% if page_group %}
+            <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-300/65">{{ page_group }}</p>
+        {% endif %}
+        <h1 class="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">{{ page_title }}</h1>
+        {% if page_description %}
+            <p class="mt-1.5 max-w-3xl text-xs leading-5 text-slate-400 sm:text-sm">{{ page_description }}</p>
+        {% endif %}
+    </div>
+    {% if page_action_url %}
+        <a href="{{ page_action_url }}" class="shrink-0 self-start rounded-md border border-slate-700 px-3 py-2 text-xs text-slate-300 transition hover:border-slate-600 hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 sm:self-auto">{{ page_action_label }}</a>
+    {% endif %}
+</header>

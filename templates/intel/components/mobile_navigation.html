@@ -1,0 +1,86 @@
+<div id="mobile-nav-shell" class="pointer-events-none fixed inset-0 z-[70] hidden lg:hidden" aria-hidden="true">
+    <button
+        id="mobile-nav-backdrop"
+        type="button"
+        class="absolute inset-0 bg-slate-950/80 opacity-0 backdrop-blur-[1px] transition-opacity"
+        aria-label="Close navigation"
+    ></button>
+    <aside
+        id="mobile-nav-panel"
+        class="absolute right-0 top-0 h-full w-[86%] max-w-[21rem] translate-x-full border-l border-slate-800 bg-slate-950 shadow-2xl transition-transform duration-200"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mobile-navigation-title"
+    >
+        <div class="flex h-full flex-col overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <div>
+                    <p id="mobile-navigation-title" class="text-sm font-semibold text-white">BorealSec Intel</p>
+                    <p class="mt-0.5 text-[9px] uppercase tracking-[0.18em] text-slate-600">Navigation</p>
+                </div>
+                <button
+                    id="mobile-nav-close"
+                    type="button"
+                    class="rounded-md px-3 py-2 text-xs text-slate-400 transition hover:bg-slate-900 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                    aria-label="Close navigation"
+                >Close</button>
+            </div>
+
+            <nav
+                id="mobile-primary-navigation"
+                class="flex-1 py-5"
+                aria-label="Primary navigation"
+                data-primary-navigation="mobile"
+            >
+                <div class="space-y-6">
+                    {% for group in app_navigation_groups %}
+                        <section aria-labelledby="mobile-nav-group-{{ forloop.counter }}">
+                            <h2 id="mobile-nav-group-{{ forloop.counter }}" class="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">{{ group.label }}</h2>
+                            <ul class="mt-2 space-y-0.5">
+                                {% for item in group.items %}
+                                    <li>
+                                        {% if item.url %}
+                                            <a
+                                                href="{{ item.url }}"
+                                                data-navigation-key="{{ item.key }}"
+                                                class="flex min-h-11 items-center border-l-2 px-3 py-2.5 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300/70 {% if item.is_active %}border-cyan-300 bg-slate-900/70 font-medium text-white{% else %}border-transparent text-slate-300 hover:border-slate-600 hover:bg-slate-900/50 hover:text-white{% endif %}"
+                                                {% if item.is_active %}aria-current="page"{% endif %}
+                                            >{{ item.label }}</a>
+                                        {% else %}
+                                            <span
+                                                data-navigation-key="{{ item.key }}"
+                                                class="flex min-h-11 items-center border-l-2 border-transparent px-3 py-2.5 text-sm text-slate-600"
+                                                aria-disabled="true"
+                                            >
+                                                {{ item.label }}
+                                                <span class="ml-auto text-[9px] uppercase tracking-[0.12em] text-slate-700">Restricted</span>
+                                            </span>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </section>
+                    {% endfor %}
+                </div>
+            </nav>
+
+            <nav class="border-t border-slate-800/80 pt-3" aria-label="Utility navigation">
+                {% for item in app_navigation_utility %}
+                    <a
+                        href="{{ item.url }}"
+                        data-navigation-key="{{ item.key }}"
+                        class="block border-l-2 px-3 py-2.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300/70 {% if item.is_active %}border-cyan-300 font-medium text-white{% else %}border-transparent text-slate-400 hover:text-white{% endif %}"
+                        {% if item.is_active %}aria-current="page"{% endif %}
+                    >{{ item.label }}</a>
+                {% endfor %}
+                {% if request.user.is_superuser %}
+                    <div class="mt-2 grid grid-cols-3 gap-2 px-3 text-xs">
+                        <a href="{% url 'intel_admin:panel' %}" class="rounded-md bg-slate-900 px-3 py-2 text-center text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Admin</a>
+                        <a href="{% url 'intel_admin:ops' %}" class="rounded-md bg-slate-900 px-3 py-2 text-center text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Ops</a>
+                        <a href="{% url 'admin:index' %}" class="rounded-md bg-slate-900 px-3 py-2 text-center text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Django</a>
+                    </div>
+                {% endif %}
+            </nav>
+        </div>
+    </aside>
+</div>

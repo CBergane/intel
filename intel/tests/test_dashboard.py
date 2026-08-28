@@ -264,7 +264,7 @@ class DashboardViewTests(TestCase):
 
         self.assertEqual(len(response.context["active_items"]), 1)
         self.assertContains(response, 'id="active-block"', html=False)
-        self.assertContains(response, "All active items")
+        self.assertContains(response, "All exploitation items")
         self.assertContains(response, "Fresh active exploitation report")
         self.assertContains(response, 'xl:grid-cols-3', html=False)
         self.assertContains(response, 'data-card-layout="dashboard-active-preview"')
