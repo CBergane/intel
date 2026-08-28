@@ -1,0 +1,10 @@
+<header class="dashboard-section-header">
+    <div class="min-w-0">
+        {% if eyebrow %}<p class="dashboard-section-eyebrow">{{ eyebrow }}</p>{% endif %}
+        <h2 id="{{ section_id }}-title" class="dashboard-section-title">{{ title }}</h2>
+        {% if description %}<p class="dashboard-section-description">{{ description }}</p>{% endif %}
+    </div>
+    {% if action_url %}
+        <a href="{{ action_url }}" class="dashboard-section-action">{{ action_label }}</a>
+    {% endif %}
+</header>

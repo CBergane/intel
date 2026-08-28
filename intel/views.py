@@ -62,7 +62,8 @@ TIME_OPTIONS = [
     ("30d", "Last 30 days"),
     ("90d", "Last 90 days"),
 ]
-NOW_MAX_PER_SOURCE = 10
+LIST_CANDIDATE_LIMIT = 1000
+LIST_PAGE_SIZE = 25
 ITEM_SECTION_ROUTE_ORDER = (
     (Feed.Section.ADVISORIES, "advisories", "Vulnerabilities"),
     (Feed.Section.ACTIVE, "active", "Active Exploitation"),
@@ -90,6 +91,39 @@ SIGNAL_LABEL_CATEGORIES = {
     "Threat news": "threat_news",
     "Research": "research",
     "Nordic": "nordic",
+}
+
+DASHBOARD_CANDIDATE_DAYS = 30
+DASHBOARD_ATTENTION_DAYS = 7
+DASHBOARD_ACTIVE_DAYS = 14
+DASHBOARD_CANDIDATE_LIMIT = 400
+DASHBOARD_SECTION_LIMITS = {
+    "priority": 6,
+    "active": 4,
+    "intelligence": 10,
+    "ransomware": 4,
+    "nordic": 4,
+    "research": 5,
+}
+EVIDENCE_DISPLAY_LABELS = {
+    "authoritative": "Authoritative source",
+    "title": "Title evidence",
+    "summary": "Summary evidence",
+    "metadata": "Source metadata",
+}
+LIST_SEMANTIC_ATTRIBUTES = {
+    "active": "active_exploitation",
+    "vulnerabilities": "vulnerability",
+    "threat-news": "threat_news",
+    "nordics": "nordic_relevance",
+    "research": "research",
+}
+LIST_EMPTY_STATES = {
+    "active": "No confirmed active exploitation in the current result set.",
+    "vulnerabilities": "No vulnerability intelligence matches the current filters.",
+    "threat-news": "No threat-news signals match the current filters.",
+    "nordics": "No Nordic-relevant intelligence matches the current filters.",
+    "research": "No research intelligence matches the current filters.",
 }
 
 DARK_SOURCE_PRESETS = (
@@ -212,6 +246,7 @@ def _validated_redirect_target(request, default_target: str) -> str:
 
 def _attach_item_signal_ui(item, signal_profile=None):
     signal_profile = signal_profile or classify_item(item)
+    item.signal_profile = signal_profile
     item.cves = list(signal_profile.cves)
     item.priority = signal_profile.priority
     item.priority_label = PRIORITY_DISPLAY_LABELS[signal_profile.priority]
@@ -223,37 +258,65 @@ def _attach_item_signal_ui(item, signal_profile=None):
     return signal_profile
 
 
-def _attach_item_meta(items):
+def _list_reason_label(profile, semantic_key):
+    if semantic_key == "active":
+        evidence = EVIDENCE_DISPLAY_LABELS.get(
+            profile.active_exploitation_evidence,
+            "Classifier evidence",
+        )
+        return f"Exploitation evidence · {evidence}"
+    if semantic_key == "vulnerabilities" and profile.active_exploitation:
+        evidence = EVIDENCE_DISPLAY_LABELS.get(
+            profile.active_exploitation_evidence,
+            "Classifier evidence",
+        )
+        return f"Confirmed exploitation · {evidence}"
+    if semantic_key == "nordics":
+        evidence = EVIDENCE_DISPLAY_LABELS.get(
+            profile.nordic_evidence,
+            "Classifier evidence",
+        )
+        return f"Nordic relevance · {evidence}"
+    if semantic_key == "threat-news":
+        return "Security news source"
+    if semantic_key == "research":
+        return "Research source or feed"
+    return profile.primary_reason
+
+
+def _list_signal_display(profile, semantic_key):
+    if semantic_key == "active":
+        return "Active exploitation", "active_exploitation"
+    if semantic_key == "threat-news":
+        return "Threat news", "threat_news"
+    if semantic_key == "nordics":
+        return "Nordic", "nordic"
+    if semantic_key == "research":
+        return "Research", "research"
+    return profile.signal_label, SIGNAL_LABEL_CATEGORIES.get(
+        profile.signal_label,
+        profile.primary_category,
+    )
+
+
+def _attach_item_meta(items, *, now=None, semantic_key=None):
     for item in items:
-        _attach_item_signal_ui(item)
+        profile = getattr(item, "signal_profile", None)
+        if profile is None:
+            profile = _attach_item_signal_ui(item, classify_item(item, now=now))
         item.activity_at = getattr(item, "activity_at", None) or item.published_at or item.created_at
         item.source_browse_url = _source_destination(
             getattr(item.feed, "section", Feed.Section.ADVISORIES),
             source_slug=item.source.slug,
         )
+        item.primary_reason = profile.primary_reason
+        if semantic_key:
+            item.list_reason_label = _list_reason_label(profile, semantic_key)
+            item.list_signal_label, item.list_signal_category = _list_signal_display(
+                profile,
+                semantic_key,
+            )
     return items
-
-
-def _balanced_items(queryset, *, limit: int, per_source_max: int):
-    source_counts = {}
-    balanced = []
-    for item in queryset:
-        count = source_counts.get(item.source_id, 0)
-        if count >= per_source_max:
-            continue
-        balanced.append(item)
-        source_counts[item.source_id] = count + 1
-        if len(balanced) >= limit:
-            break
-    return _attach_item_meta(balanced)
-
-
-def build_trending_cves(items, *, limit: int = 10):
-    counts = Counter()
-    for item in items:
-        for cve in classify_item(item).cves:
-            counts[cve] += 1
-    return counts.most_common(limit)
 
 
 def _validated_time_window(raw_value: str) -> str:
@@ -263,41 +326,44 @@ def _validated_time_window(raw_value: str) -> str:
     return selected_time
 
 
-def _build_item_filter_state(request, *, section=None, item_filter=None):
+def _build_item_filter_state(request, *, semantic_key):
     queryset = Item.objects.select_related("source", "feed").annotate(
         activity_at=Coalesce("published_at", "created_at")
     )
-    if section is not None:
-        queryset = queryset.filter(feed__section=section)
 
     query = (request.GET.get("q") or "").strip()
     source_slug = (request.GET.get("source") or "").strip()
     selected_time = _validated_time_window(request.GET.get("time"))
 
-    since = timezone.now() - TIME_RANGES[selected_time]
-    window_queryset = queryset.filter(activity_at__gte=since)
-    window_items = None
-    if item_filter is not None:
-        window_items = [item for item in window_queryset if item_filter(item)]
-        source_counts = Counter(
-            (item.source.slug, item.source.name) for item in window_items
+    now = timezone.now()
+    since = now - TIME_RANGES[selected_time]
+    candidate_rows = list(
+        queryset.filter(activity_at__gte=since)
+        .order_by("-activity_at", "-id")[: LIST_CANDIDATE_LIMIT + 1]
+    )
+    candidate_limit_reached = len(candidate_rows) > LIST_CANDIDATE_LIMIT
+    candidates = candidate_rows[:LIST_CANDIDATE_LIMIT]
+    _attach_item_meta(candidates, now=now, semantic_key=semantic_key)
+
+    semantic_attribute = LIST_SEMANTIC_ATTRIBUTES[semantic_key]
+    window_items = [
+        item
+        for item in candidates
+        if getattr(item.signal_profile, semantic_attribute)
+    ]
+    source_counts = Counter(
+        (item.source.slug, item.source.name) for item in window_items
+    )
+    source_rows = [
+        {
+            "source__slug": row_source_slug,
+            "source__name": source_name,
+            "item_count": item_count,
+        }
+        for (row_source_slug, source_name), item_count in sorted(
+            source_counts.items(), key=lambda row: row[0][1].lower()
         )
-        source_rows = [
-            {
-                "source__slug": source_slug,
-                "source__name": source_name,
-                "item_count": item_count,
-            }
-            for (source_slug, source_name), item_count in sorted(
-                source_counts.items(), key=lambda row: row[0][1].lower()
-            )
-        ]
-    else:
-        source_rows = list(
-            window_queryset.values("source__slug", "source__name")
-            .annotate(item_count=Count("id"))
-            .order_by("source__name")
-        )
+    ]
     sources = [
         {
             "slug": row["source__slug"],
@@ -322,33 +388,20 @@ def _build_item_filter_state(request, *, section=None, item_filter=None):
         )
         sources.sort(key=lambda row: (row["name"].lower(), row["slug"]))
 
-    if window_items is not None:
-        window_total = len(window_items)
-        query_value = query.casefold()
-        filtered_items = [
-            item
-            for item in window_items
-            if (
-                not query_value
-                or query_value in (item.title or "").casefold()
-                or query_value in (item.summary or "").casefold()
-                or query_value in item.source.name.casefold()
-            )
-            and (not source_slug or item.source.slug == source_slug)
-        ]
-        filtered_total = len(filtered_items)
-    else:
-        window_total = window_queryset.count()
-        filtered_items = window_queryset
-        if query:
-            filtered_items = filtered_items.filter(
-                Q(title__icontains=query)
-                | Q(summary__icontains=query)
-                | Q(source__name__icontains=query)
-            )
-        if source_slug:
-            filtered_items = filtered_items.filter(source__slug=source_slug)
-        filtered_total = filtered_items.count()
+    window_total = len(window_items)
+    query_value = query.casefold()
+    filtered_items = [
+        item
+        for item in window_items
+        if (
+            not query_value
+            or query_value in (item.title or "").casefold()
+            or query_value in (item.summary or "").casefold()
+            or query_value in item.source.name.casefold()
+        )
+        and (not source_slug or item.source.slug == source_slug)
+    ]
+    filtered_total = len(filtered_items)
     hidden_by_filters = max(0, window_total - filtered_total)
 
     return {
@@ -362,87 +415,30 @@ def _build_item_filter_state(request, *, section=None, item_filter=None):
         "sources": sources,
         "time_options": TIME_OPTIONS,
         "filtered_items": filtered_items,
+        "candidate_limit_reached": candidate_limit_reached,
+        "list_metrics": {
+            "candidate_count": len(candidates),
+            "classification_calls": len(candidates),
+        },
     }
 
 
-def _filtered_items(request, section=None, *, balance_per_source=False, item_filter=None):
-    filter_state = _build_item_filter_state(
-        request,
-        section=section,
-        item_filter=item_filter,
-    )
+def _filtered_items(request, *, semantic_key):
+    filter_state = _build_item_filter_state(request, semantic_key=semantic_key)
     filtered_items = filter_state["filtered_items"]
-    if isinstance(filtered_items, list):
-        ordered = sorted(
-            filtered_items,
-            key=lambda item: (item.activity_at, item.id),
-            reverse=True,
-        )
-    else:
-        ordered = filtered_items.order_by("-activity_at", "-id")
-
-    if balance_per_source and not filter_state["selected_source"]:
-        source_counts = {}
-        balanced_items = []
-        for item in ordered:
-            count = source_counts.get(item.source_id, 0)
-            if count >= NOW_MAX_PER_SOURCE:
-                continue
-            balanced_items.append(item)
-            source_counts[item.source_id] = count + 1
-        paginator = Paginator(balanced_items, 25)
-    else:
-        paginator = Paginator(ordered, 25)
+    paginator = Paginator(filtered_items, LIST_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
-    page_obj.object_list = _attach_item_meta(list(page_obj.object_list))
+    page_obj.object_list = list(page_obj.object_list)
 
     return {
         **{key: value for key, value in filter_state.items() if key != "filtered_items"},
         "page_obj": page_obj,
-        "balance_applied": balance_per_source and not filter_state["selected_source"],
     }
 
 
 def _source_destination(section, *, source_slug: str) -> str:
     route_name = ITEM_SECTION_ROUTE_NAMES.get(section, "advisories")
     return f"{reverse(route_name)}?{urlencode({'source': source_slug})}"
-
-
-def _source_browse_overview_url() -> str:
-    return reverse("sources")
-
-
-def _preferred_source_section_from_rows(section_rows):
-    if not section_rows:
-        return None
-
-    section_priority = {section: index for index, (section, _route_name, _label) in enumerate(ITEM_SECTION_ROUTE_ORDER)}
-    dormant_sort_floor = timezone.now() - timedelta(days=36500)
-    ordered_rows = sorted(
-        section_rows,
-        key=lambda row: (
-            row["last_item_at"] or dormant_sort_floor,
-            row["item_count"],
-            -section_priority.get(row["section"], 99),
-        ),
-        reverse=True,
-    )
-    best_row = ordered_rows[0]
-    if len(ordered_rows) > 1:
-        second_row = ordered_rows[1]
-        if (
-            best_row["last_item_at"] == second_row["last_item_at"]
-            and best_row["item_count"] == second_row["item_count"]
-        ):
-            return None
-    return best_row["section"]
-
-
-def _aggregate_source_destination(section_rows, *, source_slug: str) -> str:
-    preferred_section = _preferred_source_section_from_rows(section_rows)
-    if preferred_section is None:
-        return _source_browse_overview_url()
-    return _source_destination(preferred_section, source_slug=source_slug)
 
 
 def _source_operational_status(*, feeds_total: int, feeds_error: int, feeds_never: int, total_items: int) -> str:
@@ -457,12 +453,14 @@ def _source_operational_status(*, feeds_total: int, feeds_error: int, feeds_neve
     return "Degraded"
 
 
-def _render_items_page(request, *, title, nav_key, section=None, item_filter=None):
-    context = _filtered_items(request, section=section, item_filter=item_filter)
+def _render_items_page(request, *, title, nav_key, semantic_key):
+    context = _filtered_items(request, semantic_key=semantic_key)
     context.update(
         {
             "page_title": title,
             "current_page": nav_key,
+            "list_semantic_key": semantic_key,
+            "empty_state": LIST_EMPTY_STATES[semantic_key],
         }
     )
     if request.headers.get("HX-Request"):
@@ -473,98 +471,180 @@ def _render_items_page(request, *, title, nav_key, section=None, item_filter=Non
     return render(request, "intel/item_list.html", context)
 
 
-def now_view(request):
-    now = timezone.now()
-    # Item.created_at is our ingestion-time fallback when feeds lack publish timestamps.
-    item_base = Item.objects.select_related("source", "feed").annotate(
-        activity_at=Coalesce("published_at", "created_at")
-    )
-    ordered_by_activity = item_base.order_by("-activity_at", "-id")
+def _dashboard_claim(candidates, *, used_ids, predicate, limit):
+    claimed = []
+    for item in candidates:
+        if item.id in used_ids or not predicate(item.dashboard_profile):
+            continue
+        claimed.append(item)
+        used_ids.add(item.id)
+        if len(claimed) >= limit:
+            break
+    return claimed
 
-    high_candidates = list(
-        ordered_by_activity.filter(activity_at__gte=now - timedelta(days=7))[:400]
-    )
-    for item in high_candidates:
+
+def _build_dashboard_state(candidates, *, now):
+    attention_cutoff = now - timedelta(days=DASHBOARD_ATTENTION_DAYS)
+    active_cutoff = now - timedelta(days=DASHBOARD_ACTIVE_DAYS)
+
+    for item in candidates:
         item.activity_at = item.activity_at or item.published_at or item.created_at
-        item.source_browse_url = _source_destination(item.feed.section, source_slug=item.source.slug)
-        signal_profile = _attach_item_signal_ui(item, classify_item(item, now=now))
-        item.dashboard_score = signal_profile.score
-        item.is_low_signal_title = signal_profile.is_low_signal_title
-        item.is_high_signal = signal_profile.high_signal
-    high_candidates.sort(
+        item.source_browse_url = _source_destination(
+            item.feed.section,
+            source_slug=item.source.slug,
+        )
+        profile = _attach_item_signal_ui(item, classify_item(item, now=now))
+        item.dashboard_profile = profile
+        item.dashboard_score = profile.score
+        item.primary_reason = profile.primary_reason
+        item.active_evidence_label = EVIDENCE_DISPLAY_LABELS.get(
+            profile.active_exploitation_evidence,
+            "Classifier evidence",
+        )
+
+    attention_items = [
+        item for item in candidates if item.activity_at >= attention_cutoff
+    ]
+    active_window_items = [
+        item for item in candidates if item.activity_at >= active_cutoff
+    ]
+    priority_candidates = sorted(
+        (
+            item
+            for item in attention_items
+            if item.dashboard_profile.priority in {"P1", "P2"}
+        ),
         key=lambda item: (item.dashboard_score, item.activity_at, item.id),
         reverse=True,
     )
-    high_signal_items = [item for item in high_candidates if item.is_high_signal][:15]
 
-    active_items = _balanced_items(
-        (
+    semantic_pools = {
+        "priority": priority_candidates,
+        "active": [
             item
-            for item in ordered_by_activity.filter(
-                activity_at__gte=now - timedelta(days=14)
-            )
-            if classify_item(item, now=now).active_exploitation
-        ),
-        limit=6,
-        per_source_max=4,
+            for item in active_window_items
+            if item.dashboard_profile.active_exploitation
+        ],
+        "ransomware": [
+            item for item in candidates if item.dashboard_profile.ransomware
+        ],
+        "nordic": [
+            item for item in candidates if item.dashboard_profile.nordic_relevance
+        ],
+        "research": [
+            item for item in candidates if item.dashboard_profile.research
+        ],
+        "intelligence": [
+            item for item in attention_items if item.dashboard_profile.high_signal
+        ],
+    }
+
+    used_ids = set()
+    priority_items = _dashboard_claim(
+        priority_candidates,
+        used_ids=used_ids,
+        predicate=lambda _profile: True,
+        limit=DASHBOARD_SECTION_LIMITS["priority"],
     )
-    advisories_items = _balanced_items(
-        ordered_by_activity.filter(feed__section=Feed.Section.ADVISORIES),
-        limit=20,
-        per_source_max=8,
+    active_items = _dashboard_claim(
+        active_window_items,
+        used_ids=used_ids,
+        predicate=lambda profile: profile.active_exploitation,
+        limit=DASHBOARD_SECTION_LIMITS["active"],
     )
-    research_items = _balanced_items(
-        ordered_by_activity.filter(
-            feed__section=Feed.Section.RESEARCH,
-            activity_at__gte=now - timedelta(days=30),
-        ),
-        limit=15,
-        per_source_max=6,
+    ransomware_items = _dashboard_claim(
+        candidates,
+        used_ids=used_ids,
+        predicate=lambda profile: profile.ransomware,
+        limit=DASHBOARD_SECTION_LIMITS["ransomware"],
+    )
+    nordic_items = _dashboard_claim(
+        candidates,
+        used_ids=used_ids,
+        predicate=lambda profile: profile.nordic_relevance,
+        limit=DASHBOARD_SECTION_LIMITS["nordic"],
+    )
+    research_items = _dashboard_claim(
+        candidates,
+        used_ids=used_ids,
+        predicate=lambda profile: profile.research,
+        limit=DASHBOARD_SECTION_LIMITS["research"],
+    )
+    intelligence_items = _dashboard_claim(
+        attention_items,
+        used_ids=used_ids,
+        predicate=lambda profile: profile.high_signal,
+        limit=DASHBOARD_SECTION_LIMITS["intelligence"],
     )
 
-    sweden_source_ids = []
-    for source in Source.objects.only("id", "tags"):
-        tags = {str(tag).strip().lower() for tag in (source.tags or [])}
-        if "sweden" in tags:
-            sweden_source_ids.append(source.id)
-    sweden_items = _attach_item_meta(
-        list(
-            item_base.filter(
-                Q(feed__section=Feed.Section.SWEDEN) | Q(source_id__in=sweden_source_ids)
-            ).order_by("-activity_at", "-id")[:10]
-        )
+    pulse = {
+        "p1": sum(item.priority == "P1" for item in attention_items),
+        "p2": sum(item.priority == "P2" for item in attention_items),
+        "active": sum(
+            item.dashboard_profile.active_exploitation
+            for item in active_window_items
+        ),
+        "ransomware": sum(
+            item.dashboard_profile.ransomware for item in attention_items
+        ),
+        "nordic": sum(
+            item.dashboard_profile.nordic_relevance for item in attention_items
+        ),
+        "high_signal": sum(
+            item.dashboard_profile.high_signal for item in attention_items
+        ),
+    }
+    cve_counts = Counter(
+        cve for item in attention_items for cve in item.cves
     )
+    emerging_cves = sorted(
+        cve_counts.items(),
+        key=lambda row: (-row[1], row[0]),
+    )[:6]
 
-    trending_source_rows = list(
-        item_base.filter(activity_at__gte=now - timedelta(hours=48))
-        .values("source__name", "source__slug", "feed__section")
-        .annotate(item_count=Count("id"), last_item_at=Max("activity_at"))
-    )
-    trending_sections_by_source = {}
-    for row in trending_source_rows:
-        source_slug = row["source__slug"]
-        trending_sections_by_source.setdefault(source_slug, []).append(
-            {
-                "section": row["feed__section"],
-                "item_count": row["item_count"],
-                "last_item_at": row["last_item_at"],
-            }
+    section_items = {
+        "priority": priority_items,
+        "active": active_items,
+        "intelligence": intelligence_items,
+        "ransomware": ransomware_items,
+        "nordic": nordic_items,
+        "research": research_items,
+    }
+    return {
+        "threat_pulse": pulse,
+        "last_dashboard_item_at": candidates[0].activity_at if candidates else None,
+        "priority_items": priority_items,
+        "active_items": active_items,
+        "intelligence_items": intelligence_items,
+        "ransomware_items": ransomware_items,
+        "nordic_items": nordic_items,
+        "research_items": research_items,
+        "emerging_cves": emerging_cves,
+        "dashboard_coverage": {
+            key: bool(semantic_pools[key]) and not bool(section_items[key])
+            for key in semantic_pools
+        },
+        "dashboard_metrics": {
+            "candidate_count": len(candidates),
+            "classification_calls": len(candidates),
+            "section_counts": {
+                key: len(items) for key, items in section_items.items()
+            },
+        },
+    }
+
+
+def now_view(request):
+    now = timezone.now()
+    candidates = list(
+        Item.objects.select_related("source", "feed")
+        .annotate(activity_at=Coalesce("published_at", "created_at"))
+        .filter(
+            activity_at__gte=now - timedelta(days=DASHBOARD_CANDIDATE_DAYS)
         )
-    trending_sources = list(
-        item_base.filter(activity_at__gte=now - timedelta(hours=48))
-        .values("source__name", "source__slug")
-        .annotate(item_count=Count("id"))
-        .order_by("-item_count", "source__name")[:8]
+        .order_by("-activity_at", "-id")[:DASHBOARD_CANDIDATE_LIMIT]
     )
-    for row in trending_sources:
-        row["open_url"] = _aggregate_source_destination(
-            trending_sections_by_source.get(row["source__slug"], []),
-            source_slug=row["source__slug"],
-        )
-    trending_cves = build_trending_cves(
-        list(ordered_by_activity.filter(activity_at__gte=now - timedelta(days=7))[:400]),
-        limit=10,
-    )
+    dashboard_state = _build_dashboard_state(candidates, now=now)
 
     enabled_feeds = list(Feed.objects.filter(enabled=True).only("id"))
     latest_by_feed = {}
@@ -588,29 +668,10 @@ def now_view(request):
         .first()
     )
 
-    # Dashboard stat widgets
-    today = now.date()
-    week_ago = now - timedelta(days=7)
-    thirty_days_ago = now - timedelta(days=30)
-    items_today_count = Item.objects.filter(published_at__date=today).count()
-    items_week_count = Item.objects.filter(published_at__gte=week_ago).count()
-    active_feeds_count = Feed.objects.filter(enabled=True).count()
-    dark_hits_30d_count = DarkHit.objects.filter(detected_at__gte=thirty_days_ago).count()
-
     context = {
         "page_title": "Now",
         "current_page": "now",
-        "items_today_count": items_today_count,
-        "items_week_count": items_week_count,
-        "active_feeds_count": active_feeds_count,
-        "dark_hits_30d_count": dark_hits_30d_count,
-        "high_signal_items": high_signal_items,
-        "active_items": active_items,
-        "advisories_items": advisories_items,
-        "research_items": research_items,
-        "sweden_items": sweden_items,
-        "trending_sources": trending_sources,
-        "trending_cves": trending_cves,
+        **dashboard_state,
         "feed_status_counts": feed_status_counts,
         "enabled_feed_count": len(enabled_feeds),
         "last_ingest_finished_at": last_ingest_finished_at,
@@ -623,7 +684,7 @@ def active_view(request):
         request,
         title="Active Exploitation",
         nav_key="active",
-        item_filter=lambda item: classify_item(item).active_exploitation,
+        semantic_key="active",
     )
 
 
@@ -632,7 +693,7 @@ def advisories_view(request):
         request,
         title="Vulnerabilities",
         nav_key="advisories",
-        section=Feed.Section.ADVISORIES,
+        semantic_key="vulnerabilities",
     )
 
 
@@ -641,7 +702,7 @@ def threat_news_view(request):
         request,
         title="Threat News",
         nav_key="threat-news",
-        item_filter=lambda item: classify_item(item).threat_news,
+        semantic_key="threat-news",
     )
 
 
@@ -650,7 +711,7 @@ def research_view(request):
         request,
         title="Research",
         nav_key="research",
-        section=Feed.Section.RESEARCH,
+        semantic_key="research",
     )
 
 
@@ -659,7 +720,7 @@ def sweden_view(request):
         request,
         title="Nordics",
         nav_key="sweden",
-        section=Feed.Section.SWEDEN,
+        semantic_key="nordics",
     )
 
 

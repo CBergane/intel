@@ -63,6 +63,25 @@ class NavigationTemplateTests(TestCase):
         self.assertEqual(html.count('aria-current="page"'), 2)
         self.assertEqual(response.context["active_navigation_item"]["key"], "active")
 
+    def test_intelligence_list_destinations_keep_navigation_state(self):
+        cases = (
+            ("active", "active"),
+            ("advisories", "vulnerabilities"),
+            ("threat-news", "threat-news"),
+            ("sweden", "nordics"),
+            ("research", "research"),
+        )
+
+        for route_name, navigation_key in cases:
+            with self.subTest(route_name=route_name):
+                response = self.client.get(reverse(route_name))
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    response.context["active_navigation_item"]["key"],
+                    navigation_key,
+                )
+                self.assertEqual(response.content.decode().count('aria-current="page"'), 2)
+
     def test_anonymous_threat_watch_is_restricted_and_not_linked(self):
         response = self.client.get(reverse("about"))
         html = response.content.decode()
@@ -135,14 +154,14 @@ class NavigationTemplateTests(TestCase):
         self.assertContains(response, 'aria-label="Primary navigation"', count=2, html=False)
         self.assertContains(response, "Skip to content")
 
-    def test_now_page_section_navigation_is_distinct(self):
+    def test_now_page_briefing_does_not_duplicate_global_navigation(self):
         response = self.client.get(reverse("now"))
+        html = response.content.decode()
 
-        self.assertContains(response, 'aria-label="Now page sections"', html=False)
-        self.assertContains(response, "On this page")
-        self.assertContains(response, ">Active Exploitation<", html=False)
-        self.assertContains(response, ">Vulnerabilities<", html=False)
-        self.assertContains(response, ">Nordics<", html=False)
+        self.assertEqual(html.count('data-primary-navigation="desktop"'), 1)
+        self.assertEqual(html.count('data-primary-navigation="mobile"'), 1)
+        self.assertEqual(html.count('data-dashboard-section="active"'), 1)
+        self.assertNotIn('aria-label="Now page sections"', html)
 
 
 class PageOrientationTests(TestCase):

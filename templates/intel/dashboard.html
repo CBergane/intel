@@ -4,398 +4,135 @@
 {% block title %}Now | BorealSec Intel{% endblock %}
 
 {% block content %}
-<section class="space-y-3 sm:space-y-5 xl:space-y-7">
-    {% url 'sources' as sources_url %}
+{% url 'sources' as sources_url %}
+{% url 'active' as active_url %}
+{% url 'advisories' as advisories_url %}
+{% url 'ransomware-map' as ransomware_url %}
+{% url 'sweden' as nordic_url %}
+{% url 'research' as research_url %}
+{% url 'feed-health' as feed_health_url %}
+
+<div class="dashboard-v2">
     {% include "intel/components/page_header.html" with page_action_url=sources_url page_action_label="Browse sources" %}
 
-    <div class="space-y-2.5 md:hidden">
-        <div class="grid grid-cols-2 gap-2 max-[320px]:gap-1.5">
-            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 max-[320px]:px-2.5 max-[320px]:py-2 shadow-glow">
-                <p class="text-xl max-[320px]:text-lg font-bold tabular-nums text-accent">{{ items_today_count }}</p>
-                <p class="mt-0.5 text-[10px] max-[320px]:text-[9px] text-slate-400">Items today</p>
+    <section class="threat-pulse" aria-labelledby="threat-pulse-title" data-dashboard-section="threat-pulse">
+        <div class="threat-pulse__heading">
+            <div>
+                <p class="dashboard-section-eyebrow">Operational summary</p>
+                <h2 id="threat-pulse-title" class="dashboard-section-title">Threat Pulse</h2>
             </div>
-            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 max-[320px]:px-2.5 max-[320px]:py-2 shadow-glow">
-                <p class="text-xl max-[320px]:text-lg font-bold tabular-nums text-accent">{{ items_week_count }}</p>
-                <p class="mt-0.5 text-[10px] max-[320px]:text-[9px] text-slate-400">This week</p>
-            </div>
-            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 max-[320px]:px-2.5 max-[320px]:py-2 shadow-glow">
-                <p class="text-xl max-[320px]:text-lg font-bold tabular-nums text-accent">{{ active_feeds_count }}</p>
-                <p class="mt-0.5 text-[10px] max-[320px]:text-[9px] text-slate-400">Active feeds</p>
-            </div>
-            <div class="rounded-xl border border-line bg-panel/80 px-3 py-2.5 max-[320px]:px-2.5 max-[320px]:py-2 shadow-glow">
-                <p class="text-xl max-[320px]:text-lg font-bold tabular-nums text-accent">{{ dark_hits_30d_count }}</p>
-                <p class="mt-0.5 text-[10px] max-[320px]:text-[9px] text-slate-400">Threat Watch hits (30d)</p>
-            </div>
+            <p class="threat-pulse__freshness">
+                {% if last_dashboard_item_at %}
+                    Updated <time datetime="{{ last_dashboard_item_at|date:'c' }}" title="{{ last_dashboard_item_at|date:'Y-m-d H:i' }} UTC">{{ last_dashboard_item_at|naturaltime }}</time>
+                {% else %}
+                    Awaiting intelligence
+                {% endif %}
+            </p>
         </div>
-    </div>
-
-    <div class="hidden rounded-2xl border border-line bg-panel/80 p-4 shadow-glow md:block lg:p-5">
-        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:gap-3.5">
-                <div class="rounded-xl border border-line/80 bg-slate-900/55 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
-                    <p class="text-2xl font-bold tabular-nums text-accent lg:text-3xl">{{ items_today_count }}</p>
-                    <p class="mt-1 text-xs text-slate-400">Items today</p>
-                </div>
-                <div class="rounded-xl border border-line/80 bg-slate-900/55 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
-                    <p class="text-2xl font-bold tabular-nums text-accent lg:text-3xl">{{ items_week_count }}</p>
-                    <p class="mt-1 text-xs text-slate-400">This week</p>
-                </div>
-                <div class="rounded-xl border border-line/80 bg-slate-900/55 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
-                    <p class="text-2xl font-bold tabular-nums text-accent lg:text-3xl">{{ active_feeds_count }}</p>
-                    <p class="mt-1 text-xs text-slate-400">Active feeds</p>
-                </div>
-                <div class="rounded-xl border border-line/80 bg-slate-900/55 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
-                    <p class="text-2xl font-bold tabular-nums text-accent lg:text-3xl">{{ dark_hits_30d_count }}</p>
-                    <p class="mt-1 text-xs text-slate-400">Threat Watch hits (30d)</p>
-                </div>
-        </div>
-    </div>
-
-    <nav class="sticky top-[3.25rem] z-30 hidden rounded-xl border border-line/80 bg-night/90 p-1.5 backdrop-blur sm:block lg:hidden" aria-label="Now page sections">
-        <div class="no-scrollbar flex items-center gap-2 overflow-x-auto px-0.5 text-xs">
-            <span class="shrink-0 px-1 text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">On this page</span>
-            <a href="#high-signal-mobile" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">High Signal</a>
-            <a href="#active-block-mobile" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Active Exploitation</a>
-            <a href="#advisories-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Vulnerabilities</a>
-            <a href="#research-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Research</a>
-            <a href="#sweden-block" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Nordics</a>
-            <a href="#trending-block-mobile" class="shrink-0 rounded-lg border border-slate-700 px-2.5 py-1.5 text-slate-200 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">Trending</a>
-        </div>
-    </nav>
-
-    <section id="high-signal-mobile" data-mobile-section="high-signal" class="space-y-2 rounded-xl border border-line bg-panel/80 p-2.5 shadow-glow lg:hidden">
-        <div class="space-y-1.5">
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-200">
-                    <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-                        <path d="M10 2v4m0 8v4M2 10h4m8 0h4M5 5l2.5 2.5m5 5L15 15m0-10-2.5 2.5m-5 5L5 15" stroke-linecap="round" />
-                        <circle cx="10" cy="10" r="2.5" />
-                    </svg>
-                </span>
-                <h2 class="text-sm font-semibold text-white max-[430px]:text-[13px]">High Signal (Last 7 days)</h2>
-                <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ high_signal_items|length }} curated</span>
-            </div>
-            <p class="text-[11px] max-[430px]:text-[10px] leading-[1.15rem] max-[430px]:leading-[1rem] text-slate-400">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel.</p>
-            <a href="/sources" class="inline-flex text-[11px] font-medium text-sky-300 hover:text-sky-200">Browse layer</a>
-        </div>
-        <div class="space-y-1.5">
-            {% for item in high_signal_items %}
-                <div class="min-w-0 {% if forloop.counter > 3 %}hidden{% elif forloop.counter > 2 %}max-[430px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-mobile-trim="high-signal-overflow"{% elif forloop.counter > 2 %}data-iphone-mobile-trim="high-signal-extra"{% endif %}>
-                    {% include "intel/_item_card.html" with compact=False front_page=True mobile_dense=True %}
-                </div>
-            {% empty %}
-                <p class="text-sm text-slate-400">No urgent high-signal items cleared the curated threshold yet. Use the section browse layer for the full recent intake.</p>
-            {% endfor %}
-        </div>
-        {% if high_signal_items|length > 3 %}
-            <p class="text-[10px] text-slate-500 max-[430px]:hidden">Showing the top 3 curated items on mobile.</p>
-        {% endif %}
-        {% if high_signal_items|length > 2 %}
-            <p class="hidden max-[430px]:block text-[10px] text-slate-500">Showing the top 2 curated items on smaller phones.</p>
-        {% endif %}
+        <dl class="threat-pulse__metrics">
+            <div class="threat-pulse__metric" data-priority="P1"><dt>P1</dt><dd><strong>{{ threat_pulse.p1 }}</strong> critical</dd></div>
+            <div class="threat-pulse__metric" data-priority="P2"><dt>P2</dt><dd><strong>{{ threat_pulse.p2 }}</strong> high</dd></div>
+            <div class="threat-pulse__metric"><dt>Active</dt><dd><strong>{{ threat_pulse.active }}</strong> confirmed</dd></div>
+            <div class="threat-pulse__metric"><dt>Ransomware</dt><dd><strong>{{ threat_pulse.ransomware }}</strong> signals</dd></div>
+            <div class="threat-pulse__metric"><dt>Nordic</dt><dd><strong>{{ threat_pulse.nordic }}</strong> relevant</dd></div>
+            <div class="threat-pulse__metric"><dt>High signal</dt><dd><strong>{{ threat_pulse.high_signal }}</strong> recent</dd></div>
+        </dl>
+        <p class="threat-pulse__window">P1/P2 and category counts use the 7-day attention window. Active exploitation uses the 14-day evidence window.</p>
     </section>
 
-    <section id="active-block-mobile" data-mobile-section="active" class="space-y-2 rounded-xl border border-line bg-panel/80 p-2.5 shadow-glow lg:hidden">
-        <div class="space-y-1.5">
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-500/25 bg-rose-500/10 text-rose-200">
-                    <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-                        <path d="M4 10h3l1.4-3 2.4 6 1.7-3H16" stroke-linecap="round" stroke-linejoin="round" />
-                        <path d="M10 18c4.2-2.8 6.5-5.6 6.5-8.7A3.8 3.8 0 0 0 12.7 5c-1.2 0-2.1.5-2.7 1.4C9.4 5.5 8.4 5 7.3 5A3.8 3.8 0 0 0 3.5 9.3c0 3.1 2.3 5.9 6.5 8.7Z" stroke-linejoin="round" />
-                    </svg>
-                </span>
-                <h2 class="text-sm font-semibold text-white max-[430px]:text-[13px]">Active Exploitation</h2>
-                <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ active_items|length }} recent</span>
-            </div>
-            <p class="text-[11px] max-[430px]:text-[10px] leading-[1.15rem] max-[430px]:leading-[1rem] text-slate-400">Fast scan of recent exploitation and operational threat activity before dropping into the full Active Exploitation view.</p>
-            <a href="/active" class="inline-flex text-[11px] font-medium text-sky-300 hover:text-sky-200">All exploitation items</a>
-        </div>
-        <div class="space-y-2">
-            {% for item in active_items %}
-                <div class="min-w-0 {% if forloop.counter > 3 %}hidden{% elif forloop.counter > 2 %}max-[430px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-mobile-trim="active-overflow"{% elif forloop.counter > 2 %}data-iphone-mobile-trim="active-extra"{% endif %}>
-                    {% include "intel/_dashboard_active_preview_card.html" %}
-                </div>
+    <section class="dashboard-section dashboard-section--priority" aria-labelledby="priority-stream-title" data-dashboard-section="priority">
+        {% include "intel/components/dashboard_section_header.html" with eyebrow="Requires attention" section_id="priority-stream" title="Priority Stream" description="The strongest recent P1 and P2 intelligence, ordered by classifier priority, score, and freshness." %}
+        <div class="dashboard-stream dashboard-stream--priority">
+            {% for item in priority_items %}
+                {% include "intel/components/intelligence_row.html" %}
             {% empty %}
-                <p class="text-sm text-slate-400">No recent active items found.</p>
+                <p class="dashboard-empty">No P1/P2 signals in the current window.</p>
             {% endfor %}
         </div>
-        {% if active_items|length > 3 %}
-            <p class="text-[10px] text-slate-500 max-[430px]:hidden">Showing the top 3 active items on mobile.</p>
-        {% endif %}
-        {% if active_items|length > 2 %}
-            <p class="hidden max-[430px]:block text-[10px] text-slate-500">Showing the top 2 active items on smaller phones.</p>
-        {% endif %}
     </section>
 
-    <div id="trending-block-mobile" data-mobile-stack="dashboard-secondary-mobile-stack" class="space-y-2.5 lg:hidden">
-        <section data-mobile-section="feed-health" class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow">
-            <div class="space-y-2.5 max-[320px]:space-y-2">
-                <div class="flex items-center justify-between gap-2">
-                    <h2 class="text-sm font-semibold text-white">Feed Health</h2>
-                    <a href="/feed-health" class="text-[11px] max-[320px]:text-[10px] font-medium text-sky-300 hover:text-sky-200">Open</a>
-                </div>
-                <div class="flex flex-wrap gap-1.5 max-[320px]:gap-1 text-[10px] max-[320px]:text-[9px]">
-                    <span class="inline-flex items-center gap-1 rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-slate-300">
-                        Enabled <span class="font-semibold text-white">{{ enabled_feed_count }}</span>
-                    </span>
-                    <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-emerald-200">
-                        OK <span class="font-semibold text-emerald-100">{{ feed_status_counts.ok }}</span>
-                    </span>
-                    <span class="inline-flex items-center gap-1 rounded-full border border-rose-500/25 bg-rose-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-rose-200">
-                        Error <span class="font-semibold text-rose-100">{{ feed_status_counts.error }}</span>
-                    </span>
-                    <span class="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 max-[320px]:px-2 max-[320px]:py-0.5 text-amber-200">
-                        Never <span class="font-semibold text-amber-100">{{ feed_status_counts.never }}</span>
-                    </span>
-                </div>
-                <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 max-[320px]:px-2 max-[320px]:py-1.5">
-                    <p class="text-[10px] max-[320px]:text-[9px] uppercase tracking-[0.16em] text-slate-500">Last ingest</p>
-                    <p class="mt-1 text-sm font-semibold text-white">
-                        {% if last_ingest_finished_at %}
-                            <span title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
-                        {% else %}
-                            <span class="text-slate-400">never</span>
-                        {% endif %}
-                    </p>
-                </div>
+    <div class="dashboard-briefing-grid">
+        <section class="dashboard-section dashboard-area-active" aria-labelledby="active-preview-title" data-dashboard-section="active">
+            {% include "intel/components/dashboard_section_header.html" with eyebrow="Confirmed evidence" section_id="active-preview" title="Active Exploitation" description="A focused 14-day preview of semantically confirmed exploitation." action_url=active_url action_label="View all" %}
+            <div class="dashboard-stream dashboard-stream--compact">
+                {% for item in active_items %}
+                    {% include "intel/components/intelligence_row.html" with evidence_mode=True %}
+                {% empty %}
+                    {% if dashboard_coverage.active %}<p class="dashboard-empty">Confirmed exploitation is already represented in the Priority Stream.</p>{% else %}<p class="dashboard-empty">No confirmed active exploitation in the current window.</p>{% endif %}
+                {% endfor %}
             </div>
         </section>
 
-        <section data-mobile-section="trending-sources" class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow">
-            <div class="mb-2 flex items-center justify-between gap-2">
-                <h2 class="text-sm font-semibold text-white">Trending Sources</h2>
-                <span class="text-[10px] text-slate-500">48h</span>
-            </div>
-            <ul class="space-y-1.5 text-slate-300">
-                {% for row in trending_sources %}
-                    {% if forloop.counter <= 4 %}
-                        <li class="flex min-w-0 items-center gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2 max-[320px]:px-2 max-[320px]:py-1.5 {% if forloop.counter > 3 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 3 %}data-ultra-mobile-trim="trending-source-extra"{% endif %}>
-                            <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-[12px] max-[320px]:text-[11px] hover:text-sky-300">{{ row.source__name }}</a>
-                            <span class="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] max-[320px]:text-[9px]">{{ row.item_count }}</span>
-                        </li>
-                    {% endif %}
+        <section class="dashboard-section dashboard-area-intelligence" aria-labelledby="intelligence-stream-title" data-dashboard-section="intelligence">
+            {% include "intel/components/dashboard_section_header.html" with eyebrow="What changed" section_id="intelligence-stream" title="Intelligence Stream" description="Recent high-signal intelligence not already surfaced in a focused briefing section." action_url=sources_url action_label="Browse sources" %}
+            <div class="dashboard-stream">
+                {% for item in intelligence_items %}
+                    {% include "intel/components/intelligence_row.html" %}
                 {% empty %}
-                    <li class="text-sm text-slate-400">No recent source activity.</li>
+                    <p class="dashboard-empty">No additional high-signal intelligence in the current window.</p>
                 {% endfor %}
-            </ul>
-            {% if trending_sources|length > 4 %}
-                <p class="mt-2 text-[10px] text-slate-500">Top 4 shown on mobile.</p>
-            {% endif %}
-            {% if trending_sources|length > 3 %}
-                <p class="hidden max-[320px]:block mt-2 text-[10px] text-slate-500">Top 3 shown on very small screens.</p>
-            {% endif %}
+            </div>
         </section>
 
-        <section data-mobile-section="trending-cves" class="rounded-xl border border-line bg-panel/80 p-3 max-[430px]:p-2.5 max-[320px]:p-2.5 shadow-glow">
-            <h2 class="mb-3 text-sm font-semibold text-white">Trending CVEs (7d)</h2>
-            <div class="flex flex-wrap gap-2 max-[430px]:gap-1.5 max-[320px]:gap-1.5">
-                {% for cve, count in trending_cves %}
-                    <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/15 px-2.5 py-1.5 max-[430px]:px-2 max-[430px]:py-1 max-[430px]:text-[10px] max-[320px]:px-2 max-[320px]:py-1 max-[320px]:text-[10px] text-xs font-medium text-sky-200 hover:bg-sky-500/25 {% if forloop.counter > 4 %}max-[430px]:hidden{% elif forloop.counter > 3 %}max-[320px]:hidden{% endif %}" {% if forloop.counter > 4 %}data-iphone-mobile-trim="trending-cve-overflow"{% elif forloop.counter > 3 %}data-ultra-mobile-trim="trending-cve-extra"{% endif %}>
-                        <span>{{ cve }}</span>
-                        <span class="text-sky-100/80">({{ count }})</span>
-                    </a>
+        <section class="dashboard-section dashboard-area-ransomware" aria-labelledby="ransomware-pulse-title" data-dashboard-section="ransomware">
+            {% include "intel/components/dashboard_section_header.html" with eyebrow="Situation preview" section_id="ransomware-pulse" title="Ransomware Pulse" description="Recent ransomware intelligence without elevating every victim listing into a general alarm." action_url=ransomware_url action_label="Open map" %}
+            <div class="dashboard-stream dashboard-stream--compact">
+                {% for item in ransomware_items %}
+                    {% include "intel/components/intelligence_row.html" %}
                 {% empty %}
-                    <span class="text-sm text-slate-400">No CVE activity in the last 7 days.</span>
+                    {% if dashboard_coverage.ransomware %}<p class="dashboard-empty">Current ransomware intelligence is represented in the Priority Stream.</p>{% else %}<p class="dashboard-empty">No ransomware activity in the current window.</p>{% endif %}
                 {% endfor %}
             </div>
-            {% if trending_cves|length > 4 %}
-                <p class="hidden max-[430px]:block max-[320px]:hidden mt-2 text-[10px] text-slate-500">Top 4 CVEs shown on smaller phones.</p>
-            {% endif %}
-            {% if trending_cves|length > 3 %}
-                <p class="hidden max-[320px]:block mt-2 text-[10px] text-slate-500">Top 3 CVEs shown on very small screens.</p>
-            {% endif %}
+        </section>
+
+        <section class="dashboard-section dashboard-area-nordic" aria-labelledby="nordic-pulse-title" data-dashboard-section="nordic">
+            {% include "intel/components/dashboard_section_header.html" with eyebrow="Regional relevance" section_id="nordic-pulse" title="Nordic Pulse" description="Classifier-confirmed Swedish and Nordic intelligence." action_url=nordic_url action_label="View Nordics" %}
+            <div class="dashboard-stream dashboard-stream--compact">
+                {% for item in nordic_items %}
+                    {% include "intel/components/intelligence_row.html" %}
+                {% empty %}
+                    {% if dashboard_coverage.nordic %}<p class="dashboard-empty">Current Nordic intelligence is represented in a higher-priority section.</p>{% else %}<p class="dashboard-empty">No Nordic intelligence in the current window.</p>{% endif %}
+                {% endfor %}
+            </div>
         </section>
     </div>
 
-    <div data-desktop-layout="dashboard-primary-grid" class="hidden lg:grid gap-4 lg:grid-cols-12 lg:items-start lg:gap-5 xl:gap-6">
-        <div id="high-signal" class="flex flex-col space-y-4 rounded-xl border border-line bg-panel/80 p-4 shadow-glow lg:col-span-8 xl:col-span-9 xl:rounded-2xl xl:p-6">
-            <div class="flex items-center justify-between gap-4">
-                <div class="space-y-1">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-200">
-                            <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-                                <path d="M10 2v4m0 8v4M2 10h4m8 0h4M5 5l2.5 2.5m5 5L15 15m0-10-2.5 2.5m-5 5L5 15" stroke-linecap="round" />
-                                <circle cx="10" cy="10" r="2.5" />
-                            </svg>
-                        </span>
-                        <h2 class="text-base font-semibold text-white xl:text-lg">High Signal (Last 7 days)</h2>
-                        <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ high_signal_items|length }} curated</span>
-                    </div>
-                    <p class="text-xs leading-5 text-slate-400">Serious threats only: exploitation, ransomware, urgent advisories, and major CVE-driven intel. Routine release and maintenance notices are de-emphasized.</p>
-                </div>
-                <div class="flex flex-wrap items-center gap-3">
-                    <a href="/sources" class="text-sm font-medium text-slate-300 hover:text-white">Browse layer</a>
-                    <a href="/active" class="text-sm font-medium text-sky-300 hover:text-sky-200">View active page</a>
-                </div>
-            </div>
-            <div class="flex-1 space-y-3">
-                {% for item in high_signal_items %}
-                    <div class="min-w-0">
-                        {% include "intel/_item_card.html" with compact=False front_page=True mobile_dense=True %}
-                    </div>
+    <section class="dashboard-section dashboard-section--research" aria-labelledby="research-emerging-title" data-dashboard-section="research">
+        {% include "intel/components/dashboard_section_header.html" with eyebrow="Investigate next" section_id="research-emerging" title="Research / Emerging" description="Lower-urgency research and recurring vulnerability references worth following." action_url=research_url action_label="View research" %}
+        <div class="dashboard-research-grid">
+            <div class="dashboard-stream dashboard-stream--compact">
+                {% for item in research_items %}
+                    {% include "intel/components/intelligence_row.html" %}
                 {% empty %}
-                    <p class="text-sm text-slate-400">No urgent high-signal items cleared the curated threshold yet. Use the section browse layer for the full recent intake.</p>
+                    {% if dashboard_coverage.research %}<p class="dashboard-empty">Current research is represented in a higher-priority section.</p>{% else %}<p class="dashboard-empty">No recent research in the current window.</p>{% endif %}
                 {% endfor %}
             </div>
-        </div>
-
-        <aside id="trending-block" class="min-w-0 space-y-2.5 lg:col-span-4 lg:space-y-4 xl:sticky xl:top-36 xl:col-span-3 xl:space-y-3">
-            <div class="rounded-xl border border-line bg-panel/80 p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
-                <div class="mb-3 flex items-center justify-between gap-3">
-                    <h2 class="text-sm font-semibold text-white sm:text-base">Feed Health</h2>
-                    <a href="/feed-health" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">Open panel</a>
+            <aside class="emerging-references" aria-labelledby="emerging-references-title">
+                <div>
+                    <p class="dashboard-section-eyebrow">7-day references</p>
+                    <h3 id="emerging-references-title">Emerging CVEs</h3>
                 </div>
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                        Enabled
-                        <p class="mt-1 text-sm font-semibold text-white">{{ enabled_feed_count }}</p>
-                    </div>
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                        OK
-                        <p class="mt-1 text-sm font-semibold text-emerald-300">{{ feed_status_counts.ok }}</p>
-                    </div>
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                        Error
-                        <p class="mt-1 text-sm font-semibold text-rose-300">{{ feed_status_counts.error }}</p>
-                    </div>
-                    <div class="rounded-lg border border-line/80 bg-slate-900/60 px-2.5 py-2 text-slate-300">
-                        Never
-                        <p class="mt-1 text-sm font-semibold text-amber-300">{{ feed_status_counts.never }}</p>
-                    </div>
-                </div>
-                <p class="mt-2.5 text-[11px] text-slate-400 sm:text-xs">
-                    Last ingest:
-                    {% if last_ingest_finished_at %}
-                        <span class="font-medium text-white" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</span>
-                    {% else %}
-                        <span class="font-medium text-slate-400">never</span>
-                    {% endif %}
-                </p>
-            </div>
-
-            <div class="rounded-xl border border-line bg-panel/80 p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
-                <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending Sources (48h)</h2>
-                <ul class="space-y-2 text-sm text-slate-300">
-                    {% for row in trending_sources %}
-                        <li class="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-line/70 bg-slate-900/60 px-2.5 py-2">
-                            <a href="{{ row.open_url }}" class="min-w-0 flex-1 truncate text-sm hover:text-sky-300">{{ row.source__name }}</a>
-                            <span class="rounded bg-slate-800 px-2 py-0.5 text-xs">{{ row.item_count }}</span>
-                        </li>
+                <div class="emerging-references__list">
+                    {% for cve, count in emerging_cves %}
+                        <a href="{{ advisories_url }}?q={{ cve|urlencode }}"><span>{{ cve }}</span><span>{{ count }} mention{{ count|pluralize }}</span></a>
                     {% empty %}
-                        <li class="text-slate-400">No recent source activity.</li>
-                    {% endfor %}
-                </ul>
-            </div>
-
-            <div class="rounded-xl border border-line bg-panel/80 p-4 xl:border-line/80 xl:bg-slate-900/50 xl:shadow-none xl:ring-1 xl:ring-slate-800/60">
-                <h2 class="mb-3 text-sm font-semibold text-white sm:text-base">Trending CVEs (7d)</h2>
-                <div class="flex flex-wrap gap-2">
-                    {% for cve, count in trending_cves %}
-                        <a href="/advisories?q={{ cve|urlencode }}" class="inline-flex items-center gap-1 rounded-lg border border-sky-500/30 bg-sky-500/15 px-2.5 py-1.5 text-xs font-medium text-sky-200 hover:bg-sky-500/25">
-                            <span>{{ cve }}</span>
-                            <span class="text-sky-100/80">({{ count }})</span>
-                        </a>
-                    {% empty %}
-                        <span class="text-sm text-slate-400">No CVE activity in the last 7 days.</span>
+                        <p>No recurring CVE references in the current window.</p>
                     {% endfor %}
                 </div>
-            </div>
-        </aside>
-    </div>
-
-    <section id="active-block" data-desktop-section="active" class="hidden lg:block space-y-3.5 rounded-xl border border-line bg-panel/80 p-4 shadow-glow xl:rounded-2xl xl:border-line/80 xl:bg-slate-900/55 xl:p-5">
-        <div class="flex items-center justify-between gap-4">
-            <div class="space-y-1">
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-rose-500/25 bg-rose-500/10 text-rose-200">
-                        <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-                            <path d="M4 10h3l1.4-3 2.4 6 1.7-3H16" stroke-linecap="round" stroke-linejoin="round" />
-                            <path d="M10 18c4.2-2.8 6.5-5.6 6.5-8.7A3.8 3.8 0 0 0 12.7 5c-1.2 0-2.1.5-2.7 1.4C9.4 5.5 8.4 5 7.3 5A3.8 3.8 0 0 0 3.5 9.3c0 3.1 2.3 5.9 6.5 8.7Z" stroke-linejoin="round" />
-                        </svg>
-                    </span>
-                    <h2 class="text-base font-semibold text-white">Active Exploitation</h2>
-                    <span class="rounded-full border border-line/80 bg-slate-900/70 px-2.5 py-1 text-[11px] text-slate-300">{{ active_items|length }} recent</span>
-                </div>
-                <p class="text-xs leading-5 text-slate-400">Fast scan of recent exploitation and operational threat activity before dropping into the full Active Exploitation view.</p>
-            </div>
-            <a href="/active" class="text-sm font-medium text-sky-300 hover:text-sky-200">All exploitation items</a>
-        </div>
-        <div class="grid gap-2.5 md:grid-cols-2 md:items-start xl:grid-cols-3">
-            {% for item in active_items %}
-                <div class="min-w-0">
-                    {% include "intel/_dashboard_active_preview_card.html" %}
-                </div>
-            {% empty %}
-                <p class="text-sm text-slate-400 md:col-span-2 xl:col-span-3">No recent active items found.</p>
-            {% endfor %}
+            </aside>
         </div>
     </section>
 
-    <div class="grid gap-3 lg:grid-cols-3 lg:items-start lg:gap-5 xl:gap-6">
-        <div id="advisories-block" class="flex min-w-0 flex-col space-y-2 rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:space-y-2.5 sm:p-4 xl:p-5">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10 text-sky-200">
-                        <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-                            <path d="M10 2l6 2.5v4.5c0 4.2-2.4 6.7-6 9-3.6-2.3-6-4.8-6-9V4.5L10 2Z" stroke-linejoin="round" />
-                            <path d="M7.5 10.2 9.2 12 12.8 8.4" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </span>
-                    <h2 class="text-sm font-semibold text-white sm:text-base">Vulnerabilities</h2>
-                </div>
-                <a href="/advisories" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All vulnerabilities</a>
-            </div>
-            <div class="grid gap-2">
-                {% for item in advisories_items|slice:":2" %}
-                    {% include "intel/_dashboard_preview_card.html" %}
-                {% empty %}
-                    <p class="text-sm text-slate-400">No vulnerability items found.</p>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div id="research-block" class="flex min-w-0 flex-col space-y-2 rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:space-y-2.5 sm:p-4 xl:p-5">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-500/25 bg-cyan-500/10 text-cyan-200">
-                        <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-                            <path d="M6 3h8M8 3v4l-4.5 6.8A2 2 0 0 0 5.2 17h9.6a2 2 0 0 0 1.7-3.2L12 7V3" stroke-linecap="round" stroke-linejoin="round" />
-                            <path d="M7 12h6" stroke-linecap="round" />
-                        </svg>
-                    </span>
-                    <h2 class="text-sm font-semibold text-white sm:text-base">Research</h2>
-                </div>
-                <a href="/research" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All research</a>
-            </div>
-            <div class="grid gap-2">
-                {% for item in research_items|slice:":2" %}
-                    {% include "intel/_dashboard_preview_card.html" %}
-                {% empty %}
-                    <p class="text-sm text-slate-400">No research items found.</p>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div id="sweden-block" class="flex min-w-0 flex-col space-y-2 rounded-xl border border-line bg-panel/80 p-3 shadow-glow sm:space-y-2.5 sm:p-4 xl:p-5">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-200">
-                        <svg viewBox="0 0 20 20" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-                            <path d="M10 17s5-4.1 5-8.2A5 5 0 1 0 5 8.8C5 12.9 10 17 10 17Z" stroke-linejoin="round" />
-                            <circle cx="10" cy="8" r="1.8" />
-                        </svg>
-                    </span>
-                    <h2 class="text-sm font-semibold text-white sm:text-base">Nordics</h2>
-                </div>
-                <a href="/sweden" class="text-xs font-medium text-sky-300 hover:text-sky-200 sm:text-sm">All Nordic items</a>
-            </div>
-            <div class="grid gap-2">
-                {% for item in sweden_items|slice:":2" %}
-                    {% include "intel/_dashboard_preview_card.html" %}
-                {% empty %}
-                    <p class="text-sm text-slate-400">No Nordic items found.</p>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-</section>
+    <section class="dashboard-health" aria-labelledby="dashboard-health-title" data-dashboard-section="health">
+        <div><p class="dashboard-section-eyebrow">System context</p><h2 id="dashboard-health-title">Feed health</h2></div>
+        <dl>
+            <div><dt>Enabled</dt><dd>{{ enabled_feed_count }}</dd></div>
+            <div><dt>OK</dt><dd>{{ feed_status_counts.ok }}</dd></div>
+            <div><dt>Error</dt><dd>{{ feed_status_counts.error }}</dd></div>
+            <div><dt>Never</dt><dd>{{ feed_status_counts.never }}</dd></div>
+        </dl>
+        <p>Last ingest {% if last_ingest_finished_at %}<time datetime="{{ last_ingest_finished_at|date:'c' }}" title="{{ last_ingest_finished_at|date:'Y-m-d H:i' }} UTC">{{ last_ingest_finished_at|naturaltime }}</time>{% else %}never{% endif %}</p>
+        <a href="{{ feed_health_url }}">Open feed health</a>
+    </section>
+</div>
 {% endblock %}

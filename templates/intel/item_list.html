@@ -3,104 +3,41 @@
 {% block title %}{{ page_title }} | BorealSec Intel{% endblock %}
 
 {% block content %}
-<section class="space-y-4 sm:space-y-5">
+<section class="intelligence-list-page" data-intelligence-list="{{ list_semantic_key }}">
     {% include "intel/components/page_header.html" with page_action_url=request.path page_action_label="Reset filters" %}
 
-    <details class="rounded-xl border border-line bg-panel/80 p-3 shadow-glow md:hidden" {% if query or selected_source or selected_time != "7d" %}open{% endif %}>
-        <summary class="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-white">
-            Filters
-            <span class="rounded-md border border-line/80 bg-slate-900/70 px-2 py-1 text-[11px] text-slate-300">{{ selected_time }}</span>
-        </summary>
-        <form method="get" class="mt-3 space-y-3">
-            <div>
-                <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_q_mobile">Search</label>
-                <input id="id_q_mobile" name="q" value="{{ query }}" placeholder="CVE, vendor, keyword"
-                   class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none"
-                   hx-get="{{ request.path }}"
-                   hx-trigger="keyup changed delay:400ms"
-                   hx-target="#items-list"
-                   hx-swap="innerHTML"
-                   hx-include="closest form">
-            </div>
-            <div>
-                <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_source_mobile">Source</label>
-                <select id="id_source_mobile" name="source" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 focus:border-accent focus:outline-none">
-                    <option value="">All sources</option>
-                    {% for source in sources %}
-                        <option value="{{ source.slug }}" {% if selected_source == source.slug %}selected{% endif %}>{{ source.name }} · {{ source.count }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_time_mobile">Time</label>
-                <select id="id_time_mobile" name="time" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 focus:border-accent focus:outline-none">
-                    {% for value, label in time_options %}
-                        <option value="{{ value }}" {% if selected_time == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-                <button type="submit" class="rounded-lg bg-sky-500 px-4 py-2.5 text-sm font-medium text-slate-950 hover:bg-sky-400">Apply</button>
-                <a href="{{ request.path }}" class="rounded-lg border border-slate-600 px-4 py-2.5 text-center text-sm text-slate-200 hover:bg-slate-800">Reset</a>
-            </div>
-        </form>
-    </details>
-
-    <form method="get" class="hidden gap-3 rounded-xl border border-line bg-panel/80 p-4 shadow-glow md:grid md:grid-cols-4">
-        <div class="md:col-span-2">
-            <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_q">Search</label>
-            <input id="id_q" name="q" value="{{ query }}" placeholder="CVE, vendor, keyword"
-                   class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-accent focus:outline-none"
+    <form method="get" class="intelligence-filters" aria-label="Filter intelligence">
+        <div class="intelligence-filter intelligence-filter--search">
+            <label for="id_q">Search</label>
+            <input id="id_q" name="q" value="{{ query }}" placeholder="CVE, source, keyword"
                    hx-get="{{ request.path }}"
                    hx-trigger="keyup changed delay:400ms"
                    hx-target="#items-list"
                    hx-swap="innerHTML"
                    hx-include="closest form">
         </div>
-        <div>
-            <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_source">Source</label>
-            <select id="id_source" name="source" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none">
+        <div class="intelligence-filter">
+            <label for="id_source">Source</label>
+            <select id="id_source" name="source">
                 <option value="">All sources</option>
                 {% for source in sources %}
                     <option value="{{ source.slug }}" {% if selected_source == source.slug %}selected{% endif %}>{{ source.name }} · {{ source.count }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div>
-            <label class="mb-1 block text-xs uppercase tracking-wide text-slate-400" for="id_time">Time</label>
-            <select id="id_time" name="time" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-accent focus:outline-none">
+        <div class="intelligence-filter">
+            <label for="id_time">Time</label>
+            <select id="id_time" name="time">
                 {% for value, label in time_options %}
                     <option value="{{ value }}" {% if selected_time == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="flex items-end gap-2 md:col-span-4">
-            <button type="submit" class="rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-sky-400">Apply filters</button>
-            <a href="{{ request.path }}" class="rounded-lg border border-slate-600 px-4 py-2 text-center text-sm text-slate-200 hover:bg-slate-800">Reset</a>
+        <div class="intelligence-filter-actions">
+            <button type="submit">Apply filters</button>
+            <a href="{{ request.path }}">Reset</a>
         </div>
     </form>
-
-    <div class="rounded-xl border border-line bg-slate-900/60 p-3 text-xs leading-relaxed text-slate-300">
-        <p>
-            Showing <span class="font-semibold text-white">{{ filtered_total }}</span> items in
-            <span class="font-semibold text-white">{{ selected_time }}</span> window.
-        </p>
-        <div class="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
-            {% if query %}
-                <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">q: {{ query }}</span>
-            {% endif %}
-            {% if selected_source %}
-                <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">source: {{ selected_source_name|default:selected_source }}</span>
-            {% endif %}
-            <span class="shrink-0 rounded-md border border-line/80 bg-slate-800/80 px-2 py-1 text-[11px] text-slate-200">time: {{ selected_time }}</span>
-        </div>
-        {% if hidden_by_filters > 0 %}
-            <p class="mt-2 text-amber-300">{{ hidden_by_filters }} hidden by current source/search filters.</p>
-        {% endif %}
-        {% if balance_applied %}
-            <p class="mt-2 text-sky-300">Balanced view is active to avoid one source dominating results.</p>
-        {% endif %}
-    </div>
 
     <div id="items-list">
         {% include "intel/partials/items_list.html" %}

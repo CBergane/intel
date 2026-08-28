@@ -1,10 +1,11 @@
-from collections import Counter
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from intel.classification import classify_item
 from intel.models import Feed, Item, Source
 
 
@@ -12,312 +13,351 @@ class DashboardViewTests(TestCase):
     def setUp(self):
         self._idx = 0
 
-    def _create_feed(self, *, source_name, source_slug, section, tags=None):
+    def _create_feed(
+        self,
+        *,
+        source_name,
+        source_slug,
+        section,
+        tags=None,
+        adapter_key="",
+        feed_type=Feed.FeedType.RSS,
+    ):
         source = Source.objects.create(
             name=source_name,
             slug=source_slug,
             tags=tags or [],
         )
-        feed = Feed.objects.create(
+        return Feed.objects.create(
             source=source,
             name=f"{source_name} Feed",
             url=f"https://example.com/{source_slug}-{section}.xml",
-            feed_type=Feed.FeedType.RSS,
+            feed_type=feed_type,
             section=section,
+            adapter_key=adapter_key,
         )
-        return feed
 
-    def _create_item(self, *, feed, title, summary="", age_hours=0, age_days=0, published_at=None):
+    def _create_item(
+        self,
+        *,
+        feed,
+        title,
+        summary="",
+        age_hours=0,
+        age_days=0,
+        published_at=None,
+        raw_payload=None,
+    ):
         self._idx += 1
         return Item.objects.create(
             source=feed.source,
             feed=feed,
             title=title,
             summary=summary,
+            raw_payload=raw_payload or {},
             url=f"https://example.com/item-{self._idx}",
             stable_id="",
-            published_at=published_at or (timezone.now() - timedelta(hours=age_hours, days=age_days)),
+            published_at=published_at
+            or (timezone.now() - timedelta(hours=age_hours, days=age_days)),
         )
 
-    def test_trending_cve_extraction_and_counting(self):
+    def test_now_renders_threat_pulse_from_authoritative_profiles(self):
         feed = self._create_feed(
-            source_name="Research Lab",
-            source_slug="research-lab",
-            section=Feed.Section.RESEARCH,
-        )
-        self._create_item(
-            feed=feed,
-            title="Investigation CVE-2026-1111",
-            summary="CVE-2026-1111 and CVE-2026-2222",
-            age_hours=2,
-        )
-        self._create_item(
-            feed=feed,
-            title="Patch cve-2026-1111 now",
-            summary="",
-            age_hours=3,
-        )
-        self._create_item(
-            feed=feed,
-            title="Old CVE-2026-9999 mention",
-            summary="",
-            age_days=10,
-        )
-
-        response = self.client.get("/")
-        trending = dict(response.context["trending_cves"])
-
-        self.assertEqual(trending["CVE-2026-1111"], 2)
-        self.assertEqual(trending["CVE-2026-2222"], 1)
-        self.assertNotIn("CVE-2026-9999", trending)
-
-    def test_advisories_block_balances_per_source(self):
-        feed_alpha = self._create_feed(
-            source_name="Alpha Advisories",
-            source_slug="alpha",
+            source_name="Exploit Desk",
+            source_slug="exploit-desk",
             section=Feed.Section.ADVISORIES,
         )
-        feed_beta = self._create_feed(
-            source_name="Beta Advisories",
-            source_slug="beta",
-            section=Feed.Section.ADVISORIES,
-        )
-
-        for idx in range(12):
-            self._create_item(feed=feed_alpha, title=f"Alpha {idx}", age_hours=idx)
-        for idx in range(5):
-            self._create_item(feed=feed_beta, title=f"Beta {idx}", age_hours=24 + idx)
-
-        response = self.client.get("/")
-        advisories_items = response.context["advisories_items"]
-        counts = Counter(item.source.slug for item in advisories_items)
-
-        self.assertEqual(len(advisories_items), 13)
-        self.assertEqual(counts["alpha"], 8)
-        self.assertEqual(counts["beta"], 5)
-
-    def test_high_signal_scoring_prefers_urgent_items_and_drops_routine_release_titles(self):
-        feed = self._create_feed(
-            source_name="Research Source",
-            source_slug="research-source",
-            section=Feed.Section.RESEARCH,
-        )
-
-        plain_title = "Platform maintenance release notes"
-        keyword_title = "Exploit analysis"
-        cve_title = "Patch for CVE-2026-5555"
-
-        self._create_item(feed=feed, title=plain_title, summary="normal update", age_hours=0)
-        self._create_item(
+        p1_item = self._create_item(
             feed=feed,
-            title=keyword_title,
-            summary="Actively exploited vulnerability in the wild",
+            title="Critical CVE-2026-7001 actively exploited in the wild",
+            summary="Emergency remediation required.",
             age_hours=1,
         )
-        self._create_item(feed=feed, title=cve_title, summary="details", age_hours=2)
-
-        response = self.client.get("/")
-        top_titles = [item.title for item in response.context["high_signal_items"]]
-        top_labels = {item.title: getattr(item, "signal_label", "") for item in response.context["high_signal_items"]}
-
-        self.assertEqual(top_titles[0], keyword_title)
-        self.assertIn(cve_title, top_titles)
-        self.assertNotIn(plain_title, top_titles)
-        self.assertEqual(top_labels[keyword_title], "Active exploitation")
-        self.assertEqual(top_labels[cve_title], "CVE-driven")
-
-    def test_high_signal_item_source_links_use_item_section(self):
-        feed = self._create_feed(
-            source_name="Bleeping Computer",
-            source_slug="bleeping-computer",
-            section=Feed.Section.ACTIVE,
-        )
-        self._create_item(
+        p2_item = self._create_item(
             feed=feed,
-            title="Exploit campaign expands",
-            summary="Actively exploited vulnerability in the wild",
-            age_hours=1,
-        )
-
-        response = self.client.get("/")
-
-        item = next(
-            item for item in response.context["high_signal_items"] if item.source.slug == "bleeping-computer"
-        )
-        expected_url = reverse("active") + "?source=bleeping-computer"
-        self.assertEqual(item.source_browse_url, expected_url)
-        self.assertContains(response, f'href="{expected_url}"')
-
-    def test_trending_sources_route_to_most_relevant_recent_section(self):
-        active_feed = self._create_feed(
-            source_name="Bleeping Computer",
-            source_slug="bleeping-computer",
-            section=Feed.Section.ACTIVE,
-        )
-        advisories_feed = Feed.objects.create(
-            source=active_feed.source,
-            name="Bleeping Computer Advisories",
-            url="https://example.com/bleeping-computer-advisories.xml",
-            feed_type=Feed.FeedType.RSS,
-            section=Feed.Section.ADVISORIES,
-        )
-        self._create_item(feed=active_feed, title="Fresh active item", age_hours=1)
-        self._create_item(feed=advisories_feed, title="Older advisory item", age_hours=8)
-
-        response = self.client.get("/")
-
-        row = next(
-            row for row in response.context["trending_sources"] if row["source__slug"] == "bleeping-computer"
-        )
-        expected_url = reverse("active") + "?source=bleeping-computer"
-        self.assertEqual(row["open_url"], expected_url)
-        self.assertContains(response, f'href="{expected_url}"')
-
-    def test_trending_sources_fall_back_to_browse_overview_when_recent_sections_tie(self):
-        active_feed = self._create_feed(
-            source_name="Multi Section Source",
-            source_slug="multi-section-source",
-            section=Feed.Section.ACTIVE,
-        )
-        advisories_feed = Feed.objects.create(
-            source=active_feed.source,
-            name="Multi Section Advisories",
-            url="https://example.com/multi-section-advisories.xml",
-            feed_type=Feed.FeedType.RSS,
-            section=Feed.Section.ADVISORIES,
-        )
-        same_time = timezone.now() - timedelta(hours=2)
-        self._create_item(feed=active_feed, title="Same time active", published_at=same_time)
-        self._create_item(feed=advisories_feed, title="Same time advisory", published_at=same_time)
-
-        response = self.client.get("/")
-
-        row = next(
-            row for row in response.context["trending_sources"] if row["source__slug"] == "multi-section-source"
-        )
-        self.assertEqual(row["open_url"], reverse("sources"))
-
-    def test_dashboard_front_page_cards_keep_front_page_layout_without_full_height_stretch(self):
-        active_feed = self._create_feed(
-            source_name="High Signal Source",
-            source_slug="high-signal-source",
-            section=Feed.Section.ACTIVE,
-        )
-        advisory_feed = self._create_feed(
-            source_name="Vendor Advisories",
-            source_slug="vendor-advisories",
-            section=Feed.Section.ADVISORIES,
-        )
-        self._create_item(
-            feed=active_feed,
-            title="Actively exploited VPN zero-day under attack",
-            summary="Urgent exploitation activity in the wild",
-            age_hours=1,
-        )
-        self._create_item(
-            feed=advisory_feed,
-            title="Routine advisory update",
-            summary="Stable maintenance release information",
+            title="Service flaw actively exploited in the wild",
             age_hours=2,
         )
 
-        response = self.client.get("/")
+        response = self.client.get(reverse("now"))
+        pulse = response.context["threat_pulse"]
 
-        self.assertContains(response, 'data-card-layout="front-page"')
-        self.assertContains(response, 'lg:grid-cols-3')
-        self.assertContains(response, 'class="intel-record group', html=False)
-        self.assertContains(response, 'data-priority="', html=False)
-        html = response.content.decode()
-        card_start = html.index('data-card-layout="front-page"')
-        opening_tag = html[card_start : html.index(">", card_start)]
-        self.assertNotIn("h-full", opening_tag)
+        self.assertEqual(classify_item(p1_item).priority, "P1")
+        self.assertEqual(classify_item(p2_item).priority, "P2")
+        self.assertEqual(pulse["p1"], 1)
+        self.assertEqual(pulse["p2"], 1)
+        self.assertEqual(pulse["active"], 2)
+        self.assertContains(response, "Threat Pulse")
+        self.assertContains(response, 'data-dashboard-section="threat-pulse"', html=False)
 
-    def test_dashboard_includes_dedicated_active_preview_section(self):
-        active_feed = self._create_feed(
-            source_name="Exploit Tracker",
-            source_slug="exploit-tracker",
-            section=Feed.Section.ACTIVE,
-        )
-        advisory_feed = self._create_feed(
-            source_name="Vendor Advisories",
-            source_slug="vendor-advisories",
+    def test_priority_stream_uses_classifier_priority_and_deterministic_order(self):
+        feed = self._create_feed(
+            source_name="Priority Desk",
+            source_slug="priority-desk",
             section=Feed.Section.ADVISORIES,
         )
-        self._create_item(
-            feed=active_feed,
-            title="Fresh active exploitation report",
-            summary="Operational exploit activity",
-            age_hours=1,
+        same_time = timezone.now() - timedelta(hours=1)
+        older_p1 = self._create_item(
+            feed=feed,
+            title="CVE-2026-7101 actively exploited in the wild",
+            published_at=same_time,
         )
-        self._create_item(
-            feed=advisory_feed,
-            title="Routine advisory item",
-            summary="General advisory note",
+        newer_id_p1 = self._create_item(
+            feed=feed,
+            title="CVE-2026-7102 actively exploited in the wild",
+            published_at=same_time,
+        )
+        p2_item = self._create_item(
+            feed=feed,
+            title="Gateway flaw actively exploited in the wild",
             age_hours=2,
         )
 
-        response = self.client.get("/")
+        response = self.client.get(reverse("now"))
+        priority_items = response.context["priority_items"]
 
-        self.assertEqual(len(response.context["active_items"]), 1)
-        self.assertContains(response, 'id="active-block"', html=False)
-        self.assertContains(response, "All exploitation items")
-        self.assertContains(response, "Fresh active exploitation report")
-        self.assertContains(response, 'xl:grid-cols-3', html=False)
-        self.assertContains(response, 'data-card-layout="dashboard-active-preview"')
-        self.assertContains(response, 'class="intel-record group flex flex-col', html=False)
+        self.assertEqual(
+            [item.id for item in priority_items],
+            [newer_id_p1.id, older_p1.id, p2_item.id],
+        )
+        self.assertEqual([item.priority for item in priority_items], ["P1", "P1", "P2"])
+        self.assertContains(response, 'data-priority="P1"', html=False)
+        self.assertContains(response, "Critical")
+        self.assertContains(response, "Active exploitation in title")
 
-    def test_lower_preview_sections_render_two_compact_items_per_section(self):
-        advisories_feed = self._create_feed(
-            source_name="Advisory Desk",
-            source_slug="advisory-desk",
-            section=Feed.Section.ADVISORIES,
+    def test_active_preview_uses_semantics_not_feed_section(self):
+        active_feed = self._create_feed(
+            source_name="Legacy Active Feed",
+            source_slug="legacy-active",
+            section=Feed.Section.ACTIVE,
         )
         research_feed = self._create_feed(
-            source_name="Research Desk",
-            source_slug="research-desk",
+            source_name="Exploit Research",
+            source_slug="exploit-research",
             section=Feed.Section.RESEARCH,
         )
-        sweden_feed = self._create_feed(
-            source_name="Sweden Desk",
-            source_slug="sweden-desk",
-            section=Feed.Section.SWEDEN,
+        section_only = self._create_item(
+            feed=active_feed,
+            title="Routine platform maintenance release",
+            age_days=8,
+        )
+        semantic_active = self._create_item(
+            feed=research_feed,
+            title="Gateway vulnerability actively exploited in the wild",
+            age_days=8,
         )
 
-        for idx in range(3):
+        response = self.client.get(reverse("now"))
+        active_ids = [item.id for item in response.context["active_items"]]
+
+        self.assertFalse(classify_item(section_only).active_exploitation)
+        self.assertTrue(classify_item(semantic_active).active_exploitation)
+        self.assertEqual(active_ids, [semantic_active.id])
+        self.assertContains(response, "Title evidence")
+        self.assertNotContains(response, section_only.title)
+
+    def test_ransomware_live_victim_is_ransomware_not_active_exploitation(self):
+        feed = self._create_feed(
+            source_name="Ransomware Live",
+            source_slug="ransomware-live",
+            section=Feed.Section.ACTIVE,
+            adapter_key="ransomware_live_victims",
+            feed_type=Feed.FeedType.JSON,
+        )
+        victim = self._create_item(
+            feed=feed,
+            title="Example Manufacturing claimed by Akira",
+            summary="New victim listing.",
+            age_hours=1,
+        )
+
+        response = self.client.get(reverse("now"))
+
+        self.assertTrue(classify_item(victim).ransomware)
+        self.assertFalse(classify_item(victim).active_exploitation)
+        self.assertIn(victim.id, [item.id for item in response.context["ransomware_items"]])
+        self.assertNotIn(victim.id, [item.id for item in response.context["active_items"]])
+
+    def test_nordic_preview_uses_classifier_nordic_relevance(self):
+        feed = self._create_feed(
+            source_name="International Desk",
+            source_slug="international-desk",
+            section=Feed.Section.ADVISORIES,
+        )
+        item = self._create_item(
+            feed=feed,
+            title="Sweden agency issues new operational guidance",
+            age_hours=2,
+        )
+
+        response = self.client.get(reverse("now"))
+
+        self.assertTrue(classify_item(item).nordic_relevance)
+        self.assertEqual([row.id for row in response.context["nordic_items"]], [item.id])
+
+    def test_research_preview_uses_classifier_research_category(self):
+        feed = self._create_feed(
+            source_name="Analysis Lab",
+            source_slug="analysis-lab",
+            section=Feed.Section.RESEARCH,
+        )
+        item = self._create_item(
+            feed=feed,
+            title="Longitudinal protocol security analysis",
+            age_hours=3,
+        )
+
+        response = self.client.get(reverse("now"))
+
+        self.assertTrue(classify_item(item).research)
+        self.assertEqual([row.id for row in response.context["research_items"]], [item.id])
+
+    def test_intelligence_stream_contains_remaining_high_signal_items(self):
+        feed = self._create_feed(
+            source_name="Vendor Desk",
+            source_slug="vendor-desk",
+            section=Feed.Section.ADVISORIES,
+        )
+        item = self._create_item(
+            feed=feed,
+            title="Patch available for CVE-2026-7301",
+            age_hours=4,
+        )
+
+        response = self.client.get(reverse("now"))
+
+        self.assertTrue(classify_item(item).high_signal)
+        self.assertEqual([row.id for row in response.context["intelligence_items"]], [item.id])
+        self.assertContains(response, item.title)
+
+    def test_dashboard_deduplicates_items_across_presentation_sections(self):
+        feed = self._create_feed(
+            source_name="Combined Signals",
+            source_slug="combined-signals",
+            section=Feed.Section.RESEARCH,
+            tags=["sweden"],
+        )
+        self._create_item(
+            feed=feed,
+            title="Sweden ransomware campaign actively exploits CVE-2026-7401",
+            age_hours=1,
+        )
+        self._create_item(
+            feed=feed,
+            title="Independent research methodology",
+            age_hours=2,
+        )
+
+        response = self.client.get(reverse("now"))
+        section_keys = (
+            "priority_items",
+            "active_items",
+            "intelligence_items",
+            "ransomware_items",
+            "nordic_items",
+            "research_items",
+        )
+        rendered_ids = [
+            item.id
+            for key in section_keys
+            for item in response.context[key]
+        ]
+
+        self.assertEqual(len(rendered_ids), len(set(rendered_ids)))
+
+    def test_empty_dashboard_has_meaningful_section_states(self):
+        response = self.client.get(reverse("now"))
+
+        self.assertContains(response, "No P1/P2 signals in the current window.")
+        self.assertContains(response, "No confirmed active exploitation in the current window.")
+        self.assertContains(response, "No ransomware activity in the current window.")
+        self.assertContains(response, "No Nordic intelligence in the current window.")
+        self.assertContains(response, "No recent research in the current window.")
+
+    def test_dashboard_critical_links_and_source_destination_remain_available(self):
+        feed = self._create_feed(
+            source_name="Linked Exploit Desk",
+            source_slug="linked-exploit-desk",
+            section=Feed.Section.ACTIVE,
+        )
+        item = self._create_item(
+            feed=feed,
+            title="CVE-2026-7501 actively exploited in the wild",
+            age_hours=1,
+        )
+        response = self.client.get(reverse("now"))
+        source_url = f'{reverse("active")}?source=linked-exploit-desk'
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'href="{item.url}"', html=False)
+        self.assertContains(response, f'href="{source_url}"', html=False)
+        for route_name in ("active", "ransomware-map", "sweden", "research", "feed-health"):
+            self.assertContains(response, f'href="{reverse(route_name)}"', html=False)
+
+    def test_emerging_cves_are_counted_from_once_classified_attention_items(self):
+        feed = self._create_feed(
+            source_name="CVE Desk",
+            source_slug="cve-desk",
+            section=Feed.Section.ADVISORIES,
+        )
+        self._create_item(
+            feed=feed,
+            title="CVE-2026-7601 patch",
+            summary="CVE-2026-7602 is also affected.",
+            age_hours=1,
+        )
+        self._create_item(feed=feed, title="CVE-2026-7601 update", age_hours=2)
+        self._create_item(feed=feed, title="CVE-2026-7999 old update", age_days=8)
+
+        response = self.client.get(reverse("now"))
+
+        self.assertEqual(
+            response.context["emerging_cves"],
+            [("CVE-2026-7601", 2), ("CVE-2026-7602", 1)],
+        )
+
+    def test_each_candidate_is_classified_once(self):
+        feed = self._create_feed(
+            source_name="Bounded Desk",
+            source_slug="bounded-desk",
+            section=Feed.Section.ADVISORIES,
+        )
+        for index in range(5):
             self._create_item(
-                feed=advisories_feed,
-                title=f"Advisory Preview {idx}",
-                summary="Routine advisory preview",
-                age_hours=idx,
-            )
-            self._create_item(
-                feed=research_feed,
-                title=f"Research Preview {idx}",
-                summary="Routine research preview",
-                age_hours=idx,
-            )
-            self._create_item(
-                feed=sweden_feed,
-                title=f"Sweden Preview {idx}",
-                summary="Routine Sweden preview",
-                age_hours=idx,
+                feed=feed,
+                title=f"CVE-2026-77{index:02d} security update",
+                age_hours=index,
             )
 
-        response = self.client.get("/")
+        with patch("intel.views.classify_item", wraps=classify_item) as classifier:
+            response = self.client.get(reverse("now"))
 
-        self.assertContains(response, "Advisory Preview 0")
-        self.assertContains(response, "Advisory Preview 1")
-        self.assertNotContains(response, "Advisory Preview 2")
-        self.assertContains(response, "Research Preview 0")
-        self.assertContains(response, "Research Preview 1")
-        self.assertNotContains(response, "Research Preview 2")
-        self.assertContains(response, "Sweden Preview 0")
-        self.assertContains(response, "Sweden Preview 1")
-        self.assertNotContains(response, "Sweden Preview 2")
-        self.assertContains(response, 'data-card-layout="dashboard-preview"')
-        self.assertContains(response, 'class="intel-record group flex flex-col', html=False)
+        metrics = response.context["dashboard_metrics"]
+        self.assertEqual(metrics["candidate_count"], 5)
+        self.assertEqual(metrics["classification_calls"], 5)
+        self.assertEqual(classifier.call_count, 5)
 
-    def test_item_priority_marker_contains_level_label_and_signal_text(self):
+    def test_one_semantic_structure_orders_mobile_content_by_importance(self):
+        response = self.client.get(reverse("now"))
+        html = response.content.decode()
+        section_order = (
+            "threat-pulse",
+            "priority",
+            "active",
+            "intelligence",
+            "ransomware",
+            "nordic",
+            "research",
+        )
+
+        positions = [html.index(f'data-dashboard-section="{name}"') for name in section_order]
+        self.assertEqual(positions, sorted(positions))
+        for name in section_order:
+            self.assertEqual(html.count(f'data-dashboard-section="{name}"'), 1)
+        self.assertNotIn("data-mobile-section", html)
+        self.assertNotIn("data-desktop-layout", html)
+
+    def test_priority_marker_contains_level_label_and_signal_text(self):
         feed = self._create_feed(
             source_name="Critical Exploit Desk",
             source_slug="critical-exploit-desk",
@@ -325,177 +365,14 @@ class DashboardViewTests(TestCase):
         )
         self._create_item(
             feed=feed,
-            title="Critical CVE-2026-7001 actively exploited in the wild",
+            title="Critical CVE-2026-7801 actively exploited in the wild",
             summary="Emergency remediation is required.",
             age_hours=1,
         )
 
-        response = self.client.get(reverse("active"))
+        response = self.client.get(reverse("now"))
 
         self.assertContains(response, 'data-priority="P1"', html=False)
         self.assertContains(response, "Critical")
         self.assertContains(response, 'data-signal-category="active_exploitation"', html=False)
         self.assertContains(response, "Active exploitation")
-
-    def test_dashboard_mobile_layout_uses_compact_spacing_and_clamps(self):
-        active_feed = self._create_feed(
-            source_name="Mobile High Signal",
-            source_slug="mobile-high-signal",
-            section=Feed.Section.ACTIVE,
-        )
-        self._create_item(
-            feed=active_feed,
-            title="Critical authentication bypass exploited in the wild across exposed gateways",
-            summary="Urgent exploitation activity with longer supporting context that should clamp on smaller screens.",
-            age_hours=1,
-        )
-
-        response = self.client.get("/")
-
-        self.assertContains(response, 'class="space-y-3 sm:space-y-5 xl:space-y-7"', html=False)
-        self.assertContains(response, 'class="grid grid-cols-2 gap-2 max-[320px]:gap-1.5"', html=False)
-        self.assertContains(response, '[-webkit-line-clamp:1] sm:[-webkit-line-clamp:3]', html=False)
-        self.assertContains(response, 'mt-1 text-[12px] max-[430px]:text-[11px] max-[320px]:text-[11px] leading-[1.1rem] max-[430px]:leading-[1rem] sm:mt-2 sm:text-sm', html=False)
-        self.assertContains(response, 'flex min-w-0 flex-wrap items-start gap-2', html=False)
-        self.assertContains(response, 'class="inline-flex w-full max-w-full items-center justify-center rounded-lg bg-sky-500', html=False)
-        self.assertContains(response, 'class="w-full max-w-full rounded-md border border-slate-700/80', html=False)
-
-    def test_dashboard_mobile_sections_use_compact_high_signal_feed_health_and_trending_layouts(self):
-        active_feed = self._create_feed(
-            source_name="Mobile Signals",
-            source_slug="mobile-signals",
-            section=Feed.Section.ACTIVE,
-        )
-        for idx in range(4):
-            self._create_item(
-                feed=active_feed,
-                title=f"High Signal Mobile {idx}",
-                summary="Actively exploited vulnerability with mobile preview trimming.",
-                age_hours=idx,
-            )
-
-        for idx in range(5):
-            feed = self._create_feed(
-                source_name=f"Trending Source {idx}",
-                source_slug=f"trending-source-{idx}",
-                section=Feed.Section.ADVISORIES,
-            )
-            self._create_item(
-                feed=feed,
-                title=f"Trending Item {idx}",
-                summary="Recent source activity.",
-                age_hours=idx,
-            )
-
-        response = self.client.get("/")
-
-        body = response.content.decode()
-
-        self.assertContains(response, 'data-mobile-section="high-signal"', html=False)
-        self.assertContains(response, 'data-mobile-section="active"', html=False)
-        self.assertContains(response, 'data-mobile-stack="dashboard-secondary-mobile-stack"', html=False)
-        self.assertContains(response, 'data-mobile-section="feed-health"', html=False)
-        self.assertContains(response, 'data-mobile-section="trending-sources"', html=False)
-        self.assertContains(response, 'data-mobile-section="trending-cves"', html=False)
-        self.assertContains(response, 'data-desktop-layout="dashboard-primary-grid" class="hidden lg:grid', html=False)
-        self.assertContains(response, 'data-mobile-trim="high-signal-overflow"', html=False)
-        self.assertContains(response, "Showing the top 3 curated items on mobile.")
-        self.assertContains(response, 'data-mobile-trim="active-overflow"', html=False)
-        self.assertContains(response, "Showing the top 3 active items on mobile.")
-        self.assertContains(response, "Top 4 shown on mobile.")
-        self.assertLess(body.index('data-mobile-section="high-signal"'), body.index('data-mobile-section="active"'))
-        self.assertLess(body.index('data-mobile-section="active"'), body.index('data-mobile-section="feed-health"'))
-        self.assertLess(body.index('data-mobile-section="feed-health"'), body.index('data-mobile-section="trending-sources"'))
-        self.assertLess(body.index('data-mobile-section="trending-sources"'), body.index('data-mobile-section="trending-cves"'))
-
-    def test_dashboard_ultra_narrow_layout_uses_max_320_compaction(self):
-        active_feed = self._create_feed(
-            source_name="Ultra Mobile Source",
-            source_slug="ultra-mobile-source",
-            section=Feed.Section.ACTIVE,
-        )
-        for idx in range(4):
-            self._create_item(
-                feed=active_feed,
-                title=f"Ultra Mobile High Signal {idx}",
-                summary="Actively exploited vulnerability with ultra narrow trimming.",
-                age_hours=idx,
-            )
-
-        for idx in range(4):
-            advisory_feed = self._create_feed(
-                source_name=f"Ultra Trending {idx}",
-                source_slug=f"ultra-trending-{idx}",
-                section=Feed.Section.ADVISORIES,
-            )
-            self._create_item(
-                feed=advisory_feed,
-                title=f"Ultra Trending Item {idx}",
-                summary="Recent source activity.",
-                age_hours=idx,
-            )
-
-        cve_feed = self._create_feed(
-            source_name="Ultra CVE Source",
-            source_slug="ultra-cve-source",
-            section=Feed.Section.ADVISORIES,
-        )
-        for idx in range(4):
-            self._create_item(
-                feed=cve_feed,
-                title=f"CVE-2026-100{idx} urgent advisory",
-                summary="Critical CVE-driven item for ultra narrow mobile compaction.",
-                age_hours=idx,
-            )
-
-        response = self.client.get("/")
-
-        self.assertContains(response, 'max-[320px]:gap-1.5', html=False)
-        self.assertContains(response, 'max-[320px]:text-lg', html=False)
-        self.assertContains(response, 'data-iphone-mobile-trim="high-signal-extra"', html=False)
-        self.assertContains(response, "Showing the top 2 curated items on smaller phones.")
-        self.assertContains(response, 'data-iphone-mobile-trim="active-extra"', html=False)
-        self.assertContains(response, "Showing the top 2 active items on smaller phones.")
-        self.assertContains(response, 'data-mobile-section="trending-cves"', html=False)
-        self.assertContains(response, 'data-ultra-mobile-trim="trending-cve-extra"', html=False)
-        self.assertContains(response, "Top 3 CVEs shown on very small screens.")
-        self.assertContains(response, 'data-ultra-mobile-trim="trending-source-extra"', html=False)
-        self.assertContains(response, "Top 3 shown on very small screens.")
-
-    def test_dashboard_iphone_portrait_layout_uses_max_430_compaction(self):
-        active_feed = self._create_feed(
-            source_name="iPhone Active Source",
-            source_slug="iphone-active-source",
-            section=Feed.Section.ACTIVE,
-        )
-        for idx in range(4):
-            self._create_item(
-                feed=active_feed,
-                title=f"iPhone High Signal {idx}",
-                summary="Actively exploited vulnerability with iPhone portrait compaction.",
-                age_hours=idx,
-            )
-
-        cve_feed = self._create_feed(
-            source_name="iPhone CVE Source",
-            source_slug="iphone-cve-source",
-            section=Feed.Section.ADVISORIES,
-        )
-        for idx in range(5):
-            self._create_item(
-                feed=cve_feed,
-                title=f"CVE-2026-200{idx} urgent advisory",
-                summary="Critical CVE-driven item for iPhone-width compaction.",
-                age_hours=idx,
-            )
-
-        response = self.client.get("/")
-
-        self.assertContains(response, 'id="high-signal-mobile"', html=False)
-        self.assertContains(response, 'data-iphone-mobile-trim="high-signal-extra"', html=False)
-        self.assertContains(response, "Showing the top 2 curated items on smaller phones.")
-        self.assertContains(response, 'data-iphone-mobile-trim="active-extra"', html=False)
-        self.assertContains(response, "Showing the top 2 active items on smaller phones.")
-        self.assertContains(response, 'data-mobile-section="trending-cves"', html=False)
-        self.assertContains(response, 'data-iphone-mobile-trim="trending-cve-overflow"', html=False)
-        self.assertContains(response, "Top 4 CVEs shown on smaller phones.")
