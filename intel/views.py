@@ -12,7 +12,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.paginator import Paginator
-from django.db.models import Count, Max, Q
+from django.db.models import Count, Max, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -441,6 +441,35 @@ def _source_destination(section, *, source_slug: str) -> str:
     return f"{reverse(route_name)}?{urlencode({'source': source_slug})}"
 
 
+def _latest_fetch_run_queryset():
+    return FetchRun.objects.filter(feed_id=OuterRef("pk")).order_by(
+        "-started_at",
+        "-id",
+    )
+
+
+def _with_latest_fetch_run_id(queryset):
+    return queryset.annotate(
+        latest_fetch_run_id=Subquery(
+            _latest_fetch_run_queryset().values("id")[:1]
+        )
+    )
+
+
+def _latest_fetch_runs_by_feed(feeds):
+    latest_run_ids = [
+        feed.latest_fetch_run_id
+        for feed in feeds
+        if feed.latest_fetch_run_id is not None
+    ]
+    if not latest_run_ids:
+        return {}
+    return {
+        run.feed_id: run
+        for run in FetchRun.objects.filter(id__in=latest_run_ids)
+    }
+
+
 def _source_operational_status(*, feeds_total: int, feeds_error: int, feeds_never: int, total_items: int) -> str:
     if feeds_total == 0 or (feeds_never == feeds_total and total_items == 0):
         return "Never"
@@ -646,27 +675,28 @@ def now_view(request):
     )
     dashboard_state = _build_dashboard_state(candidates, now=now)
 
-    enabled_feeds = list(Feed.objects.filter(enabled=True).only("id"))
-    latest_by_feed = {}
-    for run in FetchRun.objects.filter(feed__enabled=True).order_by("-started_at"):
-        if run.feed_id not in latest_by_feed:
-            latest_by_feed[run.feed_id] = run
+    enabled_feeds = list(
+        Feed.objects.filter(enabled=True)
+        .annotate(
+            latest_fetch_run_ok=Subquery(
+                _latest_fetch_run_queryset().values("ok")[:1]
+            )
+        )
+        .only("id")
+        .order_by("id")
+    )
     feed_status_counts = {"ok": 0, "error": 0, "never": 0}
     for feed in enabled_feeds:
-        latest = latest_by_feed.get(feed.id)
-        if latest is None:
+        if feed.latest_fetch_run_ok is None:
             feed_status_counts["never"] += 1
-        elif latest.ok:
+        elif feed.latest_fetch_run_ok:
             feed_status_counts["ok"] += 1
         else:
             feed_status_counts["error"] += 1
 
-    last_ingest_finished_at = (
-        FetchRun.objects.filter(finished_at__isnull=False)
-        .order_by("-finished_at")
-        .values_list("finished_at", flat=True)
-        .first()
-    )
+    last_ingest_finished_at = FetchRun.objects.aggregate(
+        latest_finished_at=Max("finished_at")
+    )["latest_finished_at"]
 
     context = {
         "page_title": "Now",
@@ -725,16 +755,12 @@ def sweden_view(request):
 
 
 def feed_health_view(request):
-    feeds = (
-        Feed.objects.select_related("source")
-        .prefetch_related("fetch_runs")
-        .order_by("source__name", "name")
+    feeds = list(
+        _with_latest_fetch_run_id(
+            Feed.objects.select_related("source")
+        ).order_by("source__name", "name")
     )
-
-    latest_by_feed = {}
-    for run in FetchRun.objects.order_by("-started_at"):
-        if run.feed_id not in latest_by_feed:
-            latest_by_feed[run.feed_id] = run
+    latest_by_feed = _latest_fetch_runs_by_feed(feeds)
 
     return render(
         request,
@@ -782,20 +808,13 @@ def sources_view(request):
             bucket.append(item)
 
     enabled_feeds = list(
-        Feed.objects.filter(enabled=True)
-        .select_related("source")
-        .only("id", "source_id", "section", "name", "last_error")
+        _with_latest_fetch_run_id(
+            Feed.objects.filter(enabled=True)
+            .select_related("source")
+            .only("id", "source_id", "section", "name", "last_error")
+        )
     )
-    latest_run_by_feed = {}
-    enabled_feed_ids = [feed.id for feed in enabled_feeds]
-    if enabled_feed_ids:
-        for run in (
-            FetchRun.objects.filter(feed_id__in=enabled_feed_ids)
-            .only("feed_id", "ok", "error", "started_at")
-            .order_by("feed_id", "-started_at")
-        ):
-            if run.feed_id not in latest_run_by_feed:
-                latest_run_by_feed[run.feed_id] = run
+    latest_run_by_feed = _latest_fetch_runs_by_feed(enabled_feeds)
 
     feed_health_by_key = {}
     for feed in enabled_feeds:
@@ -2533,12 +2552,7 @@ def admin_logout_view(request):
 
 
 def _build_feed_rows(feeds):
-    latest_run_by_feed = {}
-    feed_ids = [feed.id for feed in feeds]
-    if feed_ids:
-        for run in FetchRun.objects.filter(feed_id__in=feed_ids).order_by("feed_id", "-started_at"):
-            if run.feed_id not in latest_run_by_feed:
-                latest_run_by_feed[run.feed_id] = run
+    latest_run_by_feed = _latest_fetch_runs_by_feed(feeds)
 
     feed_rows = []
     for feed in feeds:
@@ -2620,7 +2634,9 @@ def ops_dashboard(request):
             messages.error(request, "Unknown action.")
         return redirect("intel_admin:ops")
 
-    enabled_feeds_qs = Feed.objects.filter(enabled=True).select_related("source")
+    enabled_feeds_qs = _with_latest_fetch_run_id(
+        Feed.objects.filter(enabled=True).select_related("source")
+    )
     enabled_feeds = list(enabled_feeds_qs.order_by("source__name", "name"))
 
     enabled_feeds_count = len(enabled_feeds)
@@ -2703,7 +2719,7 @@ def admin_panel_view(request):
     if selected_status not in {"all", "ok", "error", "never"}:
         selected_status = "all"
 
-    feeds_qs = Feed.objects.select_related("source")
+    feeds_qs = _with_latest_fetch_run_id(Feed.objects.select_related("source"))
     if query:
         feeds_qs = feeds_qs.filter(
             Q(source__name__icontains=query)
