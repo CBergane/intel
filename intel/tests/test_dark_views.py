@@ -90,7 +90,7 @@ class DarkViewAccessTests(TestCase):
         self.assertEqual(map_response.status_code, 200)
         self.assertEqual(recent_response.status_code, 200)
         self.assertContains(groups_response, "Active Groups")
-        self.assertContains(map_response, "Threat Map")
+        self.assertContains(map_response, "Operational dark-intelligence surface")
         self.assertContains(recent_response, "Recent Hits")
 
     def test_non_superuser_does_not_get_dark_pages(self):
@@ -373,25 +373,21 @@ class DarkMapViewTests(TestCase):
         response = self.client.get(DARK_MAP_URL)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Threat Map")
+        self.assertContains(response, "Operational dark-intelligence surface")
         self.assertContains(response, "Operational Threat Surface")
-        self.assertContains(response, "Group / Context Intel")
-        self.assertContains(response, "Incident / Country Intel")
         self.assertContains(response, "Incoming Activity")
-        self.assertContains(response, "Matched Watch Context")
+        self.assertContains(response, "Matched evidence")
         self.assertContains(response, "Source Coverage")
-        self.assertContains(response, "Plot-Ready Countries")
-        self.assertContains(response, "Top Groups")
-        self.assertContains(response, 'id="dark-threat-map"')
-        self.assertContains(response, 'data-country-key="sweden"')
-        self.assertContains(response, 'data-group-node="akira"')
-        self.assertContains(response, 'data-country-connection="sweden"')
-        self.assertContains(response, "Quick Country Filter")
+        self.assertContains(response, "Top Actors")
+        self.assertContains(response, 'id="threat-watch-actor-surface"')
+        self.assertContains(response, 'data-actor-key="akira"')
         self.assertContains(response, 'data-poll-url="')
-        self.assertContains(response, "Live polling every 25s")
+        self.assertContains(response, "Live · 25s")
         self.assertNotContains(response, "overflow-x-auto")
         self.assertNotContains(response, "min-w-[68rem]")
-        self.assertFalse(response.context["group_first_mode"])
+        self.assertEqual(response.context["surface_mode"], "actors")
+        self.assertNotContains(response, "Outside Current Map Coverage")
+        self.assertNotContains(response, "<svg")
 
     def test_map_page_still_renders_without_js(self):
         self.client.force_login(self.superuser)
@@ -400,8 +396,8 @@ class DarkMapViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Alpha Manufacturing")
         self.assertContains(response, "Gamma Health")
-        self.assertContains(response, 'id="dark-threat-map"')
-        self.assertContains(response, 'id="dark-map-incoming-list"')
+        self.assertContains(response, 'id="threat-watch-actor-surface"')
+        self.assertContains(response, 'id="threat-watch-incoming-list"')
 
     def test_map_page_aggregates_countries_and_groups(self):
         self.client.force_login(self.superuser)
@@ -479,12 +475,11 @@ class DarkMapViewTests(TestCase):
         play_row = next(row for row in top_groups if row["group_name"] == "Play")
         self.assertTrue(akira_row["country_match"])
         self.assertFalse(play_row["country_match"])
-        sweden_tile = next(
-            tile for tile in response.context["map_tiles"] if tile["country_key"] == "sweden"
+        sweden_row = next(
+            row for row in response.context["country_rows"] if row["country_id"] == "SWE"
         )
-        self.assertTrue(sweden_tile["is_selected"])
-        self.assertContains(response, 'data-country-key="sweden"')
-        self.assertContains(response, 'data-selected="true"')
+        self.assertTrue(sweden_row["is_selected"])
+        self.assertEqual(response.context["selected_country_key"], "SWE")
 
     def test_map_incoming_activity_renders_group_and_incident_signals(self):
         self.client.force_login(self.superuser)
@@ -527,10 +522,10 @@ class DarkMapViewTests(TestCase):
         self.assertEqual(countries, ["Norway", "Sweden"])
         incoming_titles = [hit.title for hit in response.context["incoming_activity"]]
         self.assertEqual(incoming_titles, ["Gamma Health", "Beta Retail"])
-        norway_tile = next(
-            tile for tile in response.context["map_tiles"] if tile["country_key"] == "norway"
+        norway_row = next(
+            row for row in response.context["country_rows"] if row["country_id"] == "NOR"
         )
-        self.assertTrue(norway_tile["has_activity"])
+        self.assertEqual(norway_row["record_count"], 1)
 
     def test_map_empty_state_explains_group_only_source_selection(self):
         group_only_source = _make_source(slug="map-group-only", name="Map Group Only")
@@ -546,13 +541,13 @@ class DarkMapViewTests(TestCase):
         response = self.client.get(DARK_MAP_URL, {"source": group_only_source.slug})
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["group_first_mode"])
+        self.assertEqual(response.context["surface_mode"], "actors")
         self.assertEqual(response.context["map_metrics"]["country_count"], 0)
-        self.assertContains(response, "Group activity available, geography pending")
-        self.assertContains(response, "Group-Led Mode")
+        self.assertContains(response, "Actor evidence leads this view")
+        self.assertContains(response, "Actor-led view")
         self.assertContains(response, "Incoming Activity")
         self.assertContains(response, "Source Coverage")
-        self.assertContains(response, "Matched Watch Context")
+        self.assertContains(response, "Matched evidence")
 
     def test_map_empty_state_explains_missing_incident_country_values(self):
         countryless_source = _make_source(slug="map-countryless", name="Map Countryless")
@@ -570,10 +565,10 @@ class DarkMapViewTests(TestCase):
         response = self.client.get(DARK_MAP_URL, {"source": countryless_source.slug})
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["group_first_mode"])
+        self.assertEqual(response.context["surface_mode"], "actors")
         self.assertEqual(response.context["map_metrics"]["country_count"], 0)
-        self.assertContains(response, "Incident records found, but not plot-ready")
-        self.assertContains(response, "Group activity and source coverage remain the strongest signals in this view")
+        self.assertContains(response, "No geographic evidence")
+        self.assertContains(response, "Actors and source coverage remain the strongest signals")
         self.assertContains(response, "Incoming Activity")
 
     def test_map_empty_state_explains_placeholder_country_values_that_need_normalization(self):
@@ -592,18 +587,18 @@ class DarkMapViewTests(TestCase):
         response = self.client.get(DARK_MAP_URL, {"source": unknown_country_source.slug})
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["group_first_mode"])
+        self.assertEqual(response.context["surface_mode"], "actors")
         self.assertEqual(response.context["map_metrics"]["country_count"], 0)
-        self.assertContains(response, "Country normalization still in progress")
-        self.assertContains(response, "Group activity and source coverage remain actionable in the meantime")
+        self.assertContains(response, "Geography pending")
+        self.assertContains(response, "remain unassigned rather than being guessed")
 
     def test_map_links_preserve_filters_for_recent_hits_and_source_coverage(self):
         self.client.force_login(self.superuser)
 
         response = self.client.get(DARK_MAP_URL, {"window": "24h", "source": self.source_b.slug})
 
-        self.assertContains(response, f"{DARK_RECENT_URL}?window=24h&source={self.source_b.slug}")
-        self.assertContains(response, f"{DARK_MAP_URL}?window=24h&source={self.source_b.slug}")
+        self.assertContains(response, f"{DARK_RECENT_URL}?window=24h&amp;source={self.source_b.slug}")
+        self.assertContains(response, f"{DARK_MAP_URL}?window=24h&amp;source={self.source_b.slug}")
 
     def test_map_live_endpoint_returns_expected_shape(self):
         self.client.force_login(self.superuser)
@@ -621,7 +616,6 @@ class DarkMapViewTests(TestCase):
             sorted(event.keys()),
             sorted(
                 [
-                    "animate_connection",
                     "animate_country",
                     "animate_group",
                     "country",
@@ -646,7 +640,9 @@ class DarkMapViewTests(TestCase):
         self.assertIn("incoming_activity", payload["snapshot"])
         self.assertIn("top_groups", payload["snapshot"])
         self.assertIn("top_countries", payload["snapshot"])
-        self.assertIn("map_tiles", payload["snapshot"])
+        self.assertIn("map_country_data", payload["snapshot"])
+        self.assertIn("top_actors", payload["snapshot"])
+        self.assertIn("coverage_sources", payload["snapshot"])
 
     def test_map_live_endpoint_filters_new_events_by_cursor_and_window(self):
         self.client.force_login(self.superuser)
@@ -693,6 +689,6 @@ class DarkMapViewTests(TestCase):
         self.assertEqual(event["title"], "Countryless Live Incident")
         self.assertTrue(event["animate_group"])
         self.assertFalse(event["animate_country"])
-        self.assertFalse(event["animate_connection"])
+        self.assertNotIn("animate_connection", event)
         self.assertEqual(event["country"], "")
         self.assertEqual(event["country_key"], "")

@@ -1433,57 +1433,13 @@ DARK_WINDOW_RANGES = {
 }
 DARK_WINDOW_OPTIONS = [("24h", "24h"), ("7d", "7d"), ("30d", "30d")]
 DARK_MATCH_OPTIONS = [("all", "All records"), ("matched", "Watch matches")]
-DARK_MAP_TILE_SIZE = {"width": 56, "height": 38}
-DARK_MAP_REGION_LABELS = (
-    {"label": "Americas", "x": 88, "y": 52},
-    {"label": "Europe", "x": 430, "y": 52},
-    {"label": "MENA", "x": 706, "y": 238},
-    {"label": "APAC", "x": 864, "y": 120},
-    {"label": "Africa", "x": 636, "y": 426},
-)
-DARK_MAP_TILE_LAYOUT = (
-    {"key": "canada", "label": "Canada", "short_label": "Canada", "x": 86, "y": 102},
-    {"key": "united states", "label": "United States", "short_label": "US", "x": 122, "y": 156},
-    {"key": "mexico", "label": "Mexico", "short_label": "Mexico", "x": 150, "y": 214},
-    {"key": "brazil", "label": "Brazil", "short_label": "Brazil", "x": 240, "y": 314},
-    {"key": "argentina", "label": "Argentina", "short_label": "Argentina", "x": 246, "y": 384},
-    {"key": "iceland", "label": "Iceland", "short_label": "Iceland", "x": 352, "y": 88},
-    {"key": "ireland", "label": "Ireland", "short_label": "Ireland", "x": 374, "y": 126},
-    {"key": "united kingdom", "label": "United Kingdom", "short_label": "UK", "x": 418, "y": 122},
-    {"key": "portugal", "label": "Portugal", "short_label": "Portugal", "x": 400, "y": 196},
-    {"key": "spain", "label": "Spain", "short_label": "Spain", "x": 452, "y": 196},
-    {"key": "france", "label": "France", "short_label": "France", "x": 468, "y": 160},
-    {"key": "belgium", "label": "Belgium", "short_label": "Belgium", "x": 522, "y": 140},
-    {"key": "netherlands", "label": "Netherlands", "short_label": "NL", "x": 542, "y": 108},
-    {"key": "switzerland", "label": "Switzerland", "short_label": "CH", "x": 520, "y": 212},
-    {"key": "germany", "label": "Germany", "short_label": "Germany", "x": 562, "y": 158},
-    {"key": "denmark", "label": "Denmark", "short_label": "Denmark", "x": 566, "y": 102},
-    {"key": "norway", "label": "Norway", "short_label": "Norway", "x": 548, "y": 44},
-    {"key": "sweden", "label": "Sweden", "short_label": "Sweden", "x": 614, "y": 56},
-    {"key": "finland", "label": "Finland", "short_label": "Finland", "x": 680, "y": 56},
-    {"key": "estonia", "label": "Estonia", "short_label": "Estonia", "x": 702, "y": 108},
-    {"key": "latvia", "label": "Latvia", "short_label": "Latvia", "x": 706, "y": 146},
-    {"key": "lithuania", "label": "Lithuania", "short_label": "Lithuania", "x": 694, "y": 184},
-    {"key": "poland", "label": "Poland", "short_label": "Poland", "x": 632, "y": 158},
-    {"key": "czechia", "label": "Czechia", "short_label": "Czechia", "x": 610, "y": 204},
-    {"key": "austria", "label": "Austria", "short_label": "Austria", "x": 658, "y": 212},
-    {"key": "italy", "label": "Italy", "short_label": "Italy", "x": 548, "y": 270},
-    {"key": "romania", "label": "Romania", "short_label": "Romania", "x": 724, "y": 214},
-    {"key": "ukraine", "label": "Ukraine", "short_label": "Ukraine", "x": 770, "y": 162},
-    {"key": "greece", "label": "Greece", "short_label": "Greece", "x": 696, "y": 286},
-    {"key": "turkey", "label": "Turkey", "short_label": "Turkey", "x": 790, "y": 256},
-    {"key": "israel", "label": "Israel", "short_label": "Israel", "x": 786, "y": 318},
-    {"key": "saudi arabia", "label": "Saudi Arabia", "short_label": "Saudi", "x": 834, "y": 338},
-    {"key": "united arab emirates", "label": "United Arab Emirates", "short_label": "UAE", "x": 900, "y": 344},
-    {"key": "south africa", "label": "South Africa", "short_label": "S. Africa", "x": 690, "y": 454},
-    {"key": "india", "label": "India", "short_label": "India", "x": 876, "y": 262},
-    {"key": "china", "label": "China", "short_label": "China", "x": 940, "y": 204},
-    {"key": "korea, republic of", "label": "South Korea", "short_label": "S. Korea", "x": 992, "y": 188},
-    {"key": "japan", "label": "Japan", "short_label": "Japan", "x": 1008, "y": 132},
-    {"key": "australia", "label": "Australia", "short_label": "Australia", "x": 946, "y": 418},
-    {"key": "new zealand", "label": "New Zealand", "short_label": "NZ", "x": 1010, "y": 474},
-)
-DARK_MAP_LAYOUT_KEYS = {tile["key"] for tile in DARK_MAP_TILE_LAYOUT}
+# A primary map needs enough comparative evidence to justify the visual area it
+# occupies. Three countries and five mapped records create a minimally useful
+# comparison; when incident records exist, at least 35% must have recognized
+# geography so the map does not visually overstate a small minority of evidence.
+DARK_GEOGRAPHY_MIN_COUNTRIES = 3
+DARK_GEOGRAPHY_MIN_RECORDS = 5
+DARK_GEOGRAPHY_MIN_INCIDENT_COVERAGE = 0.35
 
 
 def _dark_map_group_key(group_name: str) -> str:
@@ -1536,9 +1492,38 @@ def _dark_filtered_hits_queryset(request):
     }
 
 
+def _latest_dark_fetch_run_queryset():
+    return DarkFetchRun.objects.filter(dark_source_id=OuterRef("pk")).order_by(
+        "-started_at",
+        "-id",
+    )
+
+
+def _with_latest_dark_fetch_run_id(queryset):
+    return queryset.annotate(
+        latest_dark_fetch_run_id=Subquery(
+            _latest_dark_fetch_run_queryset().values("id")[:1]
+        )
+    )
+
+
+def _latest_dark_fetch_runs_by_source(sources):
+    latest_run_ids = [
+        source.latest_dark_fetch_run_id
+        for source in sources
+        if source.latest_dark_fetch_run_id is not None
+    ]
+    if not latest_run_ids:
+        return {}
+    return {
+        run.dark_source_id: run
+        for run in DarkFetchRun.objects.filter(id__in=latest_run_ids)
+    }
+
+
 def _dark_source_health_context():
     sources = list(
-        DarkSource.objects.filter(enabled=True)
+        _with_latest_dark_fetch_run_id(DarkSource.objects.filter(enabled=True))
         .annotate(
             hit_count=Count("hits", distinct=True),
             document_count=Count("documents", distinct=True),
@@ -1546,16 +1531,7 @@ def _dark_source_health_context():
         )
         .order_by("name")
     )
-    latest_run_by_source = {}
-    source_ids = [source.id for source in sources]
-    if source_ids:
-        for run in (
-            DarkFetchRun.objects.filter(dark_source_id__in=source_ids)
-            .only("dark_source_id", "ok", "error", "started_at", "finished_at")
-            .order_by("dark_source_id", "-started_at")
-        ):
-            if run.dark_source_id not in latest_run_by_source:
-                latest_run_by_source[run.dark_source_id] = run
+    latest_run_by_source = _latest_dark_fetch_runs_by_source(sources)
 
     source_rows = []
     for source in sources:
@@ -1600,13 +1576,15 @@ def _active_group_rows(hits):
         )
         if not group_name:
             continue
-        country_display, _country_code = normalize_dark_country(hit.country)
+        country_identity = normalize_ransomware_country(hit.country)
+        country_display = country_identity.display_name
         group_key = group_name.lower()
         activity_at = hit.last_seen_at or hit.detected_at
         row = grouped.get(group_key)
         if row is None:
             row = {
                 "group_name": group_name,
+                "record_count": 0,
                 "incident_count": 0,
                 "latest_activity_at": activity_at,
                 "latest_detected_at": hit.detected_at,
@@ -1620,6 +1598,7 @@ def _active_group_rows(hits):
             }
             grouped[group_key] = row
 
+        row["record_count"] += 1
         row["incident_count"] += 1
         if hit.is_watch_match:
             row["watch_match_count"] += 1
@@ -1680,38 +1659,11 @@ def _live_incident_hits(hits):
 
 
 def _normalized_country_key(value: str) -> str:
-    country_display, _country_code = normalize_dark_country(value)
-    if country_display:
-        return country_display.lower()
-    return (value or "").strip().lower()
-
-
-def _dark_map_tile_palette(*, intensity_level: int, is_selected: bool, has_activity: bool):
-    if not has_activity:
-        return {
-            "fill": "#0f172a",
-            "stroke": "#1e293b",
-            "text": "#475569",
-            "badge": "#0f172a",
-        }
-
-    palette = {
-        1: {"fill": "#10263c", "stroke": "#1d4ed8", "text": "#dbeafe", "badge": "#38bdf8"},
-        2: {"fill": "#10334a", "stroke": "#0ea5e9", "text": "#e0f2fe", "badge": "#22d3ee"},
-        3: {"fill": "#11485d", "stroke": "#14b8a6", "text": "#ecfeff", "badge": "#2dd4bf"},
-        4: {"fill": "#0f766e", "stroke": "#5eead4", "text": "#f0fdfa", "badge": "#67e8f9"},
-    }.get(max(1, min(intensity_level, 4)))
-    if is_selected:
-        return {
-            "fill": palette["fill"],
-            "stroke": "#a5f3fc",
-            "text": "#f0fdfa",
-            "badge": "#67e8f9",
-        }
-    return palette
+    return normalize_ransomware_country(value).country_id
 
 
 def _dark_map_intensity_level(record_count: int, max_record_count: int) -> int:
+    """Return the bounded activity tier shared by map payload summaries."""
     if record_count <= 0:
         return 0
     if max_record_count <= 1:
@@ -1737,91 +1689,20 @@ def _dark_map_country_url(*, window: str, selected_source: str, match_filter: st
     return f"{reverse('dark-map')}?{urlencode(params)}"
 
 
-def _dark_map_tiles(country_rows, *, selected_country: str, window: str, selected_source: str, match_filter: str):
-    row_by_layout_key = {}
-    unmapped_rows = []
-    for row in country_rows:
-        map_key = row["country_key"]
-        row["map_country_key"] = map_key
-        if map_key not in DARK_MAP_LAYOUT_KEYS:
-            unmapped_rows.append(row)
-            continue
-        row_by_layout_key[map_key] = row
+def _dark_map_actor_url(*, window: str, selected_source: str, match_filter: str, actor: str) -> str:
+    params = {"window": window, "q": actor}
+    if selected_source:
+        params["source"] = selected_source
+    if match_filter != "all":
+        params["match"] = match_filter
+    return f"{reverse('dark-recent-hits')}?{urlencode(params)}"
 
-    max_record_count = max((row["record_count"] for row in country_rows), default=0)
-    width = DARK_MAP_TILE_SIZE["width"]
-    height = DARK_MAP_TILE_SIZE["height"]
-    tiles = []
-    for tile in DARK_MAP_TILE_LAYOUT:
-        row = row_by_layout_key.get(tile["key"])
-        has_activity = row is not None
-        is_selected = has_activity and row["country_key"] == _normalized_country_key(selected_country)
-        intensity_level = _dark_map_intensity_level(
-            row["record_count"] if row else 0,
-            max_record_count,
-        )
-        palette = _dark_map_tile_palette(
-            intensity_level=intensity_level,
-            is_selected=is_selected,
-            has_activity=has_activity,
-        )
-        display_count = row["incident_count"] if row and row["incident_count"] else (row["record_count"] if row else "")
-        tiles.append(
-            {
-                "country_key": tile["key"],
-                "label": tile["label"],
-                "short_label": tile["short_label"],
-                "x": tile["x"],
-                "y": tile["y"],
-                "width": width,
-                "height": height,
-                "center_x": tile["x"] + (width / 2),
-                "center_y": tile["y"] + (height / 2),
-                "label_x": tile["x"] + 8,
-                "label_y": tile["y"] + 15,
-                "count_x": tile["x"] + width - 10,
-                "count_y": tile["y"] + 26,
-                "badge_x": tile["x"] + width - 8,
-                "badge_y": tile["y"] + 9,
-                "has_activity": has_activity,
-                "is_selected": is_selected,
-                "fill_color": palette["fill"],
-                "stroke_color": palette["stroke"],
-                "text_color": palette["text"],
-                "badge_color": palette["badge"],
-                "record_count": row["record_count"] if row else 0,
-                "incident_count": row["incident_count"] if row else 0,
-                "watch_match_count": row["watch_match_count"] if row else 0,
-                "country": row["country"] if row else tile["label"],
-                "url": (
-                    _dark_map_country_url(
-                        window=window,
-                        selected_source=selected_source,
-                        match_filter=match_filter,
-                        country="" if is_selected else row["country"],
-                    )
-                    if has_activity
-                    else ""
-                ),
-                "tooltip": (
-                    f"{row['country']}: {row['record_count']} records, "
-                    f"{row['incident_count']} incidents, {row['watch_match_count']} watch-matched"
-                    if row
-                    else f"{tile['label']}: no activity in current filters"
-                ),
-                "display_count": display_count,
-            }
-        )
 
-    unmapped_rows.sort(
-        key=lambda row: (
-            row["incident_count"],
-            row["record_count"],
-            row["country"].lower(),
-        ),
-        reverse=True,
-    )
-    return tiles, unmapped_rows
+def _dark_map_source_url(*, window: str, source_slug: str, match_filter: str) -> str:
+    params = {"window": window, "source": source_slug}
+    if match_filter != "all":
+        params["match"] = match_filter
+    return f"{reverse('dark-map')}?{urlencode(params)}"
 
 
 def _dark_map_empty_state(hits, country_rows, *, selected_source_name: str = ""):
@@ -1838,30 +1719,78 @@ def _dark_map_empty_state(hits, country_rows, *, selected_source_name: str = "")
             f"{selected_source_name} is" if selected_source_name else "The current selection is"
         )
         return {
-            "title": "Group activity available, geography pending",
+            "title": "Actor evidence leads this view",
             "message": (
                 f"{source_phrase} currently contributing group/context-driven intelligence. "
-                "Top Groups, Recent Group Activity, and Source Coverage are the primary signals "
-                "until incident geography starts landing."
+                "Actors, watch matches, and source coverage remain primary until observed "
+                "geographic evidence becomes comparative."
             ),
         }
     raw_country_values = [(hit.country or "").strip() for hit in incident_hits if (hit.country or "").strip()]
     if not raw_country_values:
         return {
-            "title": "Incident records found, but not plot-ready",
+            "title": "No geographic evidence",
             "message": (
-                "Incident-style records matched the current filters, but they do not yet carry "
-                "country values for plotting. Group activity and source coverage remain the "
-                "strongest signals in this view."
+                "Incident records matched the current filters, but they do not carry country "
+                "evidence. Actors and source coverage remain the strongest signals."
             ),
         }
     return {
-        "title": "Country normalization still in progress",
+        "title": "Geography pending",
         "message": (
-            "Incident-style records matched the current filters, but their country values still "
-            "need cleaner normalization before they can be plotted reliably. Group activity and "
-            "source coverage remain actionable in the meantime."
+            "Country values are present but do not exactly match the bundled canonical country "
+            "identities. They remain unassigned rather than being guessed."
         ),
+    }
+
+
+def _dark_surface_mode(*, country_rows, incident_count: int):
+    country_count = len(country_rows)
+    mapped_record_count = sum(row["record_count"] for row in country_rows)
+    mapped_incident_count = sum(row["incident_count"] for row in country_rows)
+    incident_coverage = (
+        mapped_incident_count / incident_count if incident_count else None
+    )
+
+    enough_comparison = country_count >= DARK_GEOGRAPHY_MIN_COUNTRIES
+    enough_activity = mapped_record_count >= DARK_GEOGRAPHY_MIN_RECORDS
+    enough_incident_coverage = (
+        incident_coverage is None
+        or incident_coverage >= DARK_GEOGRAPHY_MIN_INCIDENT_COVERAGE
+    )
+    if enough_comparison and enough_activity and enough_incident_coverage:
+        return {
+            "mode": "geography",
+            "label": "Geography-led view",
+            "reason": (
+                f"{country_count} recognized countries and {mapped_record_count} mapped records "
+                "provide comparative observed geography."
+            ),
+            "incident_coverage": incident_coverage,
+        }
+
+    evidence_parts = []
+    if country_count < DARK_GEOGRAPHY_MIN_COUNTRIES:
+        evidence_parts.append(
+            f"{country_count} of {DARK_GEOGRAPHY_MIN_COUNTRIES} comparative countries"
+        )
+    if mapped_record_count < DARK_GEOGRAPHY_MIN_RECORDS:
+        evidence_parts.append(
+            f"{mapped_record_count} of {DARK_GEOGRAPHY_MIN_RECORDS} mapped records"
+        )
+    if not enough_incident_coverage:
+        evidence_parts.append(
+            f"{round(incident_coverage * 100)}% incident geography coverage"
+        )
+    evidence_summary = ", ".join(evidence_parts) or "geographic evidence is sparse"
+    return {
+        "mode": "actors",
+        "label": "Actor-led view",
+        "reason": (
+            f"Actor and source evidence lead because {evidence_summary}. "
+            "Observed geography remains available as supporting context."
+        ),
+        "incident_coverage": incident_coverage,
     }
 
 
@@ -1869,16 +1798,17 @@ def _dark_country_activity_rows(hits):
     grouped = {}
     max_record_count = 0
     for hit in hits:
-        country_display, country_code = normalize_dark_country(hit.country)
-        if not country_display:
+        country_identity = normalize_ransomware_country(hit.country)
+        if not country_identity.recognized:
             continue
-        country_key = country_display.lower()
+        country_key = country_identity.country_id
         activity_at = hit.last_seen_at or hit.detected_at
         row = grouped.get(country_key)
         if row is None:
             row = {
-                "country": country_display,
-                "country_code": country_code,
+                "country": country_identity.display_name,
+                "country_id": country_identity.country_id,
+                "country_code": country_identity.iso_alpha2,
                 "record_count": 0,
                 "incident_count": 0,
                 "latest_activity_at": activity_at,
@@ -1952,19 +1882,40 @@ def _dark_map_group_rows(hits, *, selected_country: str = ""):
         )
         if not group_name:
             continue
-        country_display, _country_code = normalize_dark_country(hit.country)
-        if not country_display:
+        country_identity = normalize_ransomware_country(hit.country)
+        if not country_identity.recognized:
             continue
         country_map = group_countries.setdefault(group_name.lower(), {})
-        country_map.setdefault(country_display.lower(), country_display)
+        country_map.setdefault(
+            country_identity.country_id,
+            country_identity.display_name,
+        )
 
     selected_country_key = _normalized_country_key(selected_country)
     for row in rows:
-        countries = sorted(group_countries.get(row["group_name"].lower(), {}).values())
+        country_map = group_countries.get(row["group_name"].lower(), {})
+        countries = sorted(country_map.values())
         row["countries"] = countries
+        row["country_ids"] = sorted(country_map)
         row["country_match"] = (
             bool(selected_country_key)
-            and selected_country_key in {country.lower() for country in countries}
+            and selected_country_key in country_map
+        )
+    rows.sort(
+        key=lambda row: (
+            -row["record_count"],
+            -row["watch_match_count"],
+            -row["source_count"],
+            -row["latest_activity_at"].timestamp(),
+            row["group_name"].casefold(),
+        )
+    )
+    max_record_count = max((row["record_count"] for row in rows), default=0)
+    for row in rows:
+        row["activity_ratio"] = (
+            max(8, round((row["record_count"] / max_record_count) * 100))
+            if max_record_count
+            else 0
         )
     return rows
 
@@ -1990,8 +1941,7 @@ def _dark_map_source_rows(hits):
         row["record_count"] += 1
         if hit.record_type == "incident":
             row["incident_count"] += 1
-            country_display, _country_code = normalize_dark_country(hit.country)
-            if country_display:
+            if normalize_ransomware_country(hit.country).recognized:
                 row["mapped_incident_count"] += 1
         if hit.is_watch_match:
             row["watch_match_count"] += 1
@@ -2010,6 +1960,11 @@ def _dark_map_source_rows(hits):
     rows = []
     for row in grouped.values():
         row["group_count"] = len(row["group_keys"])
+        row["geography_coverage_percent"] = (
+            round((row["mapped_incident_count"] / row["incident_count"]) * 100)
+            if row["incident_count"]
+            else None
+        )
         del row["group_keys"]
         rows.append(row)
 
@@ -2036,13 +1991,16 @@ def _dark_map_signal_hits(hits, *, selected_country: str = ""):
             title=hit.title,
             victim_name=hit.victim_name,
         )
-        country_display, _country_code = normalize_dark_country(hit.country)
-        if group_name and country_display:
-            group_country_keys.setdefault(group_name.lower(), set()).add(country_display.lower())
+        country_identity = normalize_ransomware_country(hit.country)
+        if group_name and country_identity.recognized:
+            group_country_keys.setdefault(group_name.lower(), set()).add(
+                country_identity.country_id
+            )
 
     rows = []
     for hit in hits:
-        country_display, country_code = normalize_dark_country(hit.country)
+        country_identity = normalize_ransomware_country(hit.country)
+        country_display = country_identity.display_name
         group_name = resolve_group_name(
             record_type=hit.record_type,
             group_name=hit.group_name,
@@ -2057,7 +2015,9 @@ def _dark_map_signal_hits(hits, *, selected_country: str = ""):
                 continue
 
         hit.map_country = country_display
-        hit.map_country_code = country_code
+        hit.map_country_id = country_identity.country_id
+        hit.map_country_code = country_identity.iso_alpha2
+        hit.map_country_recognized = country_identity.recognized
         hit.signal_group_name = group_name
         hit.signal_group_key = _dark_map_group_key(group_name)
         hit.signal_title = hit.victim_name or hit.title
@@ -2078,75 +2038,15 @@ def _dark_map_incoming_activity(hits, *, selected_country: str = ""):
 
 def _dark_map_match_summary(hits, group_rows):
     matched_hits = [hit for hit in hits if hit.is_watch_match]
+    top_actors = [row["group_name"] for row in group_rows if row["watch_match_count"]][:3]
     return {
         "record_count": len(matched_hits),
         "incident_count": len([hit for hit in matched_hits if hit.record_type == "incident"]),
         "source_count": len({hit.dark_source_id for hit in matched_hits}),
         "group_count": len([row for row in group_rows if row["watch_match_count"]]),
-        "top_groups": [row["group_name"] for row in group_rows if row["watch_match_count"]][:3],
+        "top_actors": top_actors,
+        "top_groups": top_actors,
     }
-
-
-def _dark_map_overlay(top_groups, map_tiles, *, selected_country: str = ""):
-    selected_country_key = _normalized_country_key(selected_country)
-    tile_lookup = {
-        tile["country_key"]: tile
-        for tile in map_tiles
-        if tile["has_activity"]
-    }
-    group_nodes = []
-    map_connections = []
-    eligible_groups = []
-    for row in top_groups:
-        countries = [
-            country for country in row["countries"]
-            if _normalized_country_key(country) in tile_lookup
-        ]
-        if countries:
-            eligible_groups.append((row, countries[:3]))
-
-    for index, (row, countries) in enumerate(eligible_groups[:5]):
-        node_x = 1014
-        node_y = 136 + (index * 72)
-        group_nodes.append(
-            {
-                "group_name": row["group_name"],
-                "group_key": _dark_map_group_key(row["group_name"]),
-                "watch_match_count": row["watch_match_count"],
-                "incident_count": row["incident_count"],
-                "source_count": row["source_count"],
-                "x": node_x,
-                "y": node_y,
-                "label_x": node_x - 12,
-                "label_y": node_y - 4,
-                "meta_y": node_y + 13,
-            }
-        )
-        for country in countries:
-            country_key = _normalized_country_key(country)
-            tile = tile_lookup[country_key]
-            x1 = tile["x"] + (tile["width"] / 2)
-            y1 = tile["y"] + (tile["height"] / 2)
-            x2 = node_x - 34
-            y2 = node_y
-            c1x = x1 + 88
-            c2x = x2 - 44
-            path_d = (
-                f"M {x1:.1f} {y1:.1f} "
-                f"C {c1x:.1f} {y1:.1f}, {c2x:.1f} {y2:.1f}, {x2:.1f} {y2:.1f}"
-            )
-            map_connections.append(
-                {
-                    "group_name": row["group_name"],
-                    "group_key": _dark_map_group_key(row["group_name"]),
-                    "country": country,
-                    "country_key": country_key,
-                    "path_d": path_d,
-                    "is_selected": bool(selected_country_key) and country_key == selected_country_key,
-                    "is_watch_match": row["watch_match_count"] > 0,
-                }
-            )
-    return group_nodes, map_connections
 
 
 def _dark_map_selected_source_name(selected_source: str) -> str:
@@ -2172,8 +2072,8 @@ def _dark_map_selected_country(request, country_rows):
             break
     if selected_country:
         return selected_country
-    normalized_country, _country_code = normalize_dark_country(requested_country)
-    return normalized_country or requested_country
+    country_identity = normalize_ransomware_country(requested_country)
+    return country_identity.display_name or requested_country
 
 
 def _dark_map_build_state(request, *, selected_hits, filter_context):
@@ -2183,14 +2083,12 @@ def _dark_map_build_state(request, *, selected_hits, filter_context):
     selected_country_key = _normalized_country_key(selected_country)
     for row in country_rows:
         row["is_selected"] = row["country_key"] == selected_country_key
-
-    map_tiles, unmapped_country_rows = _dark_map_tiles(
-        country_rows,
-        selected_country=selected_country,
-        window=filter_context["window"],
-        selected_source=filter_context["selected_source"],
-        match_filter=filter_context["match_filter"],
-    )
+        row["url"] = _dark_map_country_url(
+            window=filter_context["window"],
+            selected_source=filter_context["selected_source"],
+            match_filter=filter_context["match_filter"],
+            country="" if row["is_selected"] else row["country"],
+        )
     map_empty_state = _dark_map_empty_state(
         selected_hits,
         country_rows,
@@ -2198,8 +2096,21 @@ def _dark_map_build_state(request, *, selected_hits, filter_context):
     )
     top_countries = country_rows[:8]
     group_rows = _dark_map_group_rows(selected_hits, selected_country=selected_country)
-    top_groups = group_rows[:8]
+    for row in group_rows:
+        row["url"] = _dark_map_actor_url(
+            window=filter_context["window"],
+            selected_source=filter_context["selected_source"],
+            match_filter=filter_context["match_filter"],
+            actor=row["group_name"],
+        )
+    top_actors = group_rows[:10]
     coverage_source_rows = _dark_map_source_rows(selected_hits)[:6]
+    for row in coverage_source_rows:
+        row["url"] = _dark_map_source_url(
+            window=filter_context["window"],
+            source_slug=row["source_slug"],
+            match_filter=filter_context["match_filter"],
+        )
     signal_hits = _dark_map_signal_hits(
         selected_hits,
         selected_country=selected_country,
@@ -2209,40 +2120,55 @@ def _dark_map_build_state(request, *, selected_hits, filter_context):
 
     incident_count = len([hit for hit in selected_hits if hit.record_type == "incident"])
     mapped_incident_count = sum(row["incident_count"] for row in country_rows)
-    group_first_mode = not country_rows and bool(group_rows)
-    group_nodes, map_connections = _dark_map_overlay(
-        top_groups,
-        map_tiles,
-        selected_country=selected_country,
+    mapped_record_count = sum(row["record_count"] for row in country_rows)
+    surface = _dark_surface_mode(
+        country_rows=country_rows,
+        incident_count=incident_count,
+    )
+    unknown_geography_count = sum(
+        1
+        for hit in selected_hits
+        if (hit.country or "").strip()
+        and not normalize_ransomware_country(hit.country).recognized
+    )
+    missing_geography_count = sum(
+        1 for hit in selected_hits if not (hit.country or "").strip()
     )
 
     map_metrics = {
         "country_count": len(country_rows),
         "group_count": len(group_rows),
         "incident_count": incident_count,
+        "record_count": len(selected_hits),
+        "mapped_record_count": mapped_record_count,
         "mapped_incident_count": mapped_incident_count,
         "countryless_incident_count": max(incident_count - mapped_incident_count, 0),
+        "unknown_geography_count": unknown_geography_count,
+        "missing_geography_count": missing_geography_count,
         "watch_match_count": len([hit for hit in selected_hits if hit.is_watch_match]),
         "source_count": len({hit.dark_source_id for hit in selected_hits}),
     }
     return {
         "country_rows": country_rows,
-        "map_tiles": map_tiles,
-        "unmapped_country_rows": unmapped_country_rows,
+        "map_country_data": country_rows,
         "map_empty_state": map_empty_state,
         "top_countries": top_countries,
-        "top_groups": top_groups,
+        "top_actors": top_actors,
+        # Kept as a context alias for the older Active Groups terminology in
+        # callers outside the redesigned template.
+        "top_groups": top_actors,
         "coverage_source_rows": coverage_source_rows,
         "signal_hits": signal_hits,
         "incoming_activity": incoming_activity,
         "matched_summary": matched_summary,
-        "group_nodes": group_nodes,
-        "map_connections": map_connections,
         "selected_country": selected_country,
         "selected_country_key": selected_country_key,
-        "selected_country_on_map": any(tile["is_selected"] for tile in map_tiles),
+        "selected_country_on_map": any(row["is_selected"] for row in country_rows),
         "selected_source_name": selected_source_name,
-        "group_first_mode": group_first_mode,
+        "surface_mode": surface["mode"],
+        "surface_label": surface["label"],
+        "surface_reason": surface["reason"],
+        "surface_incident_coverage": surface["incident_coverage"],
         "map_metrics": map_metrics,
         "live_cursor": max((hit.id for hit in selected_hits), default=0),
     }
@@ -2257,8 +2183,9 @@ def _serialize_dark_map_signal_hit(hit, *, filter_context):
         victim_name=hit.victim_name,
     )
     signal_group_key = getattr(hit, "signal_group_key", "") or _dark_map_group_key(signal_group_name)
-    map_country = getattr(hit, "map_country", "") or normalize_dark_country(hit.country)[0]
-    map_country_key = _normalized_country_key(map_country)
+    country_identity = normalize_ransomware_country(hit.country)
+    map_country = getattr(hit, "map_country", "") or country_identity.display_name
+    map_country_key = getattr(hit, "map_country_id", "") or country_identity.country_id
     raw_params = {"window": filter_context["window"], "q": signal_title}
     if filter_context["selected_source"]:
         raw_params["source"] = filter_context["selected_source"]
@@ -2282,7 +2209,6 @@ def _serialize_dark_map_signal_hit(hit, *, filter_context):
         "raw_url": f"{reverse('dark-recent-hits')}?{urlencode(raw_params)}",
         "animate_group": bool(signal_group_key),
         "animate_country": bool(map_country_key),
-        "animate_connection": bool(signal_group_key and map_country_key),
     }
 
 
@@ -2290,6 +2216,7 @@ def _serialize_dark_map_group_row(row):
     return {
         "group_name": row["group_name"],
         "group_key": _dark_map_group_key(row["group_name"]),
+        "record_count": row["record_count"],
         "incident_count": row["incident_count"],
         "source_count": row["source_count"],
         "watch_match_count": row["watch_match_count"],
@@ -2297,25 +2224,45 @@ def _serialize_dark_map_group_row(row):
         "latest_victim_name": row.get("latest_victim_name", ""),
         "latest_country": row.get("latest_country", ""),
         "countries": row.get("countries", []),
+        "country_ids": row.get("country_ids", []),
         "country_match": row.get("country_match", False),
+        "activity_ratio": row.get("activity_ratio", 0),
+        "url": row.get("url", ""),
     }
 
 
 def _serialize_dark_map_country_row(row, *, filter_context):
     return {
         "country": row["country"],
+        "country_id": row["country_id"],
         "country_key": row["country_key"],
         "record_count": row["record_count"],
         "incident_count": row["incident_count"],
         "group_count": row["group_count"],
+        "source_count": row["source_count"],
         "watch_match_count": row["watch_match_count"],
         "is_selected": row["is_selected"],
         "url": _dark_map_country_url(
             window=filter_context["window"],
             selected_source=filter_context["selected_source"],
             match_filter=filter_context["match_filter"],
-            country=row["country"],
+            country="" if row["is_selected"] else row["country"],
         ),
+    }
+
+
+def _serialize_dark_map_source_row(row):
+    return {
+        "source_name": row["source_name"],
+        "source_slug": row["source_slug"],
+        "record_count": row["record_count"],
+        "incident_count": row["incident_count"],
+        "mapped_incident_count": row["mapped_incident_count"],
+        "geography_coverage_percent": row["geography_coverage_percent"],
+        "watch_match_count": row["watch_match_count"],
+        "group_count": row["group_count"],
+        "latest_activity_at": row["latest_activity_at"].isoformat(),
+        "url": row.get("url", ""),
     }
 
 
@@ -2366,9 +2313,8 @@ def dark_map_view(request):
         request,
         "intel/dark/map.html",
         {
-            "page_title": "Threat Watch Map",
+            "page_title": "Threat Watch",
             "current_page": "dark",
-            "map_region_labels": DARK_MAP_REGION_LABELS,
             "dashboard_url": reverse("dark-dashboard"),
             "recent_hits_url": reverse("dark-recent-hits"),
             "live_poll_url": reverse("dark-map-live"),
@@ -2410,18 +2356,27 @@ def dark_map_live_view(request):
                 _serialize_dark_map_signal_hit(hit, filter_context=filter_context)
                 for hit in state["incoming_activity"]
             ],
+            "top_actors": [
+                _serialize_dark_map_group_row(row)
+                for row in state["top_actors"]
+            ],
             "top_groups": [
                 _serialize_dark_map_group_row(row)
-                for row in state["top_groups"]
+                for row in state["top_actors"]
             ],
             "top_countries": [
                 _serialize_dark_map_country_row(row, filter_context=filter_context)
                 for row in state["top_countries"]
             ],
-            "map_tiles": state["map_tiles"],
-            "group_nodes": state["group_nodes"],
-            "map_connections": state["map_connections"],
-            "group_first_mode": state["group_first_mode"],
+            "map_country_data": [
+                _serialize_dark_map_country_row(row, filter_context=filter_context)
+                for row in state["map_country_data"]
+            ],
+            "coverage_sources": [
+                _serialize_dark_map_source_row(row)
+                for row in state["coverage_source_rows"]
+            ],
+            "surface_mode": state["surface_mode"],
             "selected_country": state["selected_country"],
             "selected_country_key": state["selected_country_key"],
         },
@@ -2763,33 +2718,15 @@ def admin_panel_sources_list(request):
 
 def _dark_source_rows():
     sources = list(
-        DarkSource.objects.annotate(
+        _with_latest_dark_fetch_run_id(DarkSource.objects.all())
+        .annotate(
             hit_count=Count("hits", distinct=True),
             document_count=Count("documents", distinct=True),
             last_hit_at=Max("hits__last_seen_at"),
-        ).order_by("name")
+        )
+        .order_by("name")
     )
-    latest_run_by_source = {}
-    source_ids = [source.id for source in sources]
-    if source_ids:
-        for run in (
-            DarkFetchRun.objects.filter(dark_source_id__in=source_ids)
-            .only(
-                "dark_source_id",
-                "ok",
-                "error",
-                "started_at",
-                "finished_at",
-                "bytes_received",
-                "http_status",
-                "documents_fetched",
-                "hits_new",
-                "hits_updated",
-            )
-            .order_by("dark_source_id", "-started_at")
-        ):
-            if run.dark_source_id not in latest_run_by_source:
-                latest_run_by_source[run.dark_source_id] = run
+    latest_run_by_source = _latest_dark_fetch_runs_by_source(sources)
 
     source_rows = []
     for source in sources:
