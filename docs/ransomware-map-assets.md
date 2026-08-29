@@ -26,6 +26,15 @@ country manifest at `intel/data/ransomware_map_countries.json`. Kosovo uses the
 commonly used `XKX` user-assigned identifier. Natural Earth geometries without
 an ISO identity keep an explicit `NE-*` identifier. No fuzzy matching is used.
 
+Generated polygon rings use RFC 7946 winding. Date-line-crossing Fiji and
+Russia components are split at the antimeridian; Antarctica's full-width ring
+is closed through the South Pole and split at the prime meridian. This preserves
+the same 1:110m geography while avoiding world-spanning planar edges in
+MapLibre's GeoJSON tessellation. The asset build rejects missing/duplicate
+country IDs, invalid coordinates, empty or unclosed rings, incorrect winding,
+and any remaining antimeridian-spanning edge. Zero-area fragments introduced
+by source quantization are discarded before validation.
+
 Required map attribution is displayed below the map and in MapLibre's compact
 attribution control:
 

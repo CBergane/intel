@@ -29,9 +29,18 @@
     let pollInFlight = false;
     let activeCountryIds = new Set();
     let countryActivity = new Map();
+    let liveCountryIds = new Set();
+    let geometryCountryIds = new Set();
+    let appliedActiveCountryIds = new Set();
+    let initialFocusScheduled = false;
 
     const countrySourceId = "ransomware-world-countries";
     const countryFillLayerId = "ransomware-country-fill";
+    const recordCountExpression = () => [
+        "to-number",
+        ["coalesce", ["feature-state", "record_count"], 0],
+        0,
+    ];
 
     const createElement = (tagName, className = "", text = "") => {
         const element = document.createElement(tagName);
@@ -369,18 +378,7 @@
         }
     };
 
-    const updateMapCountries = (rows, liveCountryIds = new Set()) => {
-        const normalizedRows = Array.isArray(rows) ? rows : [];
-        countryActivity = new Map(
-            normalizedRows.map((country) => [String(country.country_id || country.country_key), country]),
-        );
-        setText(
-            "ransomware-plotted-countries-count",
-            normalizedRows.length
-                ? `${normalizedRows.length} mapped countries`
-                : "Local world ready, waiting on recognized geography",
-        );
-
+    const applyCountryFeatureState = () => {
         if (!mapReady) return;
         activeCountryIds.forEach((countryId) => {
             map.setFeatureState(
@@ -389,10 +387,11 @@
             );
         });
         const nextActiveCountryIds = new Set();
-        normalizedRows.forEach((country) => {
-            const countryId = String(country.country_id || country.country_key || "");
+        const nextAppliedCountryIds = new Set();
+        countryActivity.forEach((country, countryId) => {
             if (!countryId) return;
             nextActiveCountryIds.add(countryId);
+            if (geometryCountryIds.has(countryId)) nextAppliedCountryIds.add(countryId);
             map.setFeatureState(
                 {source: countrySourceId, id: countryId},
                 {
@@ -403,6 +402,25 @@
             );
         });
         activeCountryIds = nextActiveCountryIds;
+        appliedActiveCountryIds = nextAppliedCountryIds;
+    };
+
+    const updateMapCountries = (rows, nextLiveCountryIds = null) => {
+        const normalizedRows = Array.isArray(rows) ? rows : [];
+        countryActivity = new Map(
+            normalizedRows.map((country) => [String(country.country_id || country.country_key), country]),
+        );
+        if (nextLiveCountryIds instanceof Set) {
+            liveCountryIds = new Set(nextLiveCountryIds);
+        }
+        setText(
+            "ransomware-plotted-countries-count",
+            normalizedRows.length
+                ? `${normalizedRows.length} mapped countries`
+                : "Local world ready, waiting on recognized geography",
+        );
+
+        applyCountryFeatureState();
     };
 
     const extendBoundsWithCoordinates = (bounds, coordinates) => {
@@ -448,16 +466,8 @@
         map.addSource(countrySourceId, {
             type: "geojson",
             data: geographyUrl,
+            promoteId: "country_id",
             attribution: "Natural Earth 4.1.0 · public domain",
-        });
-        map.addLayer({
-            id: "ransomware-country-base",
-            type: "fill",
-            source: countrySourceId,
-            paint: {
-                "fill-color": "#0b1623",
-                "fill-opacity": 0.78,
-            },
         });
         map.addLayer({
             id: countryFillLayerId,
@@ -467,7 +477,7 @@
                 "fill-color": [
                     "interpolate",
                     ["linear"],
-                    ["coalesce", ["feature-state", "record_count"], 0],
+                    recordCountExpression(),
                     0, "#0b1623",
                     1, "#0e7490",
                     3, "#d97706",
@@ -477,9 +487,9 @@
                 ],
                 "fill-opacity": [
                     "case",
-                    ["boolean", ["feature-state", "selected"], false], 0.88,
-                    [">", ["coalesce", ["feature-state", "record_count"], 0], 0], 0.72,
-                    0.18,
+                    ["boolean", ["feature-state", "selected"], false], 0.9,
+                    [">", recordCountExpression(), 0], 0.78,
+                    0.72,
                 ],
             },
         });
@@ -492,19 +502,19 @@
                     "case",
                     ["boolean", ["feature-state", "selected"], false], "#a5f3fc",
                     ["boolean", ["feature-state", "hovered"], false], "#67e8f9",
-                    [">", ["coalesce", ["feature-state", "record_count"], 0], 0], "#7dd3fc",
+                    [">", recordCountExpression(), 0], "#7dd3fc",
                     "#27364a",
                 ],
                 "line-opacity": [
                     "case",
-                    [">", ["coalesce", ["feature-state", "record_count"], 0], 0], 0.9,
+                    [">", recordCountExpression(), 0], 0.9,
                     0.64,
                 ],
                 "line-width": [
                     "case",
                     ["boolean", ["feature-state", "selected"], false], 2.6,
                     ["boolean", ["feature-state", "hovered"], false], 1.8,
-                    [">", ["coalesce", ["feature-state", "record_count"], 0], 0], 1.1,
+                    [">", recordCountExpression(), 0], 1.1,
                     0.6,
                 ],
             },
@@ -535,6 +545,31 @@
             const destination = safeUrl(countryActivity.get(countryId)?.url, {internal: true});
             if (destination) window.location.assign(destination);
         });
+    };
+
+    const countrySourceIsLoaded = () =>
+        Boolean(map?.getSource(countrySourceId) && map.isSourceLoaded(countrySourceId));
+
+    const getMapDiagnostics = () => ({
+        sourceLoaded: countrySourceIsLoaded(),
+        geometryFeatureCount: geometryCountryIds.size,
+        activeFeatureCount: activeCountryIds.size,
+        appliedActiveFeatureCount: appliedActiveCountryIds.size,
+    });
+
+    const initializeLoadedCountrySource = () => {
+        if (mapReady || !countrySourceIsLoaded()) return false;
+        geometryCountryIds = new Set(
+            map.querySourceFeatures(countrySourceId).map(countryIdForFeature).filter(Boolean),
+        );
+        mapReady = true;
+        applyCountryFeatureState();
+        hideFallback();
+        if (!initialFocusScheduled) {
+            initialFocusScheduled = true;
+            map.once("idle", focusInitialGeography);
+        }
+        return true;
     };
 
     const applySnapshot = (
@@ -626,12 +661,19 @@
         }, 9000);
 
         map.once("load", () => {
+            const onCountrySourceData = (event) => {
+                if (event.sourceId !== countrySourceId) return;
+                if (initializeLoadedCountrySource()) {
+                    map.off("sourcedata", onCountrySourceData);
+                    window.clearTimeout(failTimer);
+                }
+            };
+            map.on("sourcedata", onCountrySourceData);
             addCountryLayers();
-            mapReady = true;
-            window.clearTimeout(failTimer);
-            hideFallback();
-            updateMapCountries(initialCountryData);
-            map.once("idle", focusInitialGeography);
+            if (initializeLoadedCountrySource()) {
+                map.off("sourcedata", onCountrySourceData);
+                window.clearTimeout(failTimer);
+            }
         });
         map.on("error", (event) => {
             if (event?.error) {
@@ -640,6 +682,10 @@
         });
     } else if (mapElement) {
         showFallback("Interactive map engine unavailable. Use the country list to continue.");
+    }
+
+    if (mapElement?.dataset.debugMap === "true") {
+        window.getRansomwareMapDiagnostics = getMapDiagnostics;
     }
 
     startPolling();

@@ -2,7 +2,8 @@
   "dataset": {
     "source": "Natural Earth vector 4.1.0 via world-atlas 2.0.2",
     "scale": "1:110m",
-    "license": "Public domain geography; world-atlas redistribution is ISC"
+    "license": "Public domain geography; world-atlas redistribution is ISC",
+    "geometry_processing": "RFC 7946 ring winding; antimeridian-safe Fiji, Russia, and Antarctica polygons"
   },
   "countries": [
     {

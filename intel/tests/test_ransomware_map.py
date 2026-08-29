@@ -1,4 +1,6 @@
 import json
+import json
+import math
 from datetime import timedelta
 from pathlib import Path
 
@@ -18,6 +20,30 @@ from intel.ransomware_countries import (
 
 RANSOMWARE_MAP_URL = reverse("ransomware-map")
 RANSOMWARE_MAP_LIVE_URL = reverse("ransomware-map-live")
+
+
+def _polygon_boundary_has_proper_self_intersection(boundary):
+    def orientation(start, end, point):
+        return (end[0] - start[0]) * (point[1] - start[1]) - (
+            end[1] - start[1]
+        ) * (point[0] - start[0])
+
+    for left in range(len(boundary) - 1):
+        for right in range(left + 2, len(boundary) - 1):
+            if left == 0 and right == len(boundary) - 2:
+                continue
+            left_start, left_end = boundary[left], boundary[left + 1]
+            right_start, right_end = boundary[right], boundary[right + 1]
+            if (
+                orientation(left_start, left_end, right_start)
+                * orientation(left_start, left_end, right_end)
+                < 0
+                and orientation(right_start, right_end, left_start)
+                * orientation(right_start, right_end, left_end)
+                < 0
+            ):
+                return True
+    return False
 
 
 class RansomwareMapViewTests(TestCase):
@@ -137,6 +163,126 @@ class RansomwareMapViewTests(TestCase):
             )
         )
         self.assertEqual(style["sources"], {})
+
+    def test_map_source_waits_for_geojson_readiness_and_promotes_country_id(self):
+        runtime = (
+            Path(settings.BASE_DIR) / "static/intel/js/ransomware-map.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('promoteId: "country_id"', runtime)
+        self.assertIn("map.isSourceLoaded(countrySourceId)", runtime)
+        self.assertIn('map.on("sourcedata", onCountrySourceData)', runtime)
+        self.assertIn('map.off("sourcedata", onCountrySourceData)', runtime)
+        initializer = runtime.partition("const initializeLoadedCountrySource")[2].partition(
+            "const applySnapshot"
+        )[0]
+        self.assertLess(
+            initializer.index("countrySourceIsLoaded()"),
+            initializer.index("mapReady = true;"),
+        )
+        self.assertLess(
+            initializer.index("mapReady = true;"),
+            initializer.index("applyCountryFeatureState();"),
+        )
+        self.assertNotIn("addCountryLayers();\n            mapReady = true;", runtime)
+
+    def test_pre_ready_and_live_country_activity_is_retained_for_initialization(self):
+        runtime = (
+            Path(settings.BASE_DIR) / "static/intel/js/ransomware-map.js"
+        ).read_text(encoding="utf-8")
+        update_block = runtime.partition("const updateMapCountries")[2].partition(
+            "const extendBoundsWithCoordinates"
+        )[0]
+
+        self.assertLess(
+            update_block.index("countryActivity = new Map"),
+            update_block.index("applyCountryFeatureState();"),
+        )
+        self.assertLess(
+            update_block.index("liveCountryIds = new Set(nextLiveCountryIds)"),
+            update_block.index("applyCountryFeatureState();"),
+        )
+        self.assertIn("if (!mapReady) return;", runtime)
+        self.assertIn("applyCountryFeatureState();", runtime)
+        self.assertIn("snapshot.map_country_data || snapshot.map_marker_data || []", runtime)
+
+    def test_activity_fill_uses_feature_state_and_one_polygon_fill_layer(self):
+        runtime = (
+            Path(settings.BASE_DIR) / "static/intel/js/ransomware-map.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('["feature-state", "record_count"]', runtime)
+        for activity_color in ("#0b1623", "#0e7490", "#d97706", "#ea580c", "#dc2626"):
+            with self.subTest(activity_color=activity_color):
+                self.assertIn(activity_color, runtime)
+        self.assertNotIn("ransomware-country-base", runtime)
+        self.assertEqual(runtime.count('type: "fill"'), 1)
+        self.assertIn('["feature-state", "selected"]', runtime)
+        self.assertNotIn("new maplibregl.Marker", runtime)
+
+    def test_bundled_geometry_ids_and_polygon_rings_are_render_safe(self):
+        geography = json.loads(
+            (Path(settings.BASE_DIR) / "static/intel/maps/world-countries-110m.geojson")
+            .read_text(encoding="utf-8")
+        )
+        features_by_id = {
+            feature["properties"]["country_id"]: feature
+            for feature in geography["features"]
+        }
+
+        self.assertEqual(len(features_by_id), len(geography["features"]))
+        for representative_id in ("USA", "GBR", "DEU", "ITA", "MEX", "BRA", "IND"):
+            with self.subTest(representative_id=representative_id):
+                self.assertIn(representative_id, features_by_id)
+                self.assertEqual(features_by_id[representative_id]["id"], representative_id)
+
+        for country_id, feature in features_by_id.items():
+            with self.subTest(country_id=country_id):
+                self.assertEqual(feature["id"], country_id)
+                geometry = feature["geometry"]
+                self.assertIn(geometry["type"], {"Polygon", "MultiPolygon"})
+                polygons = (
+                    [geometry["coordinates"]]
+                    if geometry["type"] == "Polygon"
+                    else geometry["coordinates"]
+                )
+                self.assertTrue(polygons)
+                for polygon in polygons:
+                    self.assertTrue(polygon)
+                    for boundary_index, boundary in enumerate(polygon):
+                        self.assertGreaterEqual(len(boundary), 4)
+                        self.assertEqual(boundary[0], boundary[-1])
+                        area = 0.0
+                        for index, coordinate in enumerate(boundary):
+                            longitude, latitude = coordinate[:2]
+                            self.assertTrue(math.isfinite(longitude))
+                            self.assertTrue(math.isfinite(latitude))
+                            self.assertGreaterEqual(longitude, -180)
+                            self.assertLessEqual(longitude, 180)
+                            self.assertGreaterEqual(latitude, -90)
+                            self.assertLessEqual(latitude, 90)
+                            if index:
+                                self.assertLessEqual(
+                                    abs(longitude - boundary[index - 1][0]),
+                                    180,
+                                )
+                                area += (
+                                    boundary[index - 1][0] * latitude
+                                    - longitude * boundary[index - 1][1]
+                                )
+                        if boundary_index == 0:
+                            self.assertGreater(area, 0)
+                        else:
+                            self.assertLess(area, 0)
+                        if country_id in {"FJI", "RUS", "ATA"}:
+                            self.assertFalse(
+                                _polygon_boundary_has_proper_self_intersection(boundary)
+                            )
+
+        self.assertIn(
+            "antimeridian-safe Fiji, Russia, and Antarctica",
+            geography["metadata"]["geometry_processing"],
+        )
 
     def test_map_page_still_renders_useful_content_without_javascript(self):
         self._create_victim(victim="Nordic Mills", group="Akira", country="Sweden")
