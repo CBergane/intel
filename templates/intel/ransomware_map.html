@@ -97,13 +97,13 @@
                     </div>
                     <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Country polygons summarize victim geography from the current ransomware.live dataset. They do not imply attack origins, paths, or continuous geographic risk.</p>
                 </div>
-                <div class="relative mt-2 overflow-hidden rounded-[1.65rem] border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.16),_transparent_46%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.99))]">
+                <div class="ransomware-map-panel relative mt-2 overflow-hidden rounded-[1.65rem] border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.16),_transparent_46%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.99))]">
                     <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(14,165,233,0.08),_transparent_52%),linear-gradient(180deg,rgba(6,12,24,0.14),rgba(2,6,23,0.2))]"></div>
                     <div class="relative flex flex-wrap items-center justify-between gap-2 border-b border-line/70 px-3 py-3 sm:px-4 xl:px-5">
                         <div class="ransomware-map-technical-badges hidden flex-wrap gap-2 text-[11px] sm:flex"><span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-100">Self-hosted MapLibre</span><span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">Local Natural Earth 1:110m</span></div>
                         <span id="ransomware-plotted-countries-count" class="text-[11px] text-slate-400">{% if map_country_data %}{{ map_country_data|length }} mapped countries{% else %}Local world ready, waiting on recognized geography{% endif %}</span>
                     </div>
-                    <div class="relative px-2 pb-2 pt-2 sm:px-3 sm:pb-3 xl:px-4 xl:pb-4">
+                    <div class="ransomware-map-frame relative px-2 pb-2 pt-2 sm:px-3 sm:pb-3 xl:px-4 xl:pb-4">
                         {% if map_empty_state %}
                             <div class="pointer-events-none absolute inset-x-6 top-6 z-10 rounded-2xl border border-amber-500/25 bg-slate-950/86 p-4 backdrop-blur"><p class="text-[11px] uppercase tracking-[0.2em] text-amber-300">Geography Limited</p><h3 class="mt-2 text-lg font-semibold text-white">{{ map_empty_state.title }}</h3><p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{{ map_empty_state.message }}</p></div>
                         {% endif %}

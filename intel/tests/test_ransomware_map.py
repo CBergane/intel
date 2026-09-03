@@ -139,7 +139,7 @@ class RansomwareMapViewTests(TestCase):
         ).read_text(encoding="utf-8")
 
         for expected in (
-            "#ransomware-map-view {\n    height: 18rem;",
+            "#ransomware-map-view {\n    height: clamp(14rem, 64vw, 17.5rem);",
             "@media (min-width: 640px) {\n    #ransomware-map-view { height: 20rem; }",
             "@media (min-width: 768px) {\n    #ransomware-map-view { height: 26rem; }",
             "@media (min-width: 1024px) {\n    #ransomware-map-view { height: 38rem; }",
@@ -147,6 +147,10 @@ class RansomwareMapViewTests(TestCase):
             "@media (min-width: 1536px) {\n    #ransomware-map-view { height: 48rem; }",
         ):
             self.assertIn(expected, stylesheet)
+        self.assertIn("@media (max-width: 639.98px)", stylesheet)
+        self.assertIn('class="ransomware-map-panel ', template)
+        self.assertIn('class="ransomware-map-frame ', template)
+        self.assertIn(".ransomware-map-frame", stylesheet)
         self.assertIn("ransomware-map-technical-badges hidden", template)
         self.assertNotIn('class="h-[24rem]', template)
 

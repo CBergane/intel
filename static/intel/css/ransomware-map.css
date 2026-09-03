@@ -3,7 +3,7 @@
 }
 
 #ransomware-map-view {
-    height: 18rem;
+    height: clamp(14rem, 64vw, 17.5rem);
 }
 
 @media (min-width: 640px) {
@@ -119,7 +119,26 @@
     100% { opacity: 1; transform: scale(1); }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 639.98px) {
+    #ransomware-map-shell {
+        padding-right: 0.25rem;
+        padding-left: 0.25rem;
+        border-radius: 1.35rem;
+    }
+
+    .ransomware-map-panel {
+        border-radius: 1.15rem;
+    }
+
+    .ransomware-map-frame {
+        padding-right: 0;
+        padding-left: 0;
+    }
+
+    #ransomware-map-view {
+        border-radius: 0.9rem;
+    }
+
     #ransomware-map-view .maplibregl-ctrl-top-right {
         right: 0.25rem;
         top: 0.25rem;
