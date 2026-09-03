@@ -274,13 +274,17 @@ def _has_signal_match(
     return False
 
 
-def _source_tags(item: Item) -> frozenset[str]:
-    source = getattr(item, "source", None)
+def normalize_source_tags(tags) -> frozenset[str]:
     return frozenset(
         str(tag).strip().lower()
-        for tag in (getattr(source, "tags", None) or [])
+        for tag in (tags or [])
         if str(tag).strip()
     )
+
+
+def _source_tags(item: Item) -> frozenset[str]:
+    source = getattr(item, "source", None)
+    return normalize_source_tags(getattr(source, "tags", None))
 
 
 def _raw_country(item: Item) -> str:

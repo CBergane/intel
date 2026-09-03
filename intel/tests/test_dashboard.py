@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from intel.classification import classify_item
 from intel.models import Feed, Item, Source
+from intel.views import DASHBOARD_CANDIDATE_LIMIT
 
 
 class DashboardViewTests(TestCase):
@@ -194,6 +195,56 @@ class DashboardViewTests(TestCase):
 
         self.assertTrue(classify_item(item).nordic_relevance)
         self.assertEqual([row.id for row in response.context["nordic_items"]], [item.id])
+
+    def test_nordic_pulse_and_preview_survive_global_candidate_limit(self):
+        global_feed = self._create_feed(
+            source_name="High Volume Dashboard Desk",
+            source_slug="high-volume-dashboard",
+            section=Feed.Section.ADVISORIES,
+        )
+        nordic_feed = self._create_feed(
+            source_name="CERT-SE",
+            source_slug="cert-se",
+            section=Feed.Section.SWEDEN,
+        )
+        now = timezone.now()
+        unrelated_count = DASHBOARD_CANDIDATE_LIMIT * 2 + 1
+        Item.objects.bulk_create(
+            [
+                Item(
+                    source=global_feed.source,
+                    feed=global_feed,
+                    title=f"Unrelated dashboard bulletin {index}",
+                    title_hash=f"global-dashboard-{index}",
+                    stable_id=f"global-dashboard-{index}",
+                    published_at=now - timedelta(minutes=index),
+                )
+                for index in range(unrelated_count)
+            ]
+        )
+        nordic_item = self._create_item(
+            feed=nordic_feed,
+            title="CERT-SE weekly operational bulletin",
+            published_at=now - timedelta(days=6),
+        )
+
+        with patch("intel.views.classify_item", wraps=classify_item) as classifier:
+            response = self.client.get(reverse("now"))
+
+        metrics = response.context["dashboard_metrics"]
+        self.assertEqual(response.context["threat_pulse"]["nordic"], 1)
+        self.assertEqual(
+            [item.id for item in response.context["nordic_items"]],
+            [nordic_item.id],
+        )
+        self.assertEqual(metrics["candidate_count"], DASHBOARD_CANDIDATE_LIMIT)
+        self.assertEqual(metrics["nordic_candidate_count"], 1)
+        self.assertEqual(metrics["nordic_additional_candidate_count"], 1)
+        self.assertEqual(
+            metrics["classification_calls"], DASHBOARD_CANDIDATE_LIMIT + 1
+        )
+        self.assertEqual(classifier.call_count, DASHBOARD_CANDIDATE_LIMIT + 1)
+        self.assertLess(classifier.call_count, unrelated_count + 1)
 
     def test_research_preview_uses_classifier_research_category(self):
         feed = self._create_feed(

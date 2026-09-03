@@ -22,7 +22,13 @@ from django.utils.text import slugify
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .classification import classify_item
+from .classification import (
+    NORDIC_COUNTRIES,
+    NORDIC_SOURCE_TAGS,
+    NORDIC_TEXT_TERMS,
+    classify_item,
+    normalize_source_tags,
+)
 from .dark_utils import (
     dark_source_suitability_warning,
     extract_links,
@@ -328,6 +334,24 @@ def _validated_time_window(raw_value: str) -> str:
     return selected_time
 
 
+def _nordic_candidate_filter():
+    tagged_source_ids = [
+        source_id
+        for source_id, tags in Source.objects.values_list("id", "tags")
+        if normalize_source_tags(tags) & NORDIC_SOURCE_TAGS
+    ]
+    candidate_filter = (
+        Q(feed__section__icontains=Feed.Section.SWEDEN)
+        | Q(source__slug__icontains="cert-se")
+        | Q(source_id__in=tagged_source_ids)
+    )
+    for country in sorted(NORDIC_COUNTRIES):
+        candidate_filter |= Q(raw_payload__country__icontains=country)
+    for term in NORDIC_TEXT_TERMS:
+        candidate_filter |= Q(title__icontains=term) | Q(summary__icontains=term)
+    return candidate_filter
+
+
 def _build_item_filter_state(request, *, semantic_key):
     queryset = Item.objects.select_related("source", "feed").annotate(
         activity_at=Coalesce("published_at", "created_at")
@@ -339,9 +363,13 @@ def _build_item_filter_state(request, *, semantic_key):
 
     now = timezone.now()
     since = now - TIME_RANGES[selected_time]
+    candidate_queryset = queryset.filter(activity_at__gte=since)
+    if semantic_key == "nordics":
+        candidate_queryset = candidate_queryset.filter(_nordic_candidate_filter())
     candidate_rows = list(
-        queryset.filter(activity_at__gte=since)
-        .order_by("-activity_at", "-id")[: LIST_CANDIDATE_LIMIT + 1]
+        candidate_queryset.order_by("-activity_at", "-id")[
+            : LIST_CANDIDATE_LIMIT + 1
+        ]
     )
     candidate_limit_reached = len(candidate_rows) > LIST_CANDIDATE_LIMIT
     candidates = candidate_rows[:LIST_CANDIDATE_LIMIT]
@@ -514,11 +542,24 @@ def _dashboard_claim(candidates, *, used_ids, predicate, limit):
     return claimed
 
 
-def _build_dashboard_state(candidates, *, now):
+def _build_dashboard_state(candidates, *, now, nordic_candidates=None):
     attention_cutoff = now - timedelta(days=DASHBOARD_ATTENTION_DAYS)
     active_cutoff = now - timedelta(days=DASHBOARD_ACTIVE_DAYS)
+    if nordic_candidates is None:
+        nordic_candidates = candidates
 
-    for item in candidates:
+    candidate_by_id = {item.id: item for item in candidates}
+    resolved_nordic_candidates = []
+    additional_nordic_candidates = []
+    for item in nordic_candidates:
+        resolved_item = candidate_by_id.get(item.id)
+        if resolved_item is None:
+            resolved_item = item
+            candidate_by_id[item.id] = item
+            additional_nordic_candidates.append(item)
+        resolved_nordic_candidates.append(resolved_item)
+
+    for item in [*candidates, *additional_nordic_candidates]:
         item.activity_at = item.activity_at or item.published_at or item.created_at
         item.source_browse_url = _source_destination(
             item.feed.section,
@@ -538,6 +579,17 @@ def _build_dashboard_state(candidates, *, now):
     ]
     active_window_items = [
         item for item in candidates if item.activity_at >= active_cutoff
+    ]
+    nordic_attention_items = [
+        item
+        for item in resolved_nordic_candidates
+        if item.activity_at >= attention_cutoff
+        and item.dashboard_profile.nordic_relevance
+    ]
+    confirmed_nordic_candidates = [
+        item
+        for item in resolved_nordic_candidates
+        if item.dashboard_profile.nordic_relevance
     ]
     priority_candidates = sorted(
         (
@@ -559,9 +611,7 @@ def _build_dashboard_state(candidates, *, now):
         "ransomware": [
             item for item in candidates if item.dashboard_profile.ransomware
         ],
-        "nordic": [
-            item for item in candidates if item.dashboard_profile.nordic_relevance
-        ],
+        "nordic": confirmed_nordic_candidates,
         "research": [
             item for item in candidates if item.dashboard_profile.research
         ],
@@ -590,7 +640,7 @@ def _build_dashboard_state(candidates, *, now):
         limit=DASHBOARD_SECTION_LIMITS["ransomware"],
     )
     nordic_items = _dashboard_claim(
-        candidates,
+        resolved_nordic_candidates,
         used_ids=used_ids,
         predicate=lambda profile: profile.nordic_relevance,
         limit=DASHBOARD_SECTION_LIMITS["nordic"],
@@ -618,9 +668,7 @@ def _build_dashboard_state(candidates, *, now):
         "ransomware": sum(
             item.dashboard_profile.ransomware for item in attention_items
         ),
-        "nordic": sum(
-            item.dashboard_profile.nordic_relevance for item in attention_items
-        ),
+        "nordic": len(nordic_attention_items),
         "high_signal": sum(
             item.dashboard_profile.high_signal for item in attention_items
         ),
@@ -657,7 +705,12 @@ def _build_dashboard_state(candidates, *, now):
         },
         "dashboard_metrics": {
             "candidate_count": len(candidates),
-            "classification_calls": len(candidates),
+            "nordic_candidate_count": len(resolved_nordic_candidates),
+            "nordic_additional_candidate_count": len(
+                additional_nordic_candidates
+            ),
+            "classification_calls": len(candidates)
+            + len(additional_nordic_candidates),
             "section_counts": {
                 key: len(items) for key, items in section_items.items()
             },
@@ -667,15 +720,23 @@ def _build_dashboard_state(candidates, *, now):
 
 def now_view(request):
     now = timezone.now()
-    candidates = list(
-        Item.objects.select_related("source", "feed")
-        .annotate(activity_at=Coalesce("published_at", "created_at"))
-        .filter(
-            activity_at__gte=now - timedelta(days=DASHBOARD_CANDIDATE_DAYS)
-        )
-        .order_by("-activity_at", "-id")[:DASHBOARD_CANDIDATE_LIMIT]
+    candidate_queryset = Item.objects.select_related("source", "feed").annotate(
+        activity_at=Coalesce("published_at", "created_at")
     )
-    dashboard_state = _build_dashboard_state(candidates, now=now)
+    candidate_queryset = candidate_queryset.filter(
+        activity_at__gte=now - timedelta(days=DASHBOARD_CANDIDATE_DAYS)
+    ).order_by("-activity_at", "-id")
+    candidates = list(candidate_queryset[:DASHBOARD_CANDIDATE_LIMIT])
+    nordic_candidates = list(
+        candidate_queryset.filter(_nordic_candidate_filter())[
+            :DASHBOARD_CANDIDATE_LIMIT
+        ]
+    )
+    dashboard_state = _build_dashboard_state(
+        candidates,
+        now=now,
+        nordic_candidates=nordic_candidates,
+    )
 
     enabled_feeds = list(
         Feed.objects.filter(enabled=True)

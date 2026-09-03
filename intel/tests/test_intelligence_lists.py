@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from intel.classification import classify_item
 from intel.models import Feed, Item, Source
+from intel.views import LIST_CANDIDATE_LIMIT
 
 
 class IntelligenceListViewTests(TestCase):
@@ -38,6 +39,7 @@ class IntelligenceListViewTests(TestCase):
         summary="",
         age_hours=1,
         published_at=None,
+        raw_payload=None,
     ):
         self._item_index += 1
         return Item.objects.create(
@@ -45,6 +47,7 @@ class IntelligenceListViewTests(TestCase):
             feed=feed,
             title=title,
             summary=summary,
+            raw_payload=raw_payload or {},
             url=f"https://example.com/intelligence-{self._item_index}",
             stable_id="",
             published_at=published_at or timezone.now() - timedelta(hours=age_hours),
@@ -156,6 +159,90 @@ class IntelligenceListViewTests(TestCase):
         )
         self.assertContains(response, "Nordic relevance · Source metadata")
         self.assertContains(response, "CERT-SE")
+
+    def test_nordics_page_prefilters_before_global_candidate_limit(self):
+        global_feed = self._create_feed(
+            name="High Volume Global Desk",
+            slug="high-volume-global-list",
+        )
+        nordic_feed = self._create_feed(
+            name="CERT-SE",
+            slug="cert-se",
+            section=Feed.Section.SWEDEN,
+        )
+        now = timezone.now()
+        Item.objects.bulk_create(
+            [
+                Item(
+                    source=global_feed.source,
+                    feed=global_feed,
+                    title=f"Unrelated global bulletin {index}",
+                    title_hash=f"global-list-{index}",
+                    stable_id=f"global-list-{index}",
+                    published_at=now - timedelta(seconds=index),
+                )
+                for index in range(LIST_CANDIDATE_LIMIT + 1)
+            ]
+        )
+        nordic_item = self._create_item(
+            feed=nordic_feed,
+            title="CERT-SE weekly operational bulletin",
+            published_at=now - timedelta(days=6),
+        )
+
+        with patch("intel.views.classify_item", wraps=classify_item) as classifier:
+            response = self.client.get(reverse("sweden"), {"time": "7d"})
+
+        self.assertEqual(
+            [item.id for item in response.context["page_obj"].object_list],
+            [nordic_item.id],
+        )
+        self.assertEqual(response.context["list_metrics"]["candidate_count"], 1)
+        self.assertEqual(classifier.call_count, 1)
+        self.assertFalse(response.context["candidate_limit_reached"])
+
+    def test_nordics_prefilter_covers_non_section_evidence(self):
+        country_feed = self._create_feed(
+            name="International Country Desk",
+            slug="international-country-list",
+        )
+        tagged_feed = self._create_feed(
+            name="Tagged Agency Desk",
+            slug="tagged-agency-list",
+            tags=["government", "norway"],
+        )
+        summary_feed = self._create_feed(
+            name="Regional Summary Desk",
+            slug="regional-summary-list",
+        )
+        country_item = self._create_item(
+            feed=country_feed,
+            title="Regional organization activity update",
+            raw_payload={"country": " Finland "},
+        )
+        tagged_item = self._create_item(
+            feed=tagged_feed,
+            title="Government security activity update",
+        )
+        summary_item = self._create_item(
+            feed=summary_feed,
+            title="Regional threat activity update",
+            summary="The campaign affected organizations in Denmark.",
+        )
+
+        response = self.client.get(reverse("sweden"))
+
+        profiles = {
+            item.id: classify_item(item)
+            for item in (country_item, tagged_item, summary_item)
+        }
+        self.assertEqual(profiles[country_item.id].nordic_evidence, "metadata")
+        self.assertEqual(profiles[tagged_item.id].nordic_evidence, "metadata")
+        self.assertEqual(profiles[summary_item.id].nordic_evidence, "summary")
+        self.assertEqual(
+            {item.id for item in response.context["page_obj"].object_list},
+            {country_item.id, tagged_item.id, summary_item.id},
+        )
 
     def test_research_page_uses_classifier_research_semantics(self):
         research_feed = self._create_feed(

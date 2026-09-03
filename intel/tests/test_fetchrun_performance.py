@@ -136,7 +136,25 @@ class FetchRunRequestPathPerformanceTests(TestCase):
             response.context["last_ingest_finished_at"],
             self.error_latest.finished_at,
         )
-        self.assertEqual(len(queries), 3)
+        self.assertEqual(len(queries), 5)
+        query_sql = [query["sql"].lower() for query in queries]
+        self.assertEqual(
+            sum('from "intel_item"' in statement for statement in query_sql),
+            2,
+        )
+        self.assertEqual(
+            sum('from "intel_source"' in statement for statement in query_sql),
+            1,
+        )
+        self.assertEqual(response.context["dashboard_metrics"]["candidate_count"], 0)
+        self.assertEqual(
+            response.context["dashboard_metrics"]["nordic_candidate_count"],
+            0,
+        )
+        self.assertEqual(
+            response.context["dashboard_metrics"]["classification_calls"],
+            0,
+        )
         self.assertEqual(loaded_ids, [])
 
     def test_feed_health_loads_only_one_latest_run_per_feed(self):
