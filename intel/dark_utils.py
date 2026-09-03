@@ -577,8 +577,8 @@ def _fragment_url(fragment: str, base_url: str) -> str:
         context_text = normalize_text(html.unescape(TAG_RE.sub(" ", context))).lower()
         if any(label in context_text for label in ("company website", "website", "site")):
             continue
-        absolute = urljoin(base_url, href)
         try:
+            absolute = urljoin(base_url, href)
             parts = urlsplit(absolute)
         except ValueError:
             continue
@@ -835,8 +835,8 @@ def _absolute_http_url(value: str, *, base_url: str = "") -> str:
     candidate = (value or "").strip()
     if not candidate:
         return ""
-    absolute = urljoin(base_url, candidate)
     try:
+        absolute = urljoin(base_url, candidate)
         parts = urlsplit(absolute)
     except ValueError:
         return ""
@@ -1459,14 +1459,17 @@ def summarize_profile_content(markup: str, *, profile: str, base_url: str = "") 
 def extract_links(markup: str, *, base_url: str, max_links: int = 50) -> list[str]:
     links: list[str] = []
     seen = set()
-    base_parts = urlsplit(base_url)
-    base_host = (base_parts.hostname or "").lower()
+    try:
+        base_parts = urlsplit(base_url)
+        base_host = (base_parts.hostname or "").lower()
+    except ValueError:
+        return []
     for match in HREF_RE.finditer(markup or ""):
         href = (match.group("href") or "").strip()
         if not href:
             continue
-        absolute = urljoin(base_url, href)
         try:
+            absolute = urljoin(base_url, href)
             parts = urlsplit(absolute)
         except ValueError:
             continue

@@ -9,6 +9,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from intel.dark_utils import (
+    _absolute_http_url,
+    _fragment_url,
     extract_links,
     extract_profile_records,
     normalize_dark_country,
@@ -721,6 +723,237 @@ class DarkIngestionTests(TestCase):
             links,
             ["https://gamma.example.com/a", "https://gamma.example.com/b"],
         )
+
+    def test_extract_links_skips_malformed_bracket_urls_and_keeps_valid_sibling(self):
+        for malformed_url in ("http://[", "http://]"):
+            with self.subTest(malformed_url=malformed_url):
+                markup = (
+                    f'<a href="{malformed_url}">Malformed</a>'
+                    '<a href="/valid-report">Valid</a>'
+                    '<a href="https://other.example.com/external">External</a>'
+                )
+
+                links = extract_links(
+                    markup,
+                    base_url="https://gamma.example.com/index",
+                    max_links=10,
+                )
+
+                self.assertEqual(links, ["https://gamma.example.com/valid-report"])
+
+    def test_extract_links_rejects_malformed_base_url(self):
+        for malformed_url in ("http://[", "http://]"):
+            with self.subTest(malformed_url=malformed_url):
+                self.assertEqual(
+                    extract_links(
+                        '<a href="/valid-report">Valid</a>',
+                        base_url=malformed_url,
+                        max_links=10,
+                    ),
+                    [],
+                )
+
+    def test_absolute_http_url_rejects_malformed_bracket_authorities(self):
+        for malformed_url in ("http://[", "http://]"):
+            with self.subTest(malformed_url=malformed_url):
+                self.assertEqual(
+                    _absolute_http_url(
+                        malformed_url,
+                        base_url="https://gamma.example.com/page",
+                    ),
+                    "",
+                )
+
+    def test_fragment_url_skips_malformed_candidate_and_uses_valid_sibling(self):
+        for malformed_url in ("http://[", "http://]"):
+            with self.subTest(malformed_url=malformed_url):
+                fragment = (
+                    f'<a href="{malformed_url}">Malformed record link</a>'
+                    '<a href="/incidents/valid">Valid record link</a>'
+                )
+
+                self.assertEqual(
+                    _fragment_url(fragment, "https://gamma.example.com/page"),
+                    "https://gamma.example.com/incidents/valid",
+                )
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
+    def test_incident_cards_survive_malformed_website_and_record_single_page_telemetry(self):
+        self.source.extractor_profile = DarkSource.ExtractorProfile.INCIDENT_CARDS
+        self.source.save(update_fields=["extractor_profile", "updated_at"])
+        markup = """
+        <html><title>Live Updates</title><body>
+            <article class="incident-card">
+                <h3>Malformed Link Corp</h3>
+                <p>Threat Group: Akira</p>
+                <p>Country: Sweden</p>
+                <p>Industry: Manufacturing</p>
+                <a href="/incidents/broken-website">Incident details</a>
+                <p>Website: http://[</p>
+                <p>Victim disclosure posted with extortion details and a response timeline.</p>
+            </article>
+            <article class="incident-card">
+                <h3>Valid Sibling Corp</h3>
+                <p>Threat Group: Play</p>
+                <p>Country: Norway</p>
+                <p>Industry: Retail</p>
+                <a href="/incidents/valid-sibling">Incident details</a>
+                <p>Website: https://valid-sibling.example</p>
+                <p>Victim disclosure posted with extortion details and a response timeline.</p>
+            </article>
+        </body></html>
+        """
+        payload = markup.encode("utf-8")
+        final_url = "https://gamma.example.com/final-live-updates"
+        response = DummyResponse([payload], status_code=206, url=final_url)
+
+        with patch(
+            "intel.management.commands.ingest_dark.requests.get",
+            return_value=response,
+        ):
+            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+
+        run = DarkFetchRun.objects.get(dark_source=self.source)
+        hits = {
+            hit.title: hit for hit in DarkHit.objects.filter(dark_source=self.source)
+        }
+        self.assertTrue(run.ok)
+        self.assertEqual(run.http_status, 206)
+        self.assertEqual(run.final_url, final_url)
+        self.assertEqual(run.bytes_received, len(payload))
+        self.assertEqual(run.documents_fetched, 1)
+        self.assertEqual(set(hits), {"Malformed Link Corp", "Valid Sibling Corp"})
+        self.assertEqual(hits["Malformed Link Corp"].website_url, "")
+        self.assertEqual(
+            hits["Malformed Link Corp"].url,
+            "https://gamma.example.com/incidents/broken-website",
+        )
+        self.assertEqual(
+            hits["Valid Sibling Corp"].website_url,
+            "https://valid-sibling.example",
+        )
+
+    def test_table_rows_survive_malformed_website_and_keep_valid_sibling(self):
+        markup = """
+        <table>
+            <thead><tr><th>Group</th><th>Website</th><th>Notes</th></tr></thead>
+            <tbody>
+                <tr><td>Akira</td><td>http://]</td><td>Recent victim disclosures</td></tr>
+                <tr><td>Play</td><td>https://play.example</td><td>Current extortion activity</td></tr>
+            </tbody>
+        </table>
+        """
+
+        records = extract_profile_records(
+            markup,
+            profile="table_rows",
+            base_url="https://gamma.example.com/page",
+        )
+
+        records_by_title = {record.title: record for record in records}
+        self.assertEqual(set(records_by_title), {"Akira", "Play"})
+        self.assertEqual(records_by_title["Akira"].website_url, "")
+        self.assertEqual(records_by_title["Play"].website_url, "https://play.example")
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_INDEX_MAX_LINKS=5)
+    def test_index_discovery_skips_malformed_links_and_fetches_valid_sibling(self):
+        self.source.source_type = DarkSource.SourceType.INDEX_PAGE
+        self.source.url = "https://gamma.example.com/index"
+        self.source.save(update_fields=["source_type", "url", "updated_at"])
+        root_html = (
+            '<a href="http://[">Malformed opening bracket</a>'
+            '<a href="http://]">Malformed closing bracket</a>'
+            '<a href="/valid-report">Valid report</a>'
+        ).encode("utf-8")
+        requested_urls = []
+
+        def fake_get(url, **kwargs):
+            del kwargs
+            requested_urls.append(url)
+            if url == self.source.url:
+                return DummyResponse([root_html], url=url)
+            if url == "https://gamma.example.com/valid-report":
+                return DummyResponse(
+                    [b"<html><title>Valid report</title><body>Current report details.</body></html>"],
+                    url=url,
+                )
+            raise AssertionError(f"Unexpected URL fetched: {url}")
+
+        with patch("intel.management.commands.ingest_dark.requests.get", side_effect=fake_get):
+            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+
+        run = DarkFetchRun.objects.get(dark_source=self.source)
+        self.assertTrue(run.ok)
+        self.assertEqual(run.documents_discovered, 2)
+        self.assertEqual(run.documents_fetched, 2)
+        self.assertEqual(
+            requested_urls,
+            [self.source.url, self.source.url, "https://gamma.example.com/valid-report"],
+        )
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_INDEX_MAX_LINKS=5)
+    def test_feed_discovery_skips_malformed_links_and_fetches_valid_sibling(self):
+        self.source.source_type = DarkSource.SourceType.FEED
+        self.source.url = "https://gamma.example.com/feed.xml"
+        self.source.save(update_fields=["source_type", "url", "updated_at"])
+        feed_markup = b"""
+        <rss version="2.0"><channel><title>Gamma feed</title>
+            <item><title>Malformed open</title><link>http://[</link></item>
+            <item><title>Malformed close</title><link>http://]</link></item>
+            <item><title>Valid report</title><link>https://gamma.example.com/valid-report</link></item>
+            <item><title>External report</title><link>https://other.example.com/report</link></item>
+        </channel></rss>
+        """
+        requested_urls = []
+
+        def fake_get(url, **kwargs):
+            del kwargs
+            requested_urls.append(url)
+            if url == self.source.url:
+                return DummyResponse([feed_markup], url=url)
+            if url == "https://gamma.example.com/valid-report":
+                return DummyResponse(
+                    [b"<html><title>Valid report</title><body>Current report details.</body></html>"],
+                    url=url,
+                )
+            raise AssertionError(f"Unexpected URL fetched: {url}")
+
+        with patch("intel.management.commands.ingest_dark.requests.get", side_effect=fake_get):
+            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+
+        run = DarkFetchRun.objects.get(dark_source=self.source)
+        self.assertTrue(run.ok)
+        self.assertEqual(run.documents_discovered, 1)
+        self.assertEqual(run.documents_fetched, 1)
+        self.assertEqual(
+            requested_urls,
+            [self.source.url, "https://gamma.example.com/valid-report"],
+        )
+
+    @override_settings(DARK_FETCH_RETRIES=1, DARK_INDEX_MAX_LINKS=5)
+    def test_feed_discovery_returns_no_links_for_malformed_source_host(self):
+        self.source.source_type = DarkSource.SourceType.FEED
+        self.source.url = "http://["
+        self.source.save(update_fields=["source_type", "url", "updated_at"])
+        feed_markup = b"""
+        <rss version="2.0"><channel><title>Gamma feed</title>
+            <item><title>Report</title><link>https://other.example.com/report</link></item>
+        </channel></rss>
+        """
+        response = DummyResponse([feed_markup], url=self.source.url)
+
+        with patch(
+            "intel.management.commands.ingest_dark.requests.get",
+            return_value=response,
+        ) as mocked_get:
+            call_command("ingest_dark", stdout=StringIO(), stderr=StringIO())
+
+        run = DarkFetchRun.objects.get(dark_source=self.source)
+        self.assertTrue(run.ok)
+        self.assertEqual(run.documents_discovered, 0)
+        self.assertEqual(run.documents_fetched, 0)
+        self.assertEqual(run.bytes_received, len(feed_markup))
+        mocked_get.assert_called_once()
 
     @override_settings(DARK_FETCH_RETRIES=1, DARK_MAX_BYTES=5000)
     def test_extraction_removes_style_and_boilerplate_noise(self):

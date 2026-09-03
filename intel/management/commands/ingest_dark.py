@@ -98,6 +98,9 @@ class Command(BaseCommand):
                     markup, status, final_url, doc_bytes = self._fetch_with_retries(doc_url, source)
                     bytes_received_total += doc_bytes
                     docs_fetched += 1
+                    if source.source_type == DarkSource.SourceType.SINGLE_PAGE:
+                        run.http_status = status
+                        run.final_url = final_url
                     created_count, updated_count = self._upsert_document_and_hits(
                         source=source,
                         doc_url=doc_url,
@@ -166,7 +169,10 @@ class Command(BaseCommand):
             if getattr(parsed, "bozo", False) and getattr(parsed, "entries", None) is None:
                 raise ValueError(f"Invalid dark feed payload: {parsed.bozo_exception}")
             docs = []
-            source_host = (urlsplit(source.url).hostname or "").lower()
+            try:
+                source_host = (urlsplit(source.url).hostname or "").lower()
+            except ValueError:
+                return docs, status, final_url, bytes_received
             for entry in parsed.entries:
                 link = (
                     entry.get("link")
