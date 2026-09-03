@@ -140,6 +140,56 @@ class RansomDbCountryExtractionTests(SimpleTestCase):
             provenance="labeled_text",
         )
 
+    def test_country_sibling_wins_over_parent_with_later_industry_field(self):
+        cases = (
+            ("Spain", "IT services", "Spain", "ESP"),
+            ("South Africa", "Fleet management", "South Africa", "ZAF"),
+            ("United States", "Dental care", "United States", "USA"),
+        )
+
+        for source_value, industry, canonical_name, country_code in cases:
+            with self.subTest(country=source_value, industry=industry):
+                record = self._extract_record(
+                    f"""
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-dark-text-secondary">Country:</span>
+                            <span class="text-white font-medium"> {source_value} </span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-dark-text-secondary">Industry:</span>
+                            <span class="text-white font-medium"> {industry} </span>
+                        </div>
+                    </div>
+                    """
+                )
+
+                self.assertCountryEvidence(
+                    record,
+                    source_value=source_value,
+                    canonical_name=canonical_name,
+                    country_code=country_code,
+                    provenance="labeled_text",
+                )
+
+    def test_structurally_isolated_multi_country_value_remains_valid(self):
+        record = self._extract_record(
+            """
+            <div class="country-field">
+                <span>Country:</span>
+                <span>Myanmar / United States</span>
+            </div>
+            """
+        )
+
+        self.assertCountryEvidence(
+            record,
+            source_value="Myanmar / United States",
+            canonical_name="Myanmar",
+            country_code="MMR",
+            provenance="labeled_text",
+        )
+
     def test_iso2_flag_in_country_context_is_extracted(self):
         record = self._extract_record(
             '<img src="/assets/images/flags/se.png" alt="SE" />'

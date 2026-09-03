@@ -369,6 +369,29 @@ class RansomwareMapViewTests(TestCase):
         self.assertEqual(response.context["summary"]["countryless_count"], 1)
         self.assertEqual(response.context["latest_victims"][0]["country_url"], "")
 
+    def test_html_entity_semicolon_does_not_create_country_candidate(self):
+        identity = normalize_ransomware_country(
+            "United States Industry: Advertising, Marketing &amp; PR"
+        )
+
+        self.assertFalse(identity.recognized)
+        self.assertEqual(identity.country_id, "")
+        self.assertEqual(
+            identity.display_name,
+            "United States Industry: Advertising, Marketing & PR",
+        )
+
+    def test_multi_country_split_does_not_cross_labeled_metadata_boundary(self):
+        malformed = normalize_ransomware_country(
+            "Myanmar / United States Industry: Higher Education"
+        )
+        isolated = normalize_ransomware_country("Myanmar / United States")
+
+        self.assertFalse(malformed.recognized)
+        self.assertEqual(malformed.country_id, "")
+        self.assertTrue(isolated.recognized)
+        self.assertEqual(isolated.country_id, "MMR")
+
     def test_recognized_country_no_longer_needs_manual_coordinates(self):
         from intel import views
 

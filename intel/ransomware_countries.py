@@ -1,3 +1,4 @@
+import html
 import json
 import re
 import unicodedata
@@ -140,15 +141,22 @@ RANSOMWARE_COUNTRY_LOOKUP = _build_country_lookup()
 
 
 def normalize_ransomware_country(value: str) -> RansomwareCountryIdentity:
-    cleaned = WHITESPACE_RE.sub(" ", str(value or "")).strip()
+    # Decode entities before delimiter handling so the semicolon terminating
+    # an entity (for example ``&amp;``) cannot become a country-list separator.
+    cleaned = WHITESPACE_RE.sub(" ", html.unescape(str(value or ""))).strip()
     if not cleaned:
         return RansomwareCountryIdentity()
 
     candidates = [cleaned]
-    for part in COUNTRY_VALUE_SPLIT_RE.split(cleaned):
-        part = WHITESPACE_RE.sub(" ", part).strip()
-        if part and part not in candidates:
-            candidates.append(part)
+    # A canonical country value never contains a labeled metadata boundary.
+    # Do not split malformed cross-field text and accidentally validate one
+    # fragment as geography; a structurally isolated multi-country value has
+    # no colon and remains supported.
+    if ":" not in cleaned:
+        for part in COUNTRY_VALUE_SPLIT_RE.split(cleaned):
+            part = WHITESPACE_RE.sub(" ", part).strip()
+            if part and part not in candidates:
+                candidates.append(part)
 
     for candidate in candidates:
         key = _lookup_key(candidate)

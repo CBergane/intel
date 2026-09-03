@@ -648,13 +648,26 @@ def _is_country_label(value: str) -> bool:
     return cleaned in INCIDENT_COUNTRY_LABELS
 
 
+_FOLLOWING_INCIDENT_FIELD_RE = re.compile(
+    r"(?:^|\s)(?:industry|sector|website|company\s+website|official\s+website|"
+    r"threat\s+group|ransomware\s+group|group|gang|actor|victim|last\s+activity|"
+    r"last\s+seen|last\s+update|updated)\s*:",
+    re.IGNORECASE,
+)
+
+
+def _has_following_incident_field(value: str) -> bool:
+    """Return whether a purported country value includes another metadata field."""
+
+    return bool(_FOLLOWING_INCIDENT_FIELD_RE.search(value))
+
+
 def _labeled_country_value(nodes: list[_MarkupNode]) -> str | None:
     pattern = _country_label_pattern()
-    for node in nodes:
-        match = pattern.match(_markup_node_text(node))
-        if match:
-            return _clean_structured_text(match.group(1), max_length=120)
 
+    # Prefer the exact label/value relationship. Ancestor text can flatten
+    # several adjacent metadata fields into one string (for example,
+    # ``Country: Spain Industry: IT services``).
     parents = []
     seen_parent_ids = set()
     for node in nodes:
@@ -669,8 +682,30 @@ def _labeled_country_value(nodes: list[_MarkupNode]) -> str | None:
                 continue
             for sibling in children[index + 1 :]:
                 value = _markup_node_text(sibling)
-                if value:
+                if value and not _has_following_incident_field(value):
                     return value
+
+    # Same-node labels are still supported, but only when the bounded node is
+    # not carrying a later structured metadata field. Evaluate the deepest
+    # nodes first so a precise field cannot be overridden by an ancestor.
+    candidates: list[tuple[int, int, str]] = []
+    for node in nodes:
+        node_text = _markup_node_text(node)
+        match = pattern.match(node_text)
+        if not match:
+            continue
+        value = _clean_structured_text(match.group(1), max_length=120)
+        if not value or _has_following_incident_field(value):
+            continue
+        depth = 0
+        parent = node.parent
+        while parent is not None:
+            depth += 1
+            parent = parent.parent
+        candidates.append((depth, -len(node_text), value))
+
+    if candidates:
+        return max(candidates)[2]
     return None
 
 

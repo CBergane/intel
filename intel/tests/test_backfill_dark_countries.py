@@ -152,6 +152,60 @@ class BackfillDarkCountriesTests(TestCase):
         self.assertEqual(hit.country, "Canada")
         self.assertIn("changed=1", stdout.getvalue())
 
+    def test_dry_run_accepts_bounded_country_and_rejects_cross_field_value(self):
+        clean = self._hit(
+            "Nuvitia.com",
+            raw=self._raw_card(
+                "Nuvitia.com",
+                """
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="flex items-center gap-2">
+                        <span class="text-dark-text-secondary">Country:</span>
+                        <span class="text-white font-medium"> Spain </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-dark-text-secondary">Industry:</span>
+                        <span class="text-white font-medium"> IT services </span>
+                    </div>
+                </div>
+                """,
+            ),
+        )
+        unsafe = self._hit(
+            "Altavista strategic partners",
+            raw=self._raw_card(
+                "Altavista strategic partners",
+                "<p>Country: United States Industry: Advertising, Marketing &amp; PR</p>",
+            ),
+        )
+        unsafe_multi = self._hit(
+            "Parami university",
+            raw=self._raw_card(
+                "Parami university",
+                "<p>Country: Myanmar / United States Industry: Higher Education</p>",
+            ),
+        )
+
+        stdout = StringIO()
+        call_command(
+            "backfill_dark_countries",
+            source=self.source.slug,
+            stdout=stdout,
+        )
+
+        self.assertIn("mode=dry-run", stdout.getvalue())
+        self.assertIn(
+            "scanned=3 candidates=3 reparsed=3 recognized=1 "
+            "changed=1 unchanged=0 rejected=2",
+            stdout.getvalue(),
+        )
+        clean.refresh_from_db()
+        unsafe.refresh_from_db()
+        unsafe_multi.refresh_from_db()
+        self.assertEqual(clean.country, "")
+        self.assertEqual(unsafe.country, "")
+        self.assertEqual(unsafe_multi.country, "")
+
     def test_source_must_exist_and_use_incident_cards(self):
         with self.assertRaisesMessage(CommandError, "was not found"):
             call_command(
