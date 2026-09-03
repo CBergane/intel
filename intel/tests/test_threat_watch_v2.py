@@ -150,7 +150,49 @@ class ThreatWatchV2Tests(TestCase):
         self.assertEqual(source_row["incident_count"], 2)
         self.assertEqual(source_row["mapped_incident_count"], 1)
         self.assertEqual(source_row["geography_coverage_percent"], 50)
-        self.assertContains(response, "Geography coverage: 1 / 2 incidents (50%)")
+        self.assertContains(response, "1 / 2 mapped · 50% geography")
+
+    def test_mobile_console_markup_supports_progressive_disclosure(self):
+        for index in range(8):
+            self._hit(
+                title=f"Mobile activity {index}",
+                actor=f"Mobile Actor {index}",
+                country=("Sweden", "Norway", "Denmark")[index % 3],
+                matched=index % 2 == 0,
+            )
+
+        response = self.client.get(THREAT_WATCH_URL)
+        html = response.content.decode()
+
+        self.assertEqual(len(response.context["incoming_activity"]), 8)
+        self.assertEqual(len(response.context["top_actors"]), 8)
+        self.assertEqual(html.count('class="threat-watch-activity-row '), 8)
+        self.assertContains(response, 'id="threat-watch-incoming-toggle"', html=False)
+        self.assertContains(response, 'aria-controls="threat-watch-incoming-list"', html=False)
+        self.assertContains(response, 'id="threat-watch-actor-toggle"', html=False)
+        self.assertContains(response, 'aria-controls="threat-watch-top-actors"', html=False)
+        self.assertContains(response, 'id="threat-watch-country-toggle"', html=False)
+        self.assertContains(response, 'aria-controls="threat-watch-country-list"', html=False)
+        self.assertContains(response, 'class="threat-watch-panel order-2"', html=False)
+        self.assertContains(response, 'class="threat-watch-panel order-3"', html=False)
+        self.assertContains(response, 'class="threat-watch-panel order-4"', html=False)
+        self.assertContains(response, 'class="threat-watch-panel order-6"', html=False)
+
+    def test_mobile_filters_keep_server_inputs_and_primary_controls(self):
+        response = self.client.get(
+            THREAT_WATCH_URL,
+            {"window": "24h", "source": self.source.slug, "match": "matched", "country": "Sweden"},
+        )
+
+        self.assertContains(response, 'class="threat-watch-filter-disclosure', html=False)
+        self.assertContains(response, 'id="threat-watch-filter-toggle"', html=False)
+        self.assertContains(response, 'aria-controls="threat-watch-filter-secondary"', html=False)
+        self.assertContains(response, 'name="source"', html=False)
+        self.assertContains(response, 'name="window"', html=False)
+        self.assertContains(response, 'name="match"', html=False)
+        self.assertContains(response, 'type="hidden" name="country" value="Sweden"', html=False)
+        self.assertContains(response, '>Apply</button>', html=False)
+        self.assertContains(response, '>Clear</a>', html=False)
 
     def test_filters_and_selected_country_remain_server_authoritative(self):
         other_source = DarkSource.objects.create(
@@ -232,6 +274,8 @@ class ThreatWatchV2Tests(TestCase):
         self.assertNotIn("createelementns", script.lower())
         self.assertIn('promoteId: "country_id"', script)
         self.assertIn("map.isSourceLoaded(countrySourceId)", script)
+        self.assertIn("ResizeObserver", script)
+        self.assertIn("map.resize()", script)
         self.assertIn("textContent", script)
 
     def test_bundled_geometry_contains_representative_canonical_ids(self):

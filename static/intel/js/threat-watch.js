@@ -13,6 +13,13 @@
     const topActors = document.getElementById("threat-watch-top-actors");
     const countryList = document.getElementById("threat-watch-country-list");
     const sourceCoverage = document.getElementById("threat-watch-source-coverage");
+    const incomingToggle = document.getElementById("threat-watch-incoming-toggle");
+    const actorToggle = document.getElementById("threat-watch-actor-toggle");
+    const countryToggle = document.getElementById("threat-watch-country-toggle");
+    const summaryContext = page.querySelector(".threat-watch-summary-context");
+    const filterDisclosure = page.querySelector(".threat-watch-filter-disclosure");
+    const filterToggle = document.getElementById("threat-watch-filter-toggle");
+    const mobileLayout = window.matchMedia("(max-width: 1023px)");
     const pollUrl = page.dataset.pollUrl || "";
     const pollInterval = Math.max(
         Number.parseInt(page.dataset.liveInterval || "25000", 10) || 25000,
@@ -29,6 +36,8 @@
     let countryActivity = new Map();
     let appliedCountryIds = new Set();
     let geometryCountryIds = new Set();
+    let mapResizeObserver = null;
+    let mapResizeFrame = null;
     const countrySourceId = "threat-watch-world-countries";
     const countryFillLayerId = "threat-watch-country-fill";
 
@@ -79,6 +88,109 @@
         container.replaceChildren(createElement("p", "text-sm leading-6 text-slate-400", message));
     };
 
+    const disclosures = [
+        {
+            container: incomingList,
+            button: incomingToggle,
+            countId: "threat-watch-incoming-count",
+            itemSelector: ":scope > .threat-watch-activity-row",
+            mobileLimit: 4,
+            collapsedLabel: (remaining) => `View ${remaining} more activit${remaining === 1 ? "y" : "y items"}`,
+        },
+        {
+            container: topActors,
+            button: actorToggle,
+            countId: "threat-watch-actor-count",
+            itemSelector: ":scope > a",
+            mobileLimit: 5,
+            desktopLimit: 6,
+            collapsedLabel: (remaining) => `View ${remaining} more actor${remaining === 1 ? "" : "s"}`,
+        },
+        {
+            container: countryList,
+            button: countryToggle,
+            countId: "threat-watch-country-count",
+            itemSelector: ":scope > a",
+            mobileLimit: 0,
+            collapsedLabel: (remaining) => `Show ${remaining} countr${remaining === 1 ? "y" : "ies"}`,
+            collapsedCount: (count) => `${count} available`,
+        },
+    ];
+
+    const disclosureItemCount = (disclosure) =>
+        disclosure.container?.querySelectorAll(disclosure.itemSelector).length || 0;
+
+    const syncDisclosure = (disclosure) => {
+        const {container, button} = disclosure;
+        if (!container || !button) return;
+        const count = disclosureItemCount(disclosure);
+        const isMobile = mobileLayout.matches;
+        const canCollapse = isMobile && count > disclosure.mobileLimit;
+        const isExpanded = container.dataset.mobileExpanded === "true";
+        const isCollapsed = canCollapse && !isExpanded;
+
+        if (isMobile) container.dataset.mobileCollapsed = String(isCollapsed);
+        else delete container.dataset.mobileCollapsed;
+
+        button.hidden = !canCollapse;
+        button.setAttribute("aria-expanded", String(canCollapse && isExpanded));
+        if (canCollapse) {
+            button.textContent = isExpanded
+                ? "Show fewer"
+                : disclosure.collapsedLabel(count - disclosure.mobileLimit);
+        }
+
+        const visibleCount = isMobile
+            ? (isCollapsed ? disclosure.mobileLimit : count)
+            : Math.min(count, disclosure.desktopLimit || count);
+        const countText = isCollapsed && disclosure.collapsedCount
+            ? disclosure.collapsedCount(count)
+            : `${visibleCount} shown`;
+        setText(disclosure.countId, countText);
+    };
+
+    const syncDisclosures = () => disclosures.forEach(syncDisclosure);
+
+    const syncResponsiveDetails = () => {
+        if (summaryContext) {
+            if (mobileLayout.matches) summaryContext.removeAttribute("open");
+            else summaryContext.setAttribute("open", "");
+        }
+        if (!filterDisclosure || !filterToggle) return;
+        if (mobileLayout.matches && !filterDisclosure.hasAttribute("data-mobile-collapsed")) {
+            filterDisclosure.dataset.mobileCollapsed = String(
+                filterDisclosure.dataset.filterActive !== "true",
+            );
+        }
+        const isCollapsed = mobileLayout.matches
+            && filterDisclosure.dataset.mobileCollapsed === "true";
+        filterToggle.setAttribute("aria-expanded", String(!isCollapsed));
+    };
+
+    const syncResponsiveLayout = () => {
+        syncDisclosures();
+        syncResponsiveDetails();
+    };
+
+    disclosures.forEach((disclosure) => {
+        disclosure.button?.addEventListener("click", () => {
+            disclosure.container.dataset.mobileExpanded = String(
+                disclosure.container.dataset.mobileExpanded !== "true",
+            );
+            syncDisclosure(disclosure);
+        });
+    });
+
+    filterToggle?.addEventListener("click", () => {
+        if (!mobileLayout.matches) return;
+        filterDisclosure.dataset.mobileCollapsed = String(
+            filterDisclosure.dataset.mobileCollapsed !== "true",
+        );
+        syncResponsiveDetails();
+    });
+
+    mobileLayout.addEventListener("change", syncResponsiveLayout);
+
     const status = (text, tone = "ok") => {
         const element = document.getElementById("threat-watch-live-status");
         if (!element) return;
@@ -93,6 +205,7 @@
         setText("threat-watch-incoming-count", `${rows.length} shown`);
         if (!rows.length) {
             renderEmpty(incomingList, "No incoming activity in the selected window.");
+            syncDisclosure(disclosures[0]);
             return;
         }
         const fragment = document.createDocumentFragment();
@@ -125,6 +238,7 @@
             fragment.append(article);
         });
         incomingList.replaceChildren(fragment);
+        syncDisclosure(disclosures[0]);
     };
 
     const actorRow = (row, {detailed = false} = {}) => {
@@ -172,11 +286,13 @@
         if (!topActors) return;
         if (!rows.length) {
             renderEmpty(topActors, "No actor identities matched the current filters.");
+            syncDisclosure(disclosures[1]);
             return;
         }
         const fragment = document.createDocumentFragment();
-        rows.slice(0, 6).forEach((row) => fragment.append(actorRow(row)));
+        rows.forEach((row) => fragment.append(actorRow(row)));
         topActors.replaceChildren(fragment);
+        syncDisclosure(disclosures[1]);
     };
 
     const renderCountries = (rows) => {
@@ -184,6 +300,7 @@
         if (!countryList) return;
         if (!rows.length) {
             renderEmpty(countryList, "No recognized geographic evidence matches the current filters.");
+            syncDisclosure(disclosures[2]);
             return;
         }
         const fragment = document.createDocumentFragment();
@@ -204,6 +321,7 @@
             fragment.append(link);
         });
         countryList.replaceChildren(fragment);
+        syncDisclosure(disclosures[2]);
     };
 
     const renderSources = (rows) => {
@@ -214,21 +332,21 @@
         }
         const fragment = document.createDocumentFragment();
         rows.forEach((row) => {
-            const link = createInternalLink(row.url, "block rounded-xl border border-line/80 bg-slate-950/35 p-3 transition hover:border-sky-400/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70");
+            const link = createInternalLink(row.url, "threat-watch-coverage-row block rounded-xl border border-line/80 bg-slate-950/35 p-3 transition hover:border-sky-400/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70");
             link.append(
                 createElement("span", "block break-words text-sm font-medium text-white", row.source_name),
                 createElement(
                     "span",
-                    "mt-1 block text-[11px] leading-5 text-slate-400",
+                    "threat-watch-coverage-row__metrics mt-1 block text-[11px] leading-5 text-slate-400",
                     `${countLabel(row.record_count, "record")} · ${countLabel(row.group_count, "actor")} · ${countLabel(row.watch_match_count, "watch match", "watch matches")}`,
                 ),
             );
             const coverage = row.incident_count
-                ? `Geography coverage: ${row.mapped_incident_count} / ${row.incident_count} incidents (${row.geography_coverage_percent}%)`
-                : "No incident denominator; actor evidence only";
+                ? `${row.mapped_incident_count} / ${row.incident_count} mapped · ${row.geography_coverage_percent}% geography`
+                : "No incident denominator · actor evidence only";
             link.append(
-                createElement("span", "mt-2 block text-[11px] text-slate-500", coverage),
-                createElement("span", "mt-1 block text-[10px] text-slate-500", `Freshness: ${relativeTime(row.latest_activity_at)}`),
+                createElement("span", "threat-watch-coverage-row__geography mt-2 block text-[11px] text-slate-500", coverage),
+                createElement("span", "threat-watch-coverage-row__freshness mt-1 block text-[10px] text-slate-500", `Freshness: ${relativeTime(row.latest_activity_at)}`),
             );
             fragment.append(link);
         });
@@ -348,6 +466,16 @@
     };
 
     const sourceLoaded = () => Boolean(map?.getSource(countrySourceId) && map.isSourceLoaded(countrySourceId));
+    const scheduleMapResize = () => {
+        if (!map || mapResizeFrame !== null) return;
+        mapResizeFrame = window.requestAnimationFrame(() => {
+            mapResizeFrame = null;
+            map.resize();
+        });
+    };
+    const resizeVisibleMap = () => {
+        if (!document.hidden) scheduleMapResize();
+    };
     const initializeLoadedSource = () => {
         if (mapReady || !sourceLoaded()) return false;
         geometryCountryIds = new Set(map.querySourceFeatures(countrySourceId).map(countryIdForFeature).filter(Boolean));
@@ -355,6 +483,7 @@
         applyCountryState();
         mapFallback?.classList.add("hidden");
         map.fitBounds([[-180, -72], [180, 84]], {padding: window.innerWidth < 640 ? 8 : 24, duration: 0});
+        scheduleMapResize();
         return true;
     };
 
@@ -366,6 +495,13 @@
         map = new maplibregl.Map({container: mapElement, style: styleUrl, center: [12, 18], zoom: window.innerWidth < 640 ? 0.25 : 0.9, minZoom: 0, maxZoom: 5.5, attributionControl: false, dragRotate: false, touchPitch: false, renderWorldCopies: false});
         map.addControl(new maplibregl.AttributionControl({compact: true}), "bottom-right");
         map.addControl(new maplibregl.NavigationControl({showCompass: false}), "top-right");
+        if ("ResizeObserver" in window) {
+            mapResizeObserver = new ResizeObserver(scheduleMapResize);
+            mapResizeObserver.observe(mapElement);
+        }
+        window.addEventListener("resize", scheduleMapResize);
+        window.addEventListener("orientationchange", scheduleMapResize);
+        document.addEventListener("visibilitychange", resizeVisibleMap);
         const failureTimer = window.setTimeout(() => {
             if (!mapReady) mapFallback?.classList.remove("hidden");
         }, 9000);
@@ -440,6 +576,7 @@
 
     const initialCountries = parseInitialCountries();
     countryActivity = new Map(initialCountries.map((row) => [String(row.country_id || row.country_key || ""), row]));
+    syncResponsiveLayout();
     initializeMap();
     startPolling();
 
@@ -454,6 +591,12 @@
 
     window.addEventListener("pagehide", () => {
         if (pollTimer) window.clearInterval(pollTimer);
+        mobileLayout.removeEventListener("change", syncResponsiveLayout);
+        mapResizeObserver?.disconnect();
+        if (mapResizeFrame !== null) window.cancelAnimationFrame(mapResizeFrame);
+        window.removeEventListener("resize", scheduleMapResize);
+        window.removeEventListener("orientationchange", scheduleMapResize);
+        document.removeEventListener("visibilitychange", resizeVisibleMap);
         popup?.remove();
         map?.remove();
     }, {once: true});

@@ -19,7 +19,13 @@
             <div class="app-topbar__inner">
                 <a href="{% url 'now' %}" class="app-mobile-brand">
                     <span class="app-mobile-brand__mark" aria-hidden="true"></span>
-                    BorealSec Intel
+                    <span class="min-w-0">
+                        <span class="app-mobile-brand__identity">BorealSec Intel</span>
+                        <span class="app-mobile-brand__context">
+                            {% if page_group %}{{ page_group }}{% else %}Console{% endif %}
+                            {% if active_navigation_item %}<span aria-hidden="true"> / </span>{{ active_navigation_item.label }}{% endif %}
+                        </span>
+                    </span>
                 </a>
                 <button
                     id="mobile-nav-toggle"

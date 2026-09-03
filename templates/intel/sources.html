@@ -86,9 +86,9 @@
                     </div>
                 </div>
 
-                <div class="mt-5 grid gap-4 xl:grid-cols-2">
+                <div class="mt-5 grid min-w-0 gap-4 xl:grid-cols-2">
                     {% for source_row in section.sources %}
-                        <article class="rounded-2xl border border-line/80 bg-slate-950/35 p-4">
+                        <article class="min-w-0 rounded-2xl border border-line/80 bg-slate-950/35 p-4">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="min-w-0">
                                     <h3 class="min-w-0 break-words text-base font-medium text-white">{{ source_row.source.name }}</h3>
@@ -133,7 +133,7 @@
                                 </div>
                                 <div class="space-y-2.5">
                                     {% for item in source_row.recent_items %}
-                                        <article class="rounded-xl border border-line/70 bg-slate-950/55 p-3">
+                                        <article class="min-w-0 rounded-xl border border-line/70 bg-slate-950/55 p-3">
                                             <div class="flex items-start justify-between gap-3">
                                                 <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer" class="min-w-0 flex-1 text-sm font-medium text-white transition hover:text-sky-200">
                                                     <span class="block overflow-hidden break-words [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{{ item.title }}</span>

@@ -23,36 +23,26 @@ document.body.addEventListener("showToast", (event) => {
     if (!shell || !panel || !toggle || !close || !backdrop) return;
 
     const openNav = () => {
-        shell.classList.remove("hidden", "pointer-events-none");
         shell.setAttribute("aria-hidden", "false");
-        requestAnimationFrame(() => {
-            panel.classList.remove("translate-x-full");
-            backdrop.classList.remove("opacity-0");
-        });
         toggle.setAttribute("aria-expanded", "true");
+        toggle.setAttribute("aria-label", "Close navigation");
         document.body.classList.add("overflow-hidden");
         close.focus();
     };
 
-    const closeNav = () => {
+    const closeNav = ({restoreFocus = true} = {}) => {
         if (shell.getAttribute("aria-hidden") === "true") return;
-        panel.classList.add("translate-x-full");
-        backdrop.classList.add("opacity-0");
         toggle.setAttribute("aria-expanded", "false");
+        toggle.setAttribute("aria-label", "Open navigation");
         shell.setAttribute("aria-hidden", "true");
         document.body.classList.remove("overflow-hidden");
-        toggle.focus();
-        window.setTimeout(() => {
-            if (panel.classList.contains("translate-x-full")) {
-                shell.classList.add("hidden", "pointer-events-none");
-            }
-        }, 160);
+        if (restoreFocus) toggle.focus();
     };
 
     toggle.addEventListener("click", openNav);
     close.addEventListener("click", closeNav);
     backdrop.addEventListener("click", closeNav);
-    shell.querySelectorAll("a").forEach((link) => link.addEventListener("click", closeNav));
+    shell.querySelectorAll("a").forEach((link) => link.addEventListener("click", () => closeNav({restoreFocus: false})));
     document.addEventListener("keydown", (event) => {
         const navIsOpen = shell.getAttribute("aria-hidden") === "false";
         if (event.key === "Escape" && navIsOpen) {
@@ -74,5 +64,10 @@ document.body.addEventListener("showToast", (event) => {
             event.preventDefault();
             first.focus();
         }
+    });
+
+    const desktopMedia = window.matchMedia("(min-width: 1024px)");
+    desktopMedia.addEventListener("change", (event) => {
+        if (event.matches) closeNav({restoreFocus: false});
     });
 })();

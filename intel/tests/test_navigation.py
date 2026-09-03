@@ -1,7 +1,12 @@
+from pathlib import Path
+
 from django.contrib.auth import get_user_model
 from django.templatetags.static import static
 from django.test import TestCase
 from django.urls import reverse
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class NavigationTemplateTests(TestCase):
@@ -149,10 +154,31 @@ class NavigationTemplateTests(TestCase):
         response = self.client.get(reverse("about"))
 
         self.assertContains(response, 'aria-label="Open navigation"', html=False)
+        self.assertContains(response, 'aria-expanded="false"', html=False)
         self.assertContains(response, 'aria-controls="mobile-nav-shell"', html=False)
+        self.assertContains(response, 'id="mobile-nav-shell" class="mobile-nav-shell" aria-hidden="true"', html=False)
+        self.assertContains(response, 'role="dialog"', html=False)
+        self.assertContains(response, 'aria-modal="true"', html=False)
         self.assertContains(response, 'aria-label="Close navigation"', count=2, html=False)
         self.assertContains(response, 'aria-label="Primary navigation"', count=2, html=False)
         self.assertContains(response, "Skip to content")
+
+    def test_mobile_topbar_identifies_current_section_and_page(self):
+        response = self.client.get(reverse("active"))
+
+        self.assertContains(response, 'class="app-mobile-brand__identity">BorealSec Intel</span>', html=False)
+        self.assertContains(response, 'class="app-mobile-brand__context"', html=False)
+        self.assertContains(response, "Threats")
+        self.assertContains(response, "Active Exploitation")
+
+    def test_mobile_drawer_script_supports_keyboard_and_scroll_lock(self):
+        script = (REPO_ROOT / "static" / "js" / "app-shell.js").read_text(encoding="utf-8")
+        stylesheet = (REPO_ROOT / "static" / "css" / "input.css").read_text(encoding="utf-8")
+
+        self.assertIn('event.key === "Escape"', script)
+        self.assertIn('toggle.setAttribute("aria-expanded", "true")', script)
+        self.assertIn('document.body.classList.add("overflow-hidden")', script)
+        self.assertIn('mobile-nav-shell[aria-hidden="false"]', stylesheet)
 
     def test_now_page_briefing_does_not_duplicate_global_navigation(self):
         response = self.client.get(reverse("now"))
@@ -226,6 +252,7 @@ class PageOrientationTests(TestCase):
             "research",
             "sweden",
             "ransomware-map",
+            "threat-news",
             "feed-health",
             "sources",
             "about",
