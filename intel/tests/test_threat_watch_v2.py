@@ -278,6 +278,21 @@ class ThreatWatchV2Tests(TestCase):
         self.assertIn("map.resize()", script)
         self.assertIn("textContent", script)
 
+    def test_map_height_uses_compact_responsive_progression(self):
+        stylesheet = (
+            REPO_ROOT / "static" / "intel" / "css" / "threat-watch.css"
+        ).read_text(encoding="utf-8")
+
+        for expected in (
+            ".threat-watch-map-view {\n    width: 100%;\n    height: 18rem;",
+            "@media (min-width: 640px) {\n    .threat-watch-map-view { height: 20rem; }",
+            "@media (min-width: 768px) {\n    .threat-watch-map-view { height: 26rem; }",
+            "@media (min-width: 1024px) {\n    .threat-watch-map-view { height: 34rem; }",
+            "@media (min-width: 1280px) {\n    .threat-watch-map-view { height: 42rem; }",
+        ):
+            self.assertIn(expected, stylesheet)
+        self.assertNotIn("@media (max-width: 420px)", stylesheet)
+
     def test_bundled_geometry_contains_representative_canonical_ids(self):
         geometry = json.loads(
             (REPO_ROOT / "static" / "intel" / "maps" / "world-countries-110m.geojson").read_text(

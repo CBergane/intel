@@ -2,6 +2,30 @@
     outline: none;
 }
 
+#ransomware-map-view {
+    height: 18rem;
+}
+
+@media (min-width: 640px) {
+    #ransomware-map-view { height: 20rem; }
+}
+
+@media (min-width: 768px) {
+    #ransomware-map-view { height: 26rem; }
+}
+
+@media (min-width: 1024px) {
+    #ransomware-map-view { height: 38rem; }
+}
+
+@media (min-width: 1280px) {
+    #ransomware-map-view { height: 44rem; }
+}
+
+@media (min-width: 1536px) {
+    #ransomware-map-view { height: 48rem; }
+}
+
 #ransomware-map-view .maplibregl-ctrl-group,
 #ransomware-map-view .maplibregl-ctrl.maplibregl-ctrl-attrib {
     border: 1px solid rgba(51, 65, 85, 0.82);

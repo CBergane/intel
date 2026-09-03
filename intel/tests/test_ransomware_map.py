@@ -129,6 +129,27 @@ class RansomwareMapViewTests(TestCase):
         self.assertContains(response, "Nordic Mills")
         self.assertNotContains(response, "General bulletin")
 
+    def test_map_height_uses_compact_responsive_progression(self):
+        repository_root = Path(settings.BASE_DIR)
+        stylesheet = (
+            repository_root / "static/intel/css/ransomware-map.css"
+        ).read_text(encoding="utf-8")
+        template = (
+            repository_root / "templates/intel/ransomware_map.html"
+        ).read_text(encoding="utf-8")
+
+        for expected in (
+            "#ransomware-map-view {\n    height: 18rem;",
+            "@media (min-width: 640px) {\n    #ransomware-map-view { height: 20rem; }",
+            "@media (min-width: 768px) {\n    #ransomware-map-view { height: 26rem; }",
+            "@media (min-width: 1024px) {\n    #ransomware-map-view { height: 38rem; }",
+            "@media (min-width: 1280px) {\n    #ransomware-map-view { height: 44rem; }",
+            "@media (min-width: 1536px) {\n    #ransomware-map-view { height: 48rem; }",
+        ):
+            self.assertIn(expected, stylesheet)
+        self.assertIn("ransomware-map-technical-badges hidden", template)
+        self.assertNotIn('class="h-[24rem]', template)
+
     def test_map_runtime_configuration_has_no_external_map_infrastructure(self):
         response = self.client.get(RANSOMWARE_MAP_URL)
         rendered = response.content.decode()
