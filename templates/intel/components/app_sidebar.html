@@ -1,3 +1,4 @@
+{% load static %}
 <aside
     class="app-sidebar"
     aria-label="Application sidebar"
@@ -5,11 +6,13 @@
 >
     <div>
         <a href="{% url 'now' %}" class="app-brand">
-            <span class="app-brand__mark" aria-hidden="true"></span>
-            <span class="min-w-0">
-                <span class="app-brand__title">BorealSec Intel</span>
-                <span class="app-brand__subtitle">Nordic Intelligence Console</span>
-            </span>
+            <img
+                src="{% static 'brand/borealsec-intel-logo-clean-web.png' %}"
+                class="app-brand__logo"
+                width="460"
+                height="110"
+                alt="BorealSec Intel"
+            >
         </a>
     </div>
 

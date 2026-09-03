@@ -5,6 +5,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}BorealSec Intel{% endblock %}</title>
+    <link rel="icon" href="{% static 'brand/favicon.ico' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'brand/favicon-32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'brand/favicon-16.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'brand/apple-touch-icon.png' %}">
     <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
     {% block extra_head %}{% endblock %}
     <script src="{% static 'vendor/htmx/htmx.min.js' %}" defer></script>
@@ -18,7 +22,14 @@
         <header class="app-topbar">
             <div class="app-topbar__inner">
                 <a href="{% url 'now' %}" class="app-mobile-brand">
-                    <span class="app-mobile-brand__mark" aria-hidden="true"></span>
+                    <img
+                        src="{% static 'brand/apple-touch-icon.png' %}"
+                        class="app-mobile-brand__mark"
+                        width="180"
+                        height="180"
+                        alt=""
+                        aria-hidden="true"
+                    >
                     <span class="min-w-0">
                         <span class="app-mobile-brand__identity">BorealSec Intel</span>
                         <span class="app-mobile-brand__context">

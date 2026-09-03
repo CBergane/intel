@@ -17,6 +17,31 @@ class NavigationTemplateTests(TestCase):
         self.assertContains(response, f'src="{static("js/app-shell.js")}"', html=False)
         self.assertNotContains(response, "cdn.tailwindcss.com")
 
+    def test_shell_uses_production_branding_and_favicons(self):
+        response = self.client.get(reverse("about"))
+
+        self.assertContains(
+            response,
+            f'src="{static("brand/borealsec-intel-logo-clean-web.png")}"',
+            count=1,
+            html=False,
+        )
+        self.assertContains(response, 'class="app-brand__logo"', count=1, html=False)
+        self.assertContains(response, 'alt="BorealSec Intel"', count=1, html=False)
+        self.assertContains(
+            response,
+            f'src="{static("brand/apple-touch-icon.png")}"',
+            count=1,
+            html=False,
+        )
+        for asset in (
+            "brand/favicon.ico",
+            "brand/favicon-32.png",
+            "brand/favicon-16.png",
+            "brand/apple-touch-icon.png",
+        ):
+            self.assertContains(response, f'href="{static(asset)}"', count=1, html=False)
+
     def test_desktop_navigation_is_single_grouped_structure(self):
         response = self.client.get(reverse("about"))
         html = response.content.decode()
@@ -188,6 +213,29 @@ class NavigationTemplateTests(TestCase):
         self.assertEqual(html.count('data-primary-navigation="mobile"'), 1)
         self.assertEqual(html.count('data-dashboard-section="active"'), 1)
         self.assertNotIn('aria-label="Now page sections"', html)
+
+    def test_now_page_briefing_grid_keeps_one_section_per_named_area(self):
+        response = self.client.get(reverse("now"))
+        html = response.content.decode()
+
+        self.assertEqual(html.count('class="dashboard-briefing-grid"'), 1)
+        for area in ("active", "intelligence", "ransomware", "nordic"):
+            self.assertEqual(html.count(f"dashboard-area-{area}"), 1)
+            self.assertEqual(html.count(f'data-dashboard-section="{area}"'), 1)
+
+    def test_dashboard_named_grid_areas_are_scoped_to_desktop(self):
+        stylesheet = (REPO_ROOT / "static" / "css" / "input.css").read_text(
+            encoding="utf-8"
+        )
+        mobile_css, desktop_css = stylesheet.split(
+            "@media (min-width: 1024px)", maxsplit=1
+        )
+
+        self.assertIn("grid-template-areas:", desktop_css)
+        for area in ("active", "intelligence", "ransomware", "nordic"):
+            self.assertNotIn(f".dashboard-area-{area}", mobile_css)
+            self.assertIn(f".dashboard-area-{area}", desktop_css)
+            self.assertIn(f"grid-area: {area};", desktop_css)
 
 
 class PageOrientationTests(TestCase):
