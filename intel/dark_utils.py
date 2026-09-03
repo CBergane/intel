@@ -1,8 +1,11 @@
 import hashlib
 import html
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
+
+from intel.ransomware_countries import normalize_ransomware_country
 
 
 TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.IGNORECASE | re.DOTALL)
@@ -76,6 +79,11 @@ GROUP_BLOCK_HINTS = (
     "gang",
     "actor",
 )
+INCIDENT_BLOCK_HINTS = (
+    "incident-card",
+    "live-feed-item",
+    "glass-card",
+)
 MAX_STRUCTURED_RECORD_TEXT = 2800
 STRUCTURED_CONTENT_HINT_RE = re.compile(
     r"(?i)\b("
@@ -105,6 +113,12 @@ COUNTRY_LABELS = (
     "location",
     "headquarters",
     "hq",
+)
+INCIDENT_COUNTRY_LABELS = (
+    "country",
+    "victim country",
+    "country / region",
+    "country/region",
 )
 INDUSTRY_LABELS = ("industry", "sector")
 VICTIM_COUNT_LABELS = ("victim count", "victims", "listed victims")
@@ -157,71 +171,32 @@ INCIDENT_CARD_SIGNAL_RE = re.compile(
     r"victim"
     r")\b"
 )
-COUNTRY_VALUE_SPLIT_RE = re.compile(r"\s*(?:/|\||;)\s*")
-COUNTRY_NORMALIZATION_RULES = (
-    ("United States", "US", ("united states", "united states of america", "us", "usa", "u.s.", "u.s.a.", "america")),
-    ("United Kingdom", "GB", ("united kingdom", "uk", "u.k.", "great britain", "britain", "england")),
-    ("Canada", "CA", ("canada", "ca")),
-    ("Mexico", "MX", ("mexico", "mx")),
-    ("Brazil", "BR", ("brazil", "br", "brasil")),
-    ("Argentina", "AR", ("argentina", "ar")),
-    ("Iceland", "IS", ("iceland", "is", "island")),
-    ("Ireland", "IE", ("ireland", "ie")),
-    ("Portugal", "PT", ("portugal", "pt")),
-    ("Spain", "ES", ("spain", "es", "espana", "españa")),
-    ("France", "FR", ("france", "fr")),
-    ("Belgium", "BE", ("belgium", "be")),
-    ("Netherlands", "NL", ("netherlands", "nl", "holland")),
-    ("Switzerland", "CH", ("switzerland", "ch")),
-    ("Germany", "DE", ("germany", "de", "deutschland")),
-    ("Denmark", "DK", ("denmark", "dk", "danmark")),
-    ("Norway", "NO", ("norway", "no", "norge")),
-    ("Sweden", "SE", ("sweden", "se", "sverige")),
-    ("Finland", "FI", ("finland", "fi", "suomi")),
-    ("Estonia", "EE", ("estonia", "ee")),
-    ("Latvia", "LV", ("latvia", "lv")),
-    ("Lithuania", "LT", ("lithuania", "lt")),
-    ("Poland", "PL", ("poland", "pl")),
-    ("Czechia", "CZ", ("czechia", "cz", "czech republic")),
-    ("Austria", "AT", ("austria", "at")),
-    ("Italy", "IT", ("italy", "it")),
-    ("Romania", "RO", ("romania", "ro")),
-    ("Ukraine", "UA", ("ukraine", "ua")),
-    ("Greece", "GR", ("greece", "gr")),
-    ("Turkey", "TR", ("turkey", "tr", "turkiye", "türkiye")),
-    ("Israel", "IL", ("israel", "il")),
-    ("Saudi Arabia", "SA", ("saudi arabia", "sa")),
-    ("United Arab Emirates", "AE", ("united arab emirates", "uae", "u.a.e.", "ae")),
-    ("South Africa", "ZA", ("south africa", "za")),
-    ("India", "IN", ("india", "in")),
-    ("China", "CN", ("china", "cn")),
-    ("South Korea", "KR", ("south korea", "korea, republic of", "republic of korea", "kr")),
-    ("Japan", "JP", ("japan", "jp")),
-    ("Australia", "AU", ("australia", "au")),
-    ("New Zealand", "NZ", ("new zealand", "nz")),
+COUNTRY_ATTRIBUTE_NAMES = (
+    "data-country",
+    "data-country-code",
+    "data-country-iso",
+    "data-country-alpha2",
+    "data-country-alpha3",
 )
-COUNTRY_PLACEHOLDER_VALUES = {
-    "",
-    "-",
-    "--",
-    "n/a",
-    "na",
-    "none",
-    "unknown",
-    "global",
-    "worldwide",
-    "multiple",
-    "various",
-    "international",
+COUNTRY_FIELD_ATTRIBUTE_NAMES = ("data-field", "data-label", "itemprop")
+COUNTRY_VALUE_ATTRIBUTE_NAMES = ("data-value", "data-code", "data-iso", "content")
+VOID_HTML_TAGS = {
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
 }
-COUNTRY_ALIAS_TO_DISPLAY = {
-    alias: display
-    for display, _code, aliases in COUNTRY_NORMALIZATION_RULES
-    for alias in aliases
-}
-COUNTRY_DISPLAY_TO_CODE = {
-    display: code for display, code, _aliases in COUNTRY_NORMALIZATION_RULES
-}
+MAX_COUNTRY_MARKUP_NODES = 4096
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,6 +210,10 @@ class ExtractedRecord:
     group_name: str = ""
     victim_name: str = ""
     country: str = ""
+    country_value: str = ""
+    country_name: str = ""
+    country_code: str = ""
+    country_provenance: str = ""
     industry: str = ""
     website_url: str = ""
     victim_count: int | None = None
@@ -246,6 +225,67 @@ class WatchMatchResult:
     keywords: list[str]
     regex: list[str]
     fields: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class CountryEvidence:
+    source_value: str = ""
+    canonical_name: str = ""
+    country_id: str = ""
+    provenance: str = ""
+
+    @property
+    def recognized(self) -> bool:
+        return bool(self.country_id)
+
+
+@dataclass(slots=True)
+class _MarkupNode:
+    tag: str
+    attrs: dict[str, str]
+    parent: "_MarkupNode | None" = None
+    content: list[object] = field(default_factory=list)
+
+
+class _CountryMarkupParser(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.root = _MarkupNode(tag="document", attrs={})
+        self.stack = [self.root]
+        self.node_count = 0
+
+    def handle_starttag(self, tag, attrs):
+        self._append_node(tag, attrs, push=tag.lower() not in VOID_HTML_TAGS)
+
+    def handle_startendtag(self, tag, attrs):
+        self._append_node(tag, attrs, push=False)
+
+    def handle_endtag(self, tag):
+        lowered = tag.lower()
+        for index in range(len(self.stack) - 1, 0, -1):
+            if self.stack[index].tag == lowered:
+                del self.stack[index:]
+                return
+
+    def handle_data(self, data):
+        if self.node_count <= MAX_COUNTRY_MARKUP_NODES:
+            self.stack[-1].content.append(data)
+
+    def _append_node(self, tag, attrs, *, push):
+        if self.node_count >= MAX_COUNTRY_MARKUP_NODES:
+            return
+        self.node_count += 1
+        normalized_attrs = {
+            str(name or "").lower(): str(value or "") for name, value in attrs
+        }
+        node = _MarkupNode(
+            tag=tag.lower(),
+            attrs=normalized_attrs,
+            parent=self.stack[-1],
+        )
+        self.stack[-1].content.append(node)
+        if push:
+            self.stack.append(node)
 
 
 def _strip_markup_noise(markup: str) -> str:
@@ -555,40 +595,186 @@ def _clean_structured_text(value: str, *, max_length: int = 255) -> str:
     return cleaned[:max_length].strip()
 
 
-def _country_display_fallback(value: str) -> str:
-    cleaned = _clean_structured_text(value, max_length=120)
-    if not cleaned:
-        return ""
-    if cleaned.islower():
-        return cleaned.title()
-    return cleaned
-
-
 def normalize_dark_country(value: str) -> tuple[str, str]:
-    cleaned = _clean_structured_text(value, max_length=120)
-    if not cleaned:
-        return "", ""
+    identity = normalize_ransomware_country(value)
+    return identity.display_name, identity.iso_alpha2
 
-    candidates = [cleaned]
-    for part in COUNTRY_VALUE_SPLIT_RE.split(cleaned):
-        part = _clean_structured_text(part, max_length=120)
-        if part and part not in candidates:
-            candidates.append(part)
 
-    for candidate in candidates:
-        lowered = normalize_text(candidate).lower().replace("&", "and").strip(" .:-")
-        if lowered in COUNTRY_PLACEHOLDER_VALUES:
+def _country_evidence(value: str, *, provenance: str) -> CountryEvidence:
+    source_value = _clean_structured_text(value, max_length=120)
+    identity = normalize_ransomware_country(source_value)
+    return CountryEvidence(
+        source_value=source_value,
+        canonical_name=identity.display_name if identity.recognized else "",
+        country_id=identity.country_id,
+        provenance=provenance,
+    )
+
+
+def _iter_markup_nodes(root: _MarkupNode) -> list[_MarkupNode]:
+    nodes = []
+    stack = [item for item in reversed(root.content) if isinstance(item, _MarkupNode)]
+    while stack:
+        node = stack.pop()
+        nodes.append(node)
+        stack.extend(
+            item for item in reversed(node.content) if isinstance(item, _MarkupNode)
+        )
+    return nodes
+
+
+def _markup_node_text(node: _MarkupNode) -> str:
+    parts = []
+    stack = list(reversed(node.content))
+    while stack:
+        item = stack.pop()
+        if isinstance(item, _MarkupNode):
+            stack.extend(reversed(item.content))
+        else:
+            parts.append(str(item))
+    return _clean_structured_text(" ".join(parts), max_length=120)
+
+
+def _country_label_pattern() -> re.Pattern:
+    labels = "|".join(
+        re.escape(label)
+        for label in sorted(INCIDENT_COUNTRY_LABELS, key=len, reverse=True)
+    )
+    return re.compile(rf"^(?:{labels})\s*(?::|-|\|)\s*(.+)$", re.IGNORECASE)
+
+
+def _is_country_label(value: str) -> bool:
+    cleaned = normalize_text(value).lower().strip(" :|-.")
+    return cleaned in INCIDENT_COUNTRY_LABELS
+
+
+def _labeled_country_value(nodes: list[_MarkupNode]) -> str | None:
+    pattern = _country_label_pattern()
+    for node in nodes:
+        match = pattern.match(_markup_node_text(node))
+        if match:
+            return _clean_structured_text(match.group(1), max_length=120)
+
+    parents = []
+    seen_parent_ids = set()
+    for node in nodes:
+        if node.parent is None or id(node.parent) in seen_parent_ids:
             continue
-        display = COUNTRY_ALIAS_TO_DISPLAY.get(lowered)
-        if display:
-            return display, COUNTRY_DISPLAY_TO_CODE.get(display, "")
+        seen_parent_ids.add(id(node.parent))
+        parents.append(node.parent)
+    for parent in parents:
+        children = [item for item in parent.content if isinstance(item, _MarkupNode)]
+        for index, child in enumerate(children):
+            if not _is_country_label(_markup_node_text(child)):
+                continue
+            for sibling in children[index + 1 :]:
+                value = _markup_node_text(sibling)
+                if value:
+                    return value
+    return None
 
-    lowered_cleaned = normalize_text(cleaned).lower().replace("&", "and").strip(" .:-")
-    if lowered_cleaned in COUNTRY_PLACEHOLDER_VALUES:
-        return "", ""
 
-    fallback = _country_display_fallback(cleaned)
-    return fallback, COUNTRY_DISPLAY_TO_CODE.get(fallback, "")
+def _data_attribute_country_value(nodes: list[_MarkupNode]) -> str | None:
+    for node in nodes:
+        for attribute_name in COUNTRY_ATTRIBUTE_NAMES:
+            if attribute_name in node.attrs:
+                return _clean_structured_text(
+                    node.attrs[attribute_name], max_length=120
+                )
+
+        identifies_country = False
+        for attribute_name in COUNTRY_FIELD_ATTRIBUTE_NAMES:
+            attribute_value = node.attrs.get(attribute_name, "")
+            if attribute_name == "itemprop":
+                identifies_country = attribute_value.lower() == "addresscountry"
+            else:
+                identifies_country = _is_country_label(attribute_value)
+            if identifies_country:
+                break
+        if not identifies_country:
+            continue
+
+        for value_attribute in COUNTRY_VALUE_ATTRIBUTE_NAMES:
+            if node.attrs.get(value_attribute):
+                return _clean_structured_text(
+                    node.attrs[value_attribute], max_length=120
+                )
+        value = _markup_node_text(node)
+        if value and not _is_country_label(value):
+            return value
+    return None
+
+
+def _has_country_or_flag_semantics(node: _MarkupNode) -> bool:
+    for attribute_name in (
+        "class",
+        "id",
+        "role",
+        "data-field",
+        "data-label",
+        "data-role",
+        "data-type",
+    ):
+        value = node.attrs.get(attribute_name, "").lower()
+        if re.search(r"(?:^|[-_\s])(?:country|flag)(?:$|[-_\s])", value):
+            return True
+    return False
+
+
+def _flag_has_country_context(node: _MarkupNode) -> bool:
+    src = node.attrs.get("src", "").lower().replace("\\", "/")
+    if "/flags/" in src or "/flag/" in src:
+        return True
+    current = node
+    for _depth in range(3):
+        if _has_country_or_flag_semantics(current):
+            return True
+        if current.parent is None:
+            break
+        current = current.parent
+    if node.parent is not None:
+        return any(
+            _is_country_label(_markup_node_text(sibling))
+            for sibling in node.parent.content
+            if isinstance(sibling, _MarkupNode) and sibling is not node
+        )
+    return False
+
+
+def _flag_country_value(nodes: list[_MarkupNode]) -> str | None:
+    for node in nodes:
+        if node.tag != "img" or not _flag_has_country_context(node):
+            continue
+        for attribute_name in ("alt", "title"):
+            value = _clean_structured_text(
+                node.attrs.get(attribute_name, ""), max_length=120
+            )
+            if re.fullmatch(r"[A-Za-z]{2,3}", value):
+                return value
+    return None
+
+
+def extract_incident_country(fragment: str) -> CountryEvidence:
+    parser = _CountryMarkupParser()
+    try:
+        parser.feed(fragment or "")
+        parser.close()
+    except (ValueError, AssertionError):
+        return CountryEvidence()
+    nodes = _iter_markup_nodes(parser.root)
+
+    labeled_value = _labeled_country_value(nodes)
+    if labeled_value is not None:
+        return _country_evidence(labeled_value, provenance="labeled_text")
+
+    attribute_value = _data_attribute_country_value(nodes)
+    if attribute_value is not None:
+        return _country_evidence(attribute_value, provenance="data_attribute")
+
+    flag_value = _flag_country_value(nodes)
+    if flag_value is not None:
+        return _country_evidence(flag_value, provenance="flag_image")
+    return CountryEvidence()
 
 
 def resolve_group_name(
@@ -741,14 +927,31 @@ def _structured_metadata_for_profile(
     profile: str,
     base_url: str,
 ) -> dict:
-    country_name, _country_code = normalize_dark_country(
-        _extract_labeled_line_value(lines, COUNTRY_LABELS, max_length=120)
-    )
+    if profile == "incident_cards":
+        country_evidence = extract_incident_country(fragment)
+        accepted_country = (
+            country_evidence.canonical_name if country_evidence.recognized else ""
+        )
+    else:
+        labeled_country = _extract_labeled_line_value(
+            lines, COUNTRY_LABELS, max_length=120
+        )
+        country_evidence = _country_evidence(
+            labeled_country,
+            provenance="labeled_text",
+        )
+        accepted_country = normalize_dark_country(labeled_country)[0]
     metadata = {
         "record_type": "",
         "group_name": "",
         "victim_name": "",
-        "country": country_name,
+        "country": accepted_country,
+        "country_value": country_evidence.source_value,
+        "country_name": country_evidence.canonical_name,
+        "country_code": country_evidence.country_id,
+        "country_provenance": (
+            country_evidence.provenance if country_evidence.recognized else ""
+        ),
         "industry": _extract_labeled_line_value(lines, INDUSTRY_LABELS, max_length=120),
         "website_url": _extract_website_url(fragment, lines, base_url=base_url),
         "victim_count": None,
@@ -910,6 +1113,10 @@ def _build_record(fragment: str, *, base_url: str, profile: str = "") -> Extract
         group_name=metadata["group_name"],
         victim_name=metadata["victim_name"],
         country=metadata["country"],
+        country_value=metadata["country_value"],
+        country_name=metadata["country_name"],
+        country_code=metadata["country_code"],
+        country_provenance=metadata["country_provenance"],
         industry=metadata["industry"],
         website_url=metadata["website_url"],
         victim_count=metadata["victim_count"],
@@ -1010,6 +1217,25 @@ def _extract_card_records(
 
 def _extract_incident_records(markup: str, *, base_url: str) -> list[ExtractedRecord]:
     cleaned = _strip_markup_noise(markup or "")
+    card_records = _extract_card_records(
+        cleaned,
+        base_url=base_url,
+        hints=INCIDENT_BLOCK_HINTS,
+        profile="incident_cards",
+    )
+    for match in OPEN_BLOCK_RE.finditer(cleaned):
+        if match.group("tag").lower() != "article":
+            continue
+        fragment = _extract_balanced_block(cleaned, match)
+        record = _build_record(
+            fragment, base_url=base_url, profile="incident_cards"
+        )
+        if record is not None:
+            card_records.append(record)
+    card_records = _dedupe_records(card_records)
+    if card_records:
+        return card_records
+
     heading_matches = list(INCIDENT_HEADING_RE.finditer(cleaned))
     if not heading_matches:
         return []
@@ -1067,6 +1293,10 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
                 "group_name": "",
                 "victim_name": "",
                 "country": "",
+                "country_value": "",
+                "country_name": "",
+                "country_code": "",
+                "country_provenance": "",
                 "industry": "",
                 "website_url": "",
                 "victim_count": None,
@@ -1082,7 +1312,15 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
                 elif any(token in header for token in ("victim", "company", "organization")):
                     metadata["victim_name"] = _clean_structured_text(cell)
                 elif any(token in header for token in ("country", "location")):
+                    country_evidence = _country_evidence(
+                        cell, provenance="table_column"
+                    )
                     metadata["country"] = normalize_dark_country(cell)[0]
+                    metadata["country_value"] = country_evidence.source_value
+                    if country_evidence.recognized:
+                        metadata["country_name"] = country_evidence.canonical_name
+                        metadata["country_code"] = country_evidence.country_id
+                        metadata["country_provenance"] = country_evidence.provenance
                 elif any(token in header for token in ("industry", "sector")):
                     metadata["industry"] = _clean_structured_text(cell, max_length=120)
                 elif "website" in header or "domain" in header:
@@ -1117,6 +1355,10 @@ def _extract_table_records(markup: str, *, base_url: str) -> list[ExtractedRecor
                     group_name=metadata["group_name"],
                     victim_name=metadata["victim_name"],
                     country=metadata["country"],
+                    country_value=metadata["country_value"],
+                    country_name=metadata["country_name"],
+                    country_code=metadata["country_code"],
+                    country_provenance=metadata["country_provenance"],
                     industry=metadata["industry"],
                     website_url=metadata["website_url"],
                     victim_count=metadata["victim_count"],

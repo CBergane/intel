@@ -4,11 +4,15 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import Client, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from intel.dark_utils import extract_links
+from intel.dark_utils import (
+    extract_links,
+    extract_profile_records,
+    normalize_dark_country,
+)
 from intel.notifications import (
     build_dark_hit_alert_fingerprint,
     build_dark_hit_alert_identity,
@@ -43,6 +47,206 @@ class DarkSourceModelTests(TestCase):
             source.extractor_profile,
             DarkSource.ExtractorProfile.GENERIC_PAGE,
         )
+
+
+class RansomDbCountryExtractionTests(SimpleTestCase):
+    def _extract_record(self, country_markup: str):
+        markup = f"""
+        <article class="incident-card">
+            <h3>Example Victim</h3>
+            <p>Threat Group: Example Group</p>
+            {country_markup}
+            <p>Victim disclosure posted with extortion details.</p>
+        </article>
+        """
+        records = extract_profile_records(
+            markup,
+            profile="incident_cards",
+            base_url="https://www.ransom-db.com/live-updates",
+        )
+        self.assertEqual(len(records), 1)
+        return records[0]
+
+    def assertCountryEvidence(
+        self,
+        record,
+        *,
+        source_value: str,
+        canonical_name: str,
+        country_code: str,
+        provenance: str,
+    ):
+        self.assertEqual(record.country, canonical_name)
+        self.assertEqual(record.country_value, source_value)
+        self.assertEqual(record.country_name, canonical_name)
+        self.assertEqual(record.country_code, country_code)
+        self.assertEqual(record.country_provenance, provenance)
+
+    def test_same_line_country_label_is_extracted_and_validated(self):
+        record = self._extract_record("<p>Country: Sweden</p>")
+
+        self.assertCountryEvidence(
+            record,
+            source_value="Sweden",
+            canonical_name="Sweden",
+            country_code="SWE",
+            provenance="labeled_text",
+        )
+
+    def test_adjacent_block_country_label_and_value_are_extracted(self):
+        record = self._extract_record(
+            """
+            <div class="country-field">
+                <div>Country</div>
+                <div>Sweden</div>
+            </div>
+            """
+        )
+
+        self.assertCountryEvidence(
+            record,
+            source_value="Sweden",
+            canonical_name="Sweden",
+            country_code="SWE",
+            provenance="labeled_text",
+        )
+
+    def test_current_ransomdb_split_span_schema_prefers_explicit_value(self):
+        markup = """
+        <div class="glass-card p-6">
+            <div class="flex items-center gap-3">
+                <img src="/assets/images/flags/us.png" alt="US" />
+                <h3>Example Victim</h3>
+            </div>
+            <div class="flex items-center gap-2">
+                <span>Threat Group:</span><span>Example Group</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span>Country:</span><span>United States</span>
+            </div>
+            <p>Victim disclosure posted with extortion details.</p>
+        </div>
+        """
+
+        records = extract_profile_records(markup, profile="incident_cards")
+
+        self.assertEqual(len(records), 1)
+        self.assertIn("/assets/images/flags/us.png", records[0].raw)
+        self.assertCountryEvidence(
+            records[0],
+            source_value="United States",
+            canonical_name="United States",
+            country_code="USA",
+            provenance="labeled_text",
+        )
+
+    def test_iso2_flag_in_country_context_is_extracted(self):
+        record = self._extract_record(
+            '<img src="/assets/images/flags/se.png" alt="SE" />'
+        )
+
+        self.assertCountryEvidence(
+            record,
+            source_value="SE",
+            canonical_name="Sweden",
+            country_code="SWE",
+            provenance="flag_image",
+        )
+
+    def test_iso3_flag_in_country_context_is_extracted(self):
+        record = self._extract_record(
+            '<img class="country-flag" src="/images/swe.png" title="SWE" />'
+        )
+
+        self.assertCountryEvidence(
+            record,
+            source_value="SWE",
+            canonical_name="Sweden",
+            country_code="SWE",
+            provenance="flag_image",
+        )
+
+    def test_country_data_attribute_is_extracted(self):
+        record = self._extract_record('<div data-country-code="GBR"></div>')
+
+        self.assertCountryEvidence(
+            record,
+            source_value="GBR",
+            canonical_name="United Kingdom",
+            country_code="GBR",
+            provenance="data_attribute",
+        )
+
+    def test_flag_image_outside_country_context_is_not_extracted(self):
+        record = self._extract_record(
+            '<img class="company-logo" src="/assets/logos/us.png" alt="US" />'
+        )
+
+        self.assertCountryEvidence(
+            record,
+            source_value="",
+            canonical_name="",
+            country_code="",
+            provenance="",
+        )
+
+    def test_country_like_prose_does_not_become_country(self):
+        prose_samples = (
+            "Country Motors S.A. distributes vehicles across the region.",
+            "Country Honda announced a victim disclosure update.",
+            "A U.S. healthcare technology firm reported the incident.",
+            "Descriptive prose containing Country is not a labeled field.",
+            "The victim operates from Atlanta, GA and serves regional clients.",
+        )
+        for prose in prose_samples:
+            with self.subTest(prose=prose):
+                record = self._extract_record(f"<p>{prose}</p>")
+                self.assertEqual(record.country, "")
+                self.assertEqual(record.country_code, "")
+
+    def test_split_label_with_city_and_prose_is_rejected(self):
+        record = self._extract_record(
+            """
+            <div class="metadata-row">
+                <span>Country</span>
+                <span>Atlanta, GA; U.S. healthcare technology firm with recent disclosures.</span>
+            </div>
+            """
+        )
+
+        self.assertEqual(record.country, "")
+        self.assertEqual(record.country_code, "")
+
+    def test_unknown_and_missing_country_remain_blank(self):
+        unknown = self._extract_record("<p>Country: North Atlantis</p>")
+        self.assertEqual(unknown.country, "")
+        self.assertEqual(unknown.country_value, "North Atlantis")
+        self.assertEqual(unknown.country_name, "")
+        self.assertEqual(unknown.country_code, "")
+
+        missing = self._extract_record("")
+        self.assertEqual(missing.country, "")
+        self.assertEqual(missing.country_value, "")
+        self.assertEqual(missing.country_name, "")
+        self.assertEqual(missing.country_code, "")
+
+    def test_canonical_country_normalizer_accepts_iso2_iso3_and_names(self):
+        cases = {
+            "SE": ("Sweden", "SE"),
+            "SWE": ("Sweden", "SE"),
+            "Sweden": ("Sweden", "SE"),
+            "US": ("United States", "US"),
+            "USA": ("United States", "US"),
+            "United States": ("United States", "US"),
+            "GB": ("United Kingdom", "GB"),
+            "GBR": ("United Kingdom", "GB"),
+            "United Kingdom": ("United Kingdom", "GB"),
+            "Slovakia": ("Slovakia", "SK"),
+            "Thailand": ("Thailand", "TH"),
+        }
+        for value, expected in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(normalize_dark_country(value), expected)
 
 
 class DarkAdminSecurityTests(TestCase):
@@ -856,6 +1060,10 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(stockholm.victim_name, "Fruktimporten Stockholm")
         self.assertEqual(stockholm.group_name, "The_Gentelman")
         self.assertEqual(stockholm.country, "Sweden")
+        self.assertEqual(
+            normalize_dark_country(stockholm.country),
+            ("Sweden", "SE"),
+        )
         self.assertEqual(stockholm.industry, "Wholesale of fruit and vegetables")
         self.assertEqual(stockholm.website_url, "https://www.fruktimporten.se/")
         self.assertEqual(stockholm.url, self.source.url)
@@ -865,6 +1073,10 @@ class DarkIngestionTests(TestCase):
         self.assertEqual(living.victim_name, "Living in green, s. r. o.")
         self.assertEqual(living.group_name, "Qilin")
         self.assertEqual(living.country, "Czechia")
+        self.assertEqual(
+            normalize_dark_country(living.country),
+            ("Czechia", "CZ"),
+        )
         self.assertEqual(living.industry, "Home Improvement & Hardware Retail")
         self.assertEqual(living.website_url, "https://www.livingingreen.cz/")
 
