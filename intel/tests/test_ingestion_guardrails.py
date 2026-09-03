@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from email.utils import format_datetime
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
@@ -205,24 +206,27 @@ class IngestionGuardrailTests(TestCase):
         )
 
     def test_rss_ingest_parses_real_payload(self):
-        payload = b"""<?xml version="1.0"?>
+        now = timezone.now()
+        first_published_at = format_datetime(now - timedelta(hours=2))
+        second_published_at = format_datetime(now - timedelta(hours=1))
+        payload = f"""<?xml version="1.0"?>
         <rss version="2.0">
           <channel>
             <title>Example Feed</title>
             <item>
               <title>Alert One</title>
               <link>https://example.com/alert-one</link>
-              <pubDate>Sat, 07 Mar 2026 10:00:00 GMT</pubDate>
+              <pubDate>{first_published_at}</pubDate>
               <description>Alpha</description>
             </item>
             <item>
               <title>Alert Two</title>
               <link>https://example.com/alert-two</link>
-              <pubDate>Sat, 07 Mar 2026 11:00:00 GMT</pubDate>
+              <pubDate>{second_published_at}</pubDate>
               <description>Beta</description>
             </item>
           </channel>
-        </rss>"""
+        </rss>""".encode()
 
         with patch(
             "intel.management.commands.ingest_sources.Command._fetch_with_retries",
