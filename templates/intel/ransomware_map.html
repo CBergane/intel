@@ -63,16 +63,16 @@
         {% endif %}
     </div>
 
-    <div class="grid gap-4 xl:grid-cols-[minmax(14rem,0.58fr)_minmax(0,2.7fr)_minmax(15rem,0.74fr)] xl:items-start xl:gap-5 2xl:grid-cols-[minmax(15rem,0.62fr)_minmax(0,2.95fr)_minmax(16rem,0.76fr)]">
-        <aside class="order-2 space-y-4 xl:order-1 xl:sticky xl:top-32" aria-labelledby="latest-victims-heading">
-            <div class="rounded-2xl border border-line bg-panel/70 p-3.5 shadow-glow xl:p-4">
-                <div class="flex items-start justify-between gap-3">
-                    <div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Latest Victims</p><h2 id="latest-victims-heading" class="mt-2 text-base font-semibold text-white xl:text-lg">Recent ransomware incidents</h2></div>
-                    <span id="ransomware-latest-victims-count" class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ latest_victims|length }} shown</span>
+    <div class="grid w-full min-w-0 max-w-full gap-4 xl:grid-cols-[minmax(14rem,0.58fr)_minmax(0,2.7fr)_minmax(15rem,0.74fr)] xl:items-start xl:gap-5 2xl:grid-cols-[minmax(15rem,0.62fr)_minmax(0,2.95fr)_minmax(16rem,0.76fr)]">
+        <aside class="order-2 min-w-0 max-w-full space-y-4 xl:order-1 xl:sticky xl:top-32" aria-labelledby="latest-victims-heading">
+            <div class="min-w-0 max-w-full overflow-hidden rounded-2xl border border-line bg-panel/70 p-3.5 shadow-glow xl:p-4">
+                <div class="flex min-w-0 items-start justify-between gap-3">
+                    <div class="min-w-0"><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Latest Victims</p><h2 id="latest-victims-heading" class="mt-2 text-base font-semibold text-white xl:text-lg">Recent ransomware incidents</h2></div>
+                    <span id="ransomware-latest-victims-count" class="shrink-0 rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ latest_victims|length }} shown</span>
                 </div>
                 <div class="mt-3 space-y-2.5" id="ransomware-latest-victims">
                     {% for record in latest_victims %}
-                        <article class="rounded-xl border border-line/80 bg-slate-950/40 p-2.5 xl:p-3">
+                        <article class="min-w-0 max-w-full overflow-hidden rounded-xl border border-line/80 bg-slate-950/40 p-2.5 xl:p-3">
                             <a href="{{ record.url }}" class="block truncate text-sm font-medium text-white transition hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70">{{ record.victim_name }}</a>
                             <p class="mt-1 text-[11px] text-slate-500"><time datetime="{{ record.activity_at|date:'c' }}">{{ record.activity_at|naturaltime }}</time></p>
                             <div class="mt-2.5 flex flex-wrap gap-1.5 text-[11px]">
@@ -88,8 +88,8 @@
             </div>
         </aside>
 
-        <div class="order-1 min-w-0 xl:order-2">
-            <div id="ransomware-map-shell" class="rounded-[1.95rem] border border-line bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.13),_transparent_38%),radial-gradient(circle_at_82%_18%,_rgba(244,63,94,0.12),_transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.985),rgba(2,6,23,0.995))] p-2 shadow-glow sm:p-2.5 xl:p-3">
+        <div class="order-1 w-full min-w-0 max-w-full xl:order-2">
+            <div id="ransomware-map-shell" class="w-full min-w-0 max-w-full overflow-hidden rounded-[1.95rem] border border-line bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.13),_transparent_38%),radial-gradient(circle_at_82%_18%,_rgba(244,63,94,0.12),_transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.985),rgba(2,6,23,0.995))] p-2 shadow-glow sm:p-2.5 xl:p-3">
                 <div class="border-b border-line/70 px-3 py-3 sm:px-4 xl:px-5">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Threat Surface</p><h2 class="mt-2 text-xl font-semibold text-white sm:text-[1.55rem] xl:text-[1.9rem]">Ransomware victim geography</h2></div>
@@ -97,17 +97,17 @@
                     </div>
                     <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Country polygons summarize victim geography from the current ransomware.live dataset. They do not imply attack origins, paths, or continuous geographic risk.</p>
                 </div>
-                <div class="ransomware-map-panel relative mt-2 overflow-hidden rounded-[1.65rem] border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.16),_transparent_46%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.99))]">
+                <div class="ransomware-map-panel relative mt-2 w-full min-w-0 max-w-full overflow-hidden rounded-[1.65rem] border border-line/80 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.16),_transparent_46%),linear-gradient(180deg,rgba(2,6,23,0.92),rgba(2,6,23,0.99))]">
                     <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(14,165,233,0.08),_transparent_52%),linear-gradient(180deg,rgba(6,12,24,0.14),rgba(2,6,23,0.2))]"></div>
                     <div class="relative flex flex-wrap items-center justify-between gap-2 border-b border-line/70 px-3 py-3 sm:px-4 xl:px-5">
                         <div class="ransomware-map-technical-badges hidden flex-wrap gap-2 text-[11px] sm:flex"><span class="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-100">Self-hosted MapLibre</span><span class="rounded-full border border-line/80 bg-slate-950/70 px-2.5 py-1 text-slate-300">Local Natural Earth 1:110m</span></div>
                         <span id="ransomware-plotted-countries-count" class="text-[11px] text-slate-400">{% if map_country_data %}{{ map_country_data|length }} mapped countries{% else %}Local world ready, waiting on recognized geography{% endif %}</span>
                     </div>
-                    <div class="ransomware-map-frame relative px-2 pb-2 pt-2 sm:px-3 sm:pb-3 xl:px-4 xl:pb-4">
+                    <div class="ransomware-map-frame relative w-full min-w-0 max-w-full overflow-hidden px-2 pb-2 pt-2 sm:px-3 sm:pb-3 xl:px-4 xl:pb-4">
                         {% if map_empty_state %}
                             <div class="pointer-events-none absolute inset-x-6 top-6 z-10 rounded-2xl border border-amber-500/25 bg-slate-950/86 p-4 backdrop-blur"><p class="text-[11px] uppercase tracking-[0.2em] text-amber-300">Geography Limited</p><h3 class="mt-2 text-lg font-semibold text-white">{{ map_empty_state.title }}</h3><p class="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{{ map_empty_state.message }}</p></div>
                         {% endif %}
-                        <div id="ransomware-map-view" data-style-url="{% static 'intel/maps/ransomware_map_style.json' %}" data-geography-url="{% static 'intel/maps/world-countries-110m.geojson' %}" class="w-full overflow-hidden rounded-[1.2rem]" role="img" aria-label="Interactive world map of ransomware victim counts by country"></div>
+                        <div id="ransomware-map-view" data-style-url="{% static 'intel/maps/ransomware_map_style.json' %}" data-geography-url="{% static 'intel/maps/world-countries-110m.geojson' %}" class="w-full min-w-0 max-w-full overflow-hidden rounded-[1.2rem]" role="img" aria-label="Interactive world map of ransomware victim counts by country"></div>
                         <div id="ransomware-map-fallback" class="absolute inset-x-6 bottom-6 hidden rounded-2xl border border-line/80 bg-slate-950/88 p-4 text-sm text-slate-300 backdrop-blur">Map surface unavailable. Use the country and incident panels to keep drilling down.</div>
                         <noscript><div class="mt-3 rounded-2xl border border-line/80 bg-slate-950/88 p-4 text-sm text-slate-300">JavaScript is required for the interactive map. All country, victim, and group links remain available.</div></noscript>
                     </div>
@@ -119,7 +119,7 @@
             </div>
         </div>
 
-        <aside class="order-3 space-y-4 xl:sticky xl:top-32">
+        <aside class="order-3 min-w-0 max-w-full space-y-4 xl:sticky xl:top-32">
             <div class="rounded-2xl border border-line bg-panel/72 p-3.5 shadow-glow xl:p-4" aria-labelledby="top-countries-heading">
                 <div class="flex items-start justify-between gap-3"><div><p class="text-[11px] uppercase tracking-[0.2em] text-slate-500">Top Countries</p><h2 id="top-countries-heading" class="mt-2 text-base font-semibold text-white xl:text-lg">Most affected countries</h2></div><span id="ransomware-top-countries-count" class="rounded-md border border-line/80 bg-slate-950/70 px-2.5 py-1 text-[11px] text-slate-300">{{ top_countries|length }} shown</span></div>
                 <div id="ransomware-top-countries" class="mt-3 space-y-2">

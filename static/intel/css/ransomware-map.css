@@ -33,6 +33,25 @@
     box-shadow: 0 14px 40px rgba(2, 6, 23, 0.38);
 }
 
+#ransomware-map-page,
+#ransomware-map-shell,
+.ransomware-map-panel,
+.ransomware-map-frame,
+#ransomware-map-view {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+#ransomware-map-view .maplibregl-canvas-container,
+#ransomware-map-view .maplibregl-canvas {
+    max-width: 100%;
+}
+
+#ransomware-map-view {
+    width: 100%;
+}
+
 #ransomware-map-view .maplibregl-ctrl button {
     background-color: transparent;
 }
