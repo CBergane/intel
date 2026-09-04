@@ -35,3 +35,11 @@ def error_response(
         status=status,
         headers=headers,
     )
+
+
+def invalid_request_response() -> JsonResponse:
+    return error_response(
+        status=400,
+        code="invalid_request",
+        message="Invalid request.",
+    )

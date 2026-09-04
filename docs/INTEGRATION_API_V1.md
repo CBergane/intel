@@ -30,7 +30,7 @@ curl \
   https://intel.borealsec.io/api/v1/health/
 ```
 
-## Current endpoint
+## Current endpoints
 
 `GET /api/v1/health/` returns a small integration-health response and performs no Intel application-data queries:
 
@@ -43,6 +43,36 @@ curl \
 ```
 
 The trailing slash is canonical. `/api/v1/health` returns a JSON 404 and is not redirected. Health is strictly GET-only; HEAD and unsafe methods return HTTP 405 with `Allow: GET`. Standard HTTP handling omits the response body for a HEAD request.
+
+### Signal snapshot
+
+`GET /api/v1/signals/` is an authenticated, bounded newest-first snapshot of publishable Intel signals. It reuses the explicit signal DTO below and never serializes Django models or raw upstream payloads.
+
+```sh
+curl \
+  -H "Authorization: Bearer ${INTEGRATION_API_TOKEN}" \
+  "https://intel.borealsec.io/api/v1/signals/?limit=50"
+```
+
+The response envelope is:
+
+```json
+{
+  "api_version": "1",
+  "classified_at": "2026-09-04T08:00:00Z",
+  "results": [],
+  "next_cursor": null,
+  "has_more": false
+}
+```
+
+The default page size is 50 and the hard maximum is 100. Larger positive limits are clamped to 100; zero, negative, blank, or malformed limits return the generic JSON `invalid_request` error. No semantic or category filters are implemented. Unsupported query parameters are rejected rather than silently ignored.
+
+Results use deterministic `(published_at DESC, internal Item id DESC)` ordering. The internal primary key is only a tie-breaker and is never the public signal identity. Pagination fetches at most `limit + 1` rows and returns an opaque, URL-safe, signed, internally versioned `next_cursor` when another page exists. Clients must return that cursor unchanged.
+
+The signal pagination cursor is a snapshot/list position only. It is separate from, and cannot be used as, the future incremental changes cursor. `/api/v1/changes/` remains unimplemented.
+
+One `classified_at` value is captured at request start and passed to every signal DTO in the page, so all operational scores in one response share the same evaluation time.
 
 ## Response contract
 
@@ -64,11 +94,10 @@ The foundation defines JSON responses for HTTP 401 `unauthorized`, 404 `not_foun
 
 ## Foundation scope and future direction
 
-This slice exposes health only. It does not expose Intel items, sources, source health, ransomware, Nordic intelligence, Threat Watch, Dark/Tor records, configuration, or internal errors.
+The implemented API surface exposes health and the deliberately bounded publishable signal snapshot. It does not expose generic Intel model data, source health, dedicated ransomware or Nordic resources, Threat Watch, Dark/Tor records, configuration, or internal errors.
 
 Planned resources, not yet implemented, are:
 
-- `GET /api/v1/signals/`
 - `GET /api/v1/signals/{id}/`
 - `GET /api/v1/nordics/`
 - `GET /api/v1/ransomware/`
